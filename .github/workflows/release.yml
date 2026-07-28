@@ -92,6 +92,6 @@ jobs:
           tagName: v__VERSION__
           releaseName: 'AudioWave Studio v__VERSION__'
           releaseBody: 'Download AudioWave Studio installers below for Windows, macOS, and Linux.'
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
