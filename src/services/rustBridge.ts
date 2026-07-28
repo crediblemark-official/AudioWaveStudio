@@ -1,0 +1,205 @@
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+import { VisualizerConfig } from '../types/visualizer';
+
+export interface AudioMetadataRust {
+  duration: number;
+  sample_rate: number;
+  channels: number;
+}
+
+export interface AudioDecodeResult {
+  sample_rate: number;
+  channels: number;
+  duration: number;
+  samples: number[];
+}
+
+export interface SpectrumResultRust {
+  freq_data: number[];
+  time_data: number[];
+  bass_energy: number;
+}
+
+export interface RenderConfigRust {
+  style: string;
+  width: number;
+  height: number;
+  primary_color: [number, number, number, number];
+  secondary_color: [number, number, number, number];
+  accent_color: [number, number, number, number];
+  bg_color: [number, number, number, number];
+  bar_count: number;
+  sensitivity: number;
+  bass_multiplier: number;
+  show_particles: boolean;
+  title_text?: string;
+  artist_text?: string;
+}
+
+function hexToRgba(hex: string): [number, number, number, number] {
+  let c = hex.replace('#', '');
+  if (c.length === 3) {
+    c = c.split('').map((x) => x + x).join('');
+  }
+  const num = parseInt(c, 16);
+  if (isNaN(num)) return [0, 240, 255, 255];
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255, 255];
+}
+
+export function convertToRustConfig(config: VisualizerConfig, width = 1280, height = 720): RenderConfigRust {
+  return {
+    style: config.style,
+    width,
+    height,
+    primary_color: hexToRgba(config.theme.primaryColor),
+    secondary_color: hexToRgba(config.theme.secondaryColor),
+    accent_color: hexToRgba(config.theme.accentColor),
+    bg_color: hexToRgba(config.background.solidColor),
+    bar_count: config.reactivity.barCount,
+    sensitivity: config.reactivity.sensitivity,
+    bass_multiplier: config.reactivity.bassMultiplier,
+    show_particles: config.background.showParticles,
+    title_text: config.text.showTitle ? config.text.songTitle : undefined,
+    artist_text: config.text.showArtist ? config.text.artistName : undefined,
+  };
+}
+
+export class RustBridge {
+  public async decodeAudio(filePath: string): Promise<AudioMetadataRust> {
+    return await invoke<AudioMetadataRust>('decode_audio', { filePath });
+  }
+
+  public async decodeAudioPlayback(filePath: string): Promise<AudioDecodeResult> {
+    return await invoke<AudioDecodeResult>('decode_audio_playback', { filePath });
+  }
+
+  public async readFileBytes(path: string): Promise<Uint8Array> {
+    const bytes = await invoke<number[]>('read_file_bytes', { path });
+    return new Uint8Array(bytes);
+  }
+
+  public async copyFileToPath(source: string, destination: string): Promise<void> {
+    await invoke('copy_file_to_path', { source, destination });
+  }
+
+  public async computeSpectrum(
+    timeSec: number,
+    barCount: number,
+    fftSize: number,
+    smoothing: number,
+    bassMultiplier: number,
+  ): Promise<SpectrumResultRust> {
+    return await invoke<SpectrumResultRust>('compute_spectrum_rust', {
+      timeSec,
+      barCount,
+      fftSize,
+      smoothing,
+      bassMultiplier,
+    });
+  }
+
+  public async renderFrame(config: VisualizerConfig, timeSec: number): Promise<Uint8Array> {
+    const rustConfig = convertToRustConfig(config);
+    const bytes = await invoke<number[]>('render_frame_rust', {
+      config: rustConfig,
+      timeSec,
+    });
+    return new Uint8Array(bytes);
+  }
+
+  public async checkFfmpeg(): Promise<boolean> {
+    return await invoke<boolean>('check_ffmpeg');
+  }
+
+  public async ffmpegDownloadUrl(): Promise<string> {
+    return await invoke<string>('ffmpeg_download_url');
+  }
+
+  public async saveUploadToTemp(bytes: Uint8Array, ext: string): Promise<string> {
+    return await invoke<string>('save_upload_to_temp', { bytes, ext });
+  }
+
+  public async startExportSession(
+    fps: number,
+    width: number,
+    height: number,
+    outputMp4Path: string,
+    audioFilePath: string,
+    includeAudio: boolean,
+  ): Promise<void> {
+    await invoke('start_export_session', {
+      fps,
+      width,
+      height,
+      outputMp4Path,
+      audioFilePath,
+      includeAudio,
+    });
+  }
+
+  public async writeFrame(jpegBytes: Uint8Array): Promise<void> {
+    await invoke('write_frame', { jpegBytes });
+  }
+
+  public async writeFrameRgba(width: number, height: number, rgbaData: Uint8Array): Promise<void> {
+    await invoke('write_frame_rgba', { width, height, rgbaData });
+  }
+
+  public async finishExportSession(): Promise<string> {
+    return await invoke<string>('finish_export_session');
+  }
+
+  public async convertWebmToMp4(
+    webmPath: string,
+    audioPath: string,
+    outputMp4Path: string,
+    includeAudio: boolean,
+  ): Promise<string> {
+    return await invoke<string>('convert_webm_to_mp4', {
+      webmPath,
+      audioPath,
+      outputMp4Path,
+      includeAudio,
+    });
+  }
+
+  public async exportMp4Native(
+    audioFilePath: string,
+    outputMp4Path: string,
+    config: VisualizerConfig,
+    fps: number,
+    width: number,
+    height: number,
+    includeAudio: boolean,
+    onProgress?: (progress: { percent: number; current_frame: number; total_frames: number; is_finished: boolean }) => void,
+  ): Promise<string> {
+    const rustConfig = convertToRustConfig(config, width, height);
+
+    let unlisten: (() => void) | null = null;
+    if (onProgress) {
+      unlisten = await listen<{
+        percent: number;
+        current_frame: number;
+        total_frames: number;
+        is_finished: boolean;
+      }>('export-progress', (event) => {
+        onProgress(event.payload);
+      });
+    }
+
+    try {
+      return await invoke<string>('export_mp4_native', {
+        audioFilePath,
+        outputMp4Path,
+        config: rustConfig,
+        fps,
+        includeAudio,
+      });
+    } finally {
+      if (unlisten) unlisten();
+    }
+  }
+}
+
+export const rustBridge = new RustBridge();
