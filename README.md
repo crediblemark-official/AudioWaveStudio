@@ -1,94 +1,65 @@
-# AudioWave Studio 🎵⚡
+# AudioWave Studio
 
-**AudioWave Studio** is a high-performance desktop audio visualizer application built with **Tauri v2**, **React 19**, **TypeScript**, and **Vite**. It enables creators, musicians, and video producers to render dynamic audio spectrum visualizations and export high-quality visualizer videos in real-time.
-
----
-
-## ✨ Features
-
-- 🎨 **Dynamic Audio Visualizer Renderers**
-  - Multiple visualizer styles: Waveform, Spectrum Bars, Circular Wave, Radial Spectrum, and Dynamic Particle systems.
-- 🎛️ **Extensive Customization Options**
-  - **Backgrounds**: Custom colors, smooth gradients, background images, and video loops.
-  - **Color Themes**: Customizable primary, secondary, and accent colors with glow effects.
-  - **Audio Reactivity**: Adjust sensitivity for Bass, Mid, and Treble frequency bands.
-  - **Typography & Text Overlays**: Add song titles, artist names, custom fonts, size, position, and shadows.
-  - **Presets System**: Save and quickly switch between custom visualization themes.
-- ⚡ **Native Performance with Rust & Tauri v2**
-  - Fast audio FFT analysis and GPU-accelerated canvas rendering.
-  - Low memory footprint compared to traditional Electron apps.
-- 🎬 **Video Export & Recording**
-  - Integrated recording studio for rendering visualizers to video formats (WebM/MP4) with custom framerate and bitrate settings.
-- 📁 **Native File System Integration**
-  - Drag & drop local audio files (MP3, WAV, FLAC, AAC, etc.) or select them via native OS file dialogs.
-- 🌓 **Modern Glassmorphic UI**
-  - Sleek, intuitive dark mode user interface designed for maximum productivity.
+**AudioWave Studio** is a high-performance desktop audio visualizer built with **Tauri v2**, **React 19**, **TypeScript**, and **Rust**. It renders dynamic beat-synced visualizations and exports high-quality visualizer videos in real-time.
 
 ---
 
-## 🛠️ Tech Stack
+## Features
 
-- **Frontend**: React 19, TypeScript, Vite, HTML5 Canvas API, Lucide React Icons
-- **Desktop Framework**: Tauri v2 (Rust)
-- **Audio Processing**: Web Audio API & Rust FFT analysis engine
-- **Video Exporting**: Web MediaRecorder API / Native FFmpeg integration
+- **Beat-Synced Visuals** — Screen effects (shake, glitch, chromatic aberration, vignette, pulse) trigger on percussive beats, not smooth energy
+- **Customizable Particles** — 8+ particle styles with beat-responsive bursts, size, and velocity
+- **Multiple Visualizers** — Waveform, Spectrum Bars, Circular Wave, Radial Spectrum, Particles, Music Notes
+- **Fullscreen Mode** — F11, double-click, or toggle button; hides chrome for distraction-free viewing
+- **Keyboard Shortcuts** — Space (play/pause), S (stop), arrows (seek/volume), M (mute)
+- **Custom Titlebar** — Hidden native decorations; drag via navbar with minimize/maximize/close buttons
+- **Video Export** — Render to MP4 (H.264) via FFmpeg with configurable FPS and bitrate
+- **Presets System** — Save and switch between themes
+- **Drag & Drop** — Load MP3, WAV, FLAC, AAC, and more via drag-drop or native file dialog
 
 ---
 
-## 🚀 Getting Started
+## Tech Stack
+
+- **Frontend**: React 19, TypeScript, Vite, HTML5 Canvas, Lucide React
+- **Desktop**: Tauri v2 (Rust)
+- **Audio**: Web Audio API + Rust FFT (symphonia, realfft)
+- **Graphics**: GPU-accelerated Canvas 2D via wgpu
+- **Export**: FFmpeg subprocess (system or bundled)
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-Ensure you have the following installed on your machine:
-- [Node.js](https://nodejs.org/) (v18 or higher)
-- [npm](https://www.npmjs.com/) or [pnpm](https://pnpm.io/)
-- [Rust & Cargo](https://www.rust-lang.org/tools/install)
-- [Tauri v2 Prerequisites](https://v2.tauri.app/start/prerequisites/) for your operating system (Linux / macOS / Windows)
+- [Node.js](https://nodejs.org/) 20+
+- [npm](https://www.npmjs.com/)
+- [Rust](https://www.rust-lang.org/tools/install) (latest stable)
+- [Tauri v2 system deps](https://v2.tauri.app/start/prerequisites/) for your OS
+- **Linux**: `ffmpeg` for video export (`sudo apt install ffmpeg`)
 
-### Installation
+### Install & Run
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/crediblemark-official/AudioWaveStudio.git
-   cd AudioWaveStudio
-   ```
-
-2. **Install frontend dependencies:**
-   ```bash
-   npm install
-   ```
-
----
-
-## 💻 Development & Usage
-
-### Run Web Development Server
-To run only the web frontend in the browser:
 ```bash
-npm run dev
+git clone https://github.com/crediblemark-official/AudioWaveStudio.git
+cd AudioWaveStudio
+npm install
+npm run tauri dev       # desktop app
+# or
+npm run dev              # web-only preview
 ```
 
-### Run Tauri Desktop Application
-To launch the full desktop app with Rust backend integration:
-```bash
-npm run tauri dev
-```
-
----
-
-## 📦 Building for Production
-
-To build the desktop application bundle for your operating system:
+## Building
 
 ```bash
 npm run tauri build
 ```
 
-The output installer/executable will be generated in `src-tauri/target/release/bundle/`.
+Output in `src-tauri/target/release/bundle/`. The `.deb` on Linux depends on system `ffmpeg` (auto-installed via apt).
 
 ---
 
-## 📂 Directory Structure
+## Directory Structure
 
 ```text
 audiowave/
@@ -110,6 +81,6 @@ audiowave/
 
 ---
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
