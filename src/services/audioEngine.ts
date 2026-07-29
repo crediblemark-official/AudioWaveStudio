@@ -102,7 +102,7 @@ export class AudioEngine {
     }
 
     // Extract filename and title
-    const fileName = filePath.split('/').pop() || 'Track';
+    const fileName = filePath.split(/[/\\]/).pop() || 'Track';
     const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
     const parts = fileNameWithoutExt.split(' - ');
     const title = parts.length > 1 ? parts.slice(1).join(' - ') : fileNameWithoutExt;
