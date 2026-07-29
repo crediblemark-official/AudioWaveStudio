@@ -1,9 +1,12 @@
 import React, { useRef } from 'react';
-import { Activity, Upload, Film, Sparkles } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Minus, Square, X } from 'lucide-react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
 import { SongMetadata, VisualizerConfig } from '../types/visualizer';
 import { CustomSelect } from './CustomSelect';
+
+const appWindow = getCurrentWindow();
 
 interface NavbarProps {
   config: VisualizerConfig;
@@ -55,7 +58,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="navbar">
+    <header className="navbar" data-tauri-drag-region>
       <div className="navbar-left">
         <div className="brand">
           <div className="brand-icon">
@@ -110,6 +113,18 @@ export const Navbar: React.FC<NavbarProps> = ({
           <Film size={18} />
           <span>Export MP4 Video</span>
         </button>
+
+        <div className="window-controls">
+          <button className="btn-winctrl" onClick={() => appWindow.minimize()} title="Minimize">
+            <Minus size={14} />
+          </button>
+          <button className="btn-winctrl" onClick={() => appWindow.toggleMaximize()} title="Maximize">
+            <Square size={12} />
+          </button>
+          <button className="btn-winctrl btn-winctrl-close" onClick={() => appWindow.close()} title="Close">
+            <X size={14} />
+          </button>
+        </div>
       </div>
     </header>
   );

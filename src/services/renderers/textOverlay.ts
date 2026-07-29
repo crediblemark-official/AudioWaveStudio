@@ -8,21 +8,12 @@ export function renderTextOverlay(ctx: RenderContext) {
   c.save();
   c.textAlign = 'center';
 
-  let x = width / 2;
-  let yTitle = height * 0.82;
-  let yArtist = height * 0.87;
+  let x = (txt.textPositionX / 100) * width;
+  let yTitle = (txt.textPositionY / 100) * height;
+  let yArtist = yTitle + (txt.titleFontSize * 0.4) + txt.artistFontSize;
 
-  if (txt.position === 'top-center') {
-    yTitle = height * 0.12;
-    yArtist = height * 0.18;
-  } else if (txt.position === 'center') {
-    yTitle = height * 0.46;
-    yArtist = height * 0.53;
-  } else if (txt.position === 'bottom-left') {
+  if (txt.position === 'bottom-left') {
     c.textAlign = 'left';
-    x = width * 0.08;
-    yTitle = height * 0.82;
-    yArtist = height * 0.88;
   }
 
   if (txt.textShadow) {
@@ -30,14 +21,16 @@ export function renderTextOverlay(ctx: RenderContext) {
     c.shadowColor = config.theme.glowColor;
   }
 
+  const font = txt.fontFamily || '"Outfit", "Inter", sans-serif';
+
   if (txt.showTitle && txt.songTitle) {
-    c.font = `700 ${txt.titleFontSize}px "Outfit", "Inter", sans-serif`;
+    c.font = `700 ${txt.titleFontSize}px ${font}`;
     c.fillStyle = txt.titleColor;
     c.fillText(txt.songTitle, x, yTitle);
   }
 
   if (txt.showArtist && txt.artistName) {
-    c.font = `500 ${txt.artistFontSize}px "Inter", sans-serif`;
+    c.font = `500 ${txt.artistFontSize}px ${font}`;
     c.fillStyle = txt.artistColor;
     c.fillText(txt.artistName, x, yArtist);
   }

@@ -104,7 +104,7 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({ songMeta }) => {
             disabled={!songMeta}
             title={isPlaying ? 'Pause' : 'Play'}
           >
-            {isPlaying ? <Pause size={20} /> : <Play size={20} className="ml-1" />}
+            {isPlaying ? <Pause size={18} /> : <Play size={18} />}
           </button>
           <button
             className="btn-control"
@@ -118,22 +118,16 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({ songMeta }) => {
 
         <div className="player-seeker">
           <span className="time-text">{formatTime(currentTime)}</span>
-          <div className="range-wrapper">
-            <input
-              type="range"
-              min={0}
-              max={duration || 100}
-              step={0.1}
-              value={currentTime}
-              onChange={handleSeek}
-              disabled={!songMeta}
-              className="seek-slider"
-            />
-            <div
-              className="seek-progress"
-              style={{ width: `${duration ? (currentTime / duration) * 100 : 0}%` }}
-            />
-          </div>
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            step={0.1}
+            value={currentTime}
+            onChange={handleSeek}
+            disabled={!songMeta}
+            className="seek-slider"
+          />
           <span className="time-text">{formatTime(duration)}</span>
         </div>
       </div>

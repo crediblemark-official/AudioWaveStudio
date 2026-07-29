@@ -35,6 +35,8 @@ export interface RenderConfigRust {
   show_particles: boolean;
   title_text?: string;
   artist_text?: string;
+  position_x?: number;
+  position_y?: number;
 }
 
 function hexToRgba(hex: string): [number, number, number, number] {
@@ -62,6 +64,8 @@ export function convertToRustConfig(config: VisualizerConfig, width = 1280, heig
     show_particles: config.background.showParticles,
     title_text: config.text.showTitle ? config.text.songTitle : undefined,
     artist_text: config.text.showArtist ? config.text.artistName : undefined,
+    position_x: config.positionX || 0,
+    position_y: config.positionY || 0,
   };
 }
 

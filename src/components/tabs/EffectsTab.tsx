@@ -53,16 +53,6 @@ export const EffectsTab: React.FC<Props> = ({ config, updateConfig }) => {
             )}
           </div>
 
-          {showIntensity && s.mainEffect === 'shake' && (
-            <div className="control-group">
-              <label className="label-row">
-                <span>Shake Intensity ({Math.round(s.shakeIntensity * 100)}%)</span>
-              </label>
-              <input type="range" min={0} max={1} step={0.05} value={s.shakeIntensity}
-                onChange={(e) => handleChange('shakeIntensity', parseFloat(e.target.value))} className="input-range" />
-            </div>
-          )}
-
           {showIntensity && s.mainEffect === 'glitch' && (
             <div className="control-group">
               <label className="label-row">

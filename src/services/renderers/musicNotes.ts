@@ -3,7 +3,7 @@ import { RenderContext } from './types';
 const SYMBOLS = ['♩', '♪', '♫', '♬'];
 
 export function renderMusicNotes(ctx: RenderContext) {
-  const { ctx: c, width, height, config, freqData, bassEnergy: be, musicNotes } = ctx;
+  const { ctx: c, width, height, config, freqData, bassEnergy: be, beatStrength: bs, musicNotes } = ctx;
   const bg = config.background;
   const density = bg.musicNoteDensity ?? 0.5;
   const noteSize = bg.musicNoteSize ?? 24;
@@ -23,21 +23,22 @@ export function renderMusicNotes(ctx: RenderContext) {
   const highEnergy = highSum / (Math.max(1, highBins - 24) * 255);
   const wobbleAmp = highEnergy * 3;
 
-  const spawnChance = density * 0.12 + be * 0.4 * bassMult;
+  const beatBoost = 1 + bs * 2;
+  const spawnChance = Math.min(1, density * 0.12 + be * 0.2 * bassMult + bs * 0.6);
   if (Math.random() < spawnChance) {
     const count = Math.min(
-      Math.floor(1 + midEnergy * 2 + be * 2),
+      Math.floor(1 + midEnergy * 2 + be + bs * 5),
       maxNotes - musicNotes.length,
     );
     const phaseStep = (Math.PI * 2) / Math.max(1, count);
-    const baseVY = -(0.8 + Math.random() * 1.5 + be * 3 * bassMult) * noteSpeed;
+    const baseVY = -(0.8 + Math.random() * 1.5 + be * 2 * bassMult + bs * 6) * noteSpeed;
     for (let n = 0; n < count; n++) {
       musicNotes.push({
         x: Math.random() * width,
         y: height + 30,
         vx: (Math.random() - 0.5) * 2,
         vy: baseVY * (1 + Math.random() * 0.3),
-        size: noteSize * (0.5 + Math.random() * 0.7 + be * 0.4),
+        size: noteSize * (0.5 + Math.random() * 0.7 + be * 0.3 + bs * 0.5),
         alpha: 0.5 + Math.random() * 0.5,
         rotation: (Math.random() - 0.5) * 0.3,
         symbol: SYMBOLS[Math.floor(Math.random() * 4)],
@@ -49,7 +50,7 @@ export function renderMusicNotes(ctx: RenderContext) {
     }
   }
 
-  const speedBoost = 1 + be * 1.2 * bassMult;
+  const speedBoost = (1 + be * 1.2 * bassMult) * beatBoost;
 
   c.textAlign = 'center';
   c.textBaseline = 'middle';

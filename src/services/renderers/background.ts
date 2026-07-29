@@ -20,9 +20,4 @@ export function renderBackground(ctx: RenderContext) {
     c.fillRect(0, 0, width, height);
   }
 
-  const overlay = bg.overlayOpacity || 0;
-  if (overlay > 0) {
-    c.fillStyle = `rgba(10, 10, 15, ${overlay})`;
-    c.fillRect(0, 0, width, height);
-  }
 }

@@ -311,6 +311,10 @@ export class AudioEngine {
     }
   }
 
+  public getVolume(): number {
+    return this.volume;
+  }
+
   public setVolume(val: number) {
     this.volume = Math.max(0, Math.min(1, val));
     if (this.gainNode) {

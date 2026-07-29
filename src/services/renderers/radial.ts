@@ -1,7 +1,7 @@
 import { RenderContext } from './types';
 
 export function renderRadialVisualizer(ctx: RenderContext) {
-  const { ctx: c, width, height, config, freqData, bassEnergy, rotationAngle, exportFreqData } = ctx;
+  const { ctx: c, width, height, config, freqData, bassEnergy, rotationAngle, exportFreqData, radialCenterImgElement } = ctx;
   const centerX = width / 2;
   const centerY = height * 0.48;
   const baseRadius = Math.min(width, height) * 0.18 + bassEnergy * 18;
@@ -18,11 +18,19 @@ export function renderRadialVisualizer(ctx: RenderContext) {
   c.arc(centerX, centerY, baseRadius - 5, 0, Math.PI * 2);
   c.clip();
 
-  const discGrad = c.createRadialGradient(centerX, centerY, 5, centerX, centerY, baseRadius);
-  discGrad.addColorStop(0, theme.primaryColor);
-  discGrad.addColorStop(1, theme.secondaryColor);
-  c.fillStyle = discGrad;
-  c.fill();
+  if (radialCenterImgElement && radialCenterImgElement.complete && radialCenterImgElement.naturalWidth > 0) {
+    const imgSize = (baseRadius - 5) * 2;
+    const s = Math.min(imgSize / radialCenterImgElement.naturalWidth, imgSize / radialCenterImgElement.naturalHeight);
+    const iw = radialCenterImgElement.naturalWidth * s;
+    const ih = radialCenterImgElement.naturalHeight * s;
+    c.drawImage(radialCenterImgElement, centerX - iw / 2, centerY - ih / 2, iw, ih);
+  } else {
+    const discGrad = c.createRadialGradient(centerX, centerY, 5, centerX, centerY, baseRadius);
+    discGrad.addColorStop(0, theme.primaryColor);
+    discGrad.addColorStop(1, theme.secondaryColor);
+    c.fillStyle = discGrad;
+    c.fill();
+  }
   c.restore();
 
   c.save();

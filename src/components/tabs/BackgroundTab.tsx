@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { VisualizerConfig, MusicNoteStyle } from '../../types/visualizer';
+import { VisualizerConfig, MusicNoteStyle, ParticleStyle } from '../../types/visualizer';
 import { CustomSelect } from '../CustomSelect';
 import { Sparkles, Music, Upload } from 'lucide-react';
 
@@ -91,13 +91,45 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
       </div>
 
       {config.background.showParticles && (
-        <div className="control-group mt-2">
-          <div className="picker-item">
-            <span>Particle Color</span>
-            <input type="color" value={config.background.particleColor}
-              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleColor: e.target.value } }))} />
+        <>
+          <div className="control-group mt-2">
+            <label className="label-row">Movement Style</label>
+            <CustomSelect value={config.background.particleStyle ?? 'float'}
+              options={[
+                { value: 'float', label: 'Float' },
+                { value: 'bounce', label: 'Bounce' },
+                { value: 'wave', label: 'Wave' },
+                { value: 'confined', label: 'Confined' },
+                { value: 'static', label: 'Static' },
+              ]}
+              onChange={(val) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleStyle: val as ParticleStyle } }))} />
           </div>
-        </div>
+          <div className="control-group mt-2">
+            <div className="picker-item">
+              <span>Color</span>
+              <input type="color" value={config.background.particleColor}
+                onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleColor: e.target.value } }))} />
+            </div>
+          </div>
+          <div className="control-group">
+            <label className="label-row"><span>Particle Size ({config.background.particleSize ?? 4}px)</span></label>
+            <input type="range" min={1} max={12} step={1} value={config.background.particleSize ?? 4}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleSize: parseInt(e.target.value) } }))}
+              className="input-range" />
+          </div>
+          <div className="control-group">
+            <label className="label-row"><span>Reactivity Speed ({((config.background.particleSpeed ?? 1.0) * 100).toFixed(0)}%)</span></label>
+            <input type="range" min={0.2} max={3} step={0.1} value={config.background.particleSpeed ?? 1.0}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleSpeed: parseFloat(e.target.value) } }))}
+              className="input-range" />
+          </div>
+          <div className="control-group">
+            <label className="label-row"><span>Particle Count ({config.background.particleCount ?? 60})</span></label>
+            <input type="range" min={10} max={150} step={5} value={config.background.particleCount ?? 60}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleCount: parseInt(e.target.value) } }))}
+              className="input-range" />
+          </div>
+        </>
       )}
 
       {config.background.mode === 'customImage' && (

@@ -33,10 +33,13 @@ export interface RenderContext {
   freqData: Uint8Array;
   timeData: Uint8Array;
   bassEnergy: number;
+  beatStrength: number;
   peakData: number[];
   particles: Particle[];
   musicNotes: MusicNote[];
   customImgElement: HTMLImageElement | null;
+  radialCenterImgElement: HTMLImageElement | null;
   rotationAngle: number;
   exportFreqData: Uint8Array | null;
+  isPlaying: boolean;
 }

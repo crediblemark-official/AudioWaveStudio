@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
-  Layers, Circle, Radio, Grid, Minus, AudioWaveform, CircleDot, LineChart,
+  Layers, Circle, Radio, Grid, Minus, AudioWaveform, CircleDot, LineChart, Image as ImageIcon,
 } from 'lucide-react';
 import { VisualizerConfig, VisualizerStyle } from '../../types/visualizer';
 
@@ -22,6 +22,21 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
       ...prev,
       reactivity: { ...prev.reactivity, [key]: value }
     }));
+  };
+
+  const radialImgInputRef = useRef<HTMLInputElement>(null);
+  const prevRadialUrlRef = useRef<string>('');
+
+  const handleRadialImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      if (prevRadialUrlRef.current) URL.revokeObjectURL(prevRadialUrlRef.current);
+      const url = URL.createObjectURL(e.target.files[0]);
+      prevRadialUrlRef.current = url;
+      updateConfig((prev) => ({
+        ...prev,
+        background: { ...prev.background, radialCenterImageUri: url }
+      }));
+    }
   };
 
   return (
@@ -70,6 +85,34 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
         <label className="label-row"><span>Bass Pulse Boost ({config.reactivity.bassMultiplier.toFixed(1)}x)</span></label>
         <input type="range" min={1.0} max={3.0} step={0.1} value={config.reactivity.bassMultiplier}
           onChange={(e) => handleReactivityChange('bassMultiplier', parseFloat(e.target.value))} className="input-range" />
+      </div>
+
+      <h3 className="section-title">Position</h3>
+      <div className="control-group">
+        <label className="label-row"><span>Horizontal X ({config.positionX > 0 ? '+' : ''}{config.positionX})</span></label>
+        <input type="range" min={-500} max={500} step={1} value={config.positionX}
+          onChange={(e) => updateConfig((prev) => ({ ...prev, positionX: parseInt(e.target.value) }))} className="input-range" />
+      </div>
+      <div className="control-group">
+        <label className="label-row"><span>Vertical Y ({config.positionY > 0 ? '+' : ''}{config.positionY})</span></label>
+        <input type="range" min={-500} max={500} step={1} value={config.positionY}
+          onChange={(e) => updateConfig((prev) => ({ ...prev, positionY: parseInt(e.target.value) }))} className="input-range" />
+      </div>
+
+      <h3 className="section-title">Radial Center Image</h3>
+      <div className="control-group">
+        <button className="btn btn-secondary w-full" onClick={() => radialImgInputRef.current?.click()}>
+          <ImageIcon size={16} /><span>{config.background.radialCenterImageUri ? 'Change Center Image' : 'Choose Center Image'}</span>
+        </button>
+        <input type="file" ref={radialImgInputRef} onChange={handleRadialImageUpload} accept="image/*" className="hidden-input" />
+        {config.background.radialCenterImageUri && (
+          <button className="w-full mt-1" style={{ background: 'none', border: 'none', color: '#ff5555', cursor: 'pointer', fontSize: '0.8rem', padding: '4px 0' }} onClick={() => {
+            if (prevRadialUrlRef.current) URL.revokeObjectURL(prevRadialUrlRef.current);
+            updateConfig((prev) => ({ ...prev, background: { ...prev.background, radialCenterImageUri: undefined } }));
+          }}>
+            Remove Image
+          </button>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ export type AspectRatio = '16:9' | '9:16' | '1:1';
 export type ColorThemeName = 'cyberpunk' | 'synthwave' | 'emerald' | 'violet' | 'gold' | 'custom';
 
 export type MusicNoteStyle = 'float' | 'bounce' | 'spiral' | 'wave' | 'burst';
+export type ParticleStyle = 'float' | 'bounce' | 'wave' | 'static' | 'confined';
 
 export type ScreenEffect = 'none' | 'shake' | 'glitch' | 'chromatic' | 'vignette' | 'pulse';
 
@@ -26,10 +27,15 @@ export interface BackgroundSettings {
   overlayOpacity: number; // 0 to 1
   customImageUri?: string;
   showParticles: boolean;
+  particleStyle?: ParticleStyle;
   particleColor: string;
+  particleSize?: number;
+  particleSpeed?: number;
+  particleCount?: number;
   showMusicNotes?: boolean;
   musicNoteStyle?: MusicNoteStyle;
   musicNoteColor?: string;
+  radialCenterImageUri?: string;
   musicNoteDensity?: number;
   musicNoteSize?: number;
   musicNoteSpeed?: number;
@@ -45,7 +51,10 @@ export interface TextSettings {
   artistColor: string;
   titleFontSize: number;
   artistFontSize: number;
+  fontFamily: string;
   position: 'center' | 'bottom-left' | 'bottom-center' | 'top-center';
+  textPositionX: number;
+  textPositionY: number;
   textShadow: boolean;
 }
 
@@ -95,6 +104,8 @@ export interface VisualizerConfig {
   reactivity: AudioReactivitySettings;
   export: ExportSettings;
   screenEffects: ScreenEffectsSettings;
+  positionX: number;
+  positionY: number;
 }
 
 export interface ThemePreset {

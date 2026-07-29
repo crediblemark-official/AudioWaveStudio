@@ -54,7 +54,11 @@ export const DEFAULT_CONFIG: VisualizerConfig = {
     blurAmount: 8,
     overlayOpacity: 0.7,
     showParticles: true,
+    particleStyle: 'float',
     particleColor: '#00f0ff',
+    particleSize: 4,
+    particleSpeed: 1.0,
+    particleCount: 60,
     showMusicNotes: true,
     musicNoteStyle: 'float',
     musicNoteColor: '#ffe600',
@@ -72,7 +76,10 @@ export const DEFAULT_CONFIG: VisualizerConfig = {
     artistColor: '#00f0ff',
     titleFontSize: 28,
     artistFontSize: 16,
+    fontFamily: '"Outfit", "Inter", sans-serif',
     position: 'bottom-center',
+    textPositionX: 50,
+    textPositionY: 82,
     textShadow: true
   },
   reactivity: {
@@ -101,7 +108,9 @@ export const DEFAULT_CONFIG: VisualizerConfig = {
     glitchIntensity: 0.4,
     chromaticIntensity: 0.3,
     pulseIntensity: 0.5,
-  }
+  },
+  positionX: 0,
+  positionY: 0,
 };
 
 export const PRESETS: ThemePreset[] = [

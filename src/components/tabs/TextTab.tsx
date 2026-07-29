@@ -39,15 +39,51 @@ export const TextTab: React.FC<Props> = ({ config, updateConfig }) => {
       </div>
 
       <div className="control-group">
-        <label className="label-row">Text Position</label>
+        <label className="label-row">Font Family</label>
+        <CustomSelect value={config.text.fontFamily}
+          onChange={(v) => handleTextChange('fontFamily', v)}
+          options={[
+            { value: '"Outfit", "Inter", sans-serif', label: 'Outfit' },
+            { value: '"Inter", sans-serif', label: 'Inter' },
+            { value: '"Space Grotesk", sans-serif', label: 'Space Grotesk' },
+            { value: '"JetBrains Mono", monospace', label: 'JetBrains Mono' },
+            { value: '"Georgia", serif', label: 'Georgia' },
+            { value: 'system-ui, sans-serif', label: 'System UI' },
+          ]} />
+      </div>
+
+      <div className="control-group">
+        <label className="label-row">Text Preset</label>
         <CustomSelect value={config.text.position}
-          onChange={(v) => handleTextChange('position', v)}
+          onChange={(v) => {
+            const presets: Record<string, { x: number; y: number }> = {
+              'bottom-center': { x: 50, y: 82 },
+              'top-center': { x: 50, y: 15 },
+              'center': { x: 50, y: 48 },
+              'bottom-left': { x: 8, y: 82 },
+            };
+            const p = presets[v] || { x: 50, y: 82 };
+            updateConfig((prev) => ({
+              ...prev,
+              text: { ...prev.text, position: v as typeof prev.text.position, textPositionX: p.x, textPositionY: p.y }
+            }));
+          }}
           options={[
             { value: 'bottom-center', label: 'Bottom Center' },
             { value: 'top-center', label: 'Top Center' },
             { value: 'center', label: 'Center Overlay' },
             { value: 'bottom-left', label: 'Bottom Left' },
           ]} />
+      </div>
+      <div className="control-group">
+        <label className="label-row"><span>Horizontal X ({config.text.textPositionX}%)</span></label>
+        <input type="range" min={0} max={100} step={1} value={config.text.textPositionX}
+          onChange={(e) => handleTextChange('textPositionX', parseInt(e.target.value))} className="input-range" />
+      </div>
+      <div className="control-group">
+        <label className="label-row"><span>Vertical Y ({config.text.textPositionY}%)</span></label>
+        <input type="range" min={0} max={100} step={1} value={config.text.textPositionY}
+          onChange={(e) => handleTextChange('textPositionY', parseInt(e.target.value))} className="input-range" />
       </div>
 
       <div className="control-group">

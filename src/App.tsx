@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { VisualizerCanvas } from './components/VisualizerCanvas';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
@@ -14,6 +14,7 @@ export const App: React.FC = () => {
   const [songMeta, setSongMeta] = useState<SongMetadata | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const handleLoadSong = async (file: File) => {
     setIsLoading(true);
@@ -55,6 +56,65 @@ export const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.code === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+        return;
+      }
+      if (e.code === 'F11') {
+        e.preventDefault();
+        setIsFullscreen((v) => !v);
+        return;
+      }
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          if (audioEngine.getDuration() > 0) {
+            if (audioEngine.getIsPlaying()) {
+              audioEngine.pause();
+            } else {
+              audioEngine.play();
+            }
+          }
+          break;
+        case 'KeyS':
+          if (audioEngine.getDuration() > 0) {
+            e.preventDefault();
+            audioEngine.stop();
+          }
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          if (audioEngine.getDuration() > 0) audioEngine.seek(audioEngine.getCurrentTime() - 5);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          if (audioEngine.getDuration() > 0) audioEngine.seek(audioEngine.getCurrentTime() + 5);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          audioEngine.setVolume(Math.min(1, audioEngine.getVolume() + 0.1));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          audioEngine.setVolume(Math.max(0, audioEngine.getVolume() - 0.1));
+          break;
+        case 'KeyM':
+          e.preventDefault();
+          audioEngine.setVolume(audioEngine.getVolume() > 0 ? 0 : 0.8);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
   const handleApplyPreset = (presetId: string) => {
     const preset = PRESETS.find((p) => p.id === presetId);
     if (preset && preset.config) {
@@ -73,8 +133,10 @@ export const App: React.FC = () => {
     }
   };
 
+  const toggleFullscreen = () => setIsFullscreen((v) => !v);
+
   return (
-    <div className="app-layout">
+    <div className={`app-layout ${isFullscreen ? 'fullscreen' : ''}`}>
       {isLoading && (
         <div className="loading-overlay">
           <div className="loading-content">
@@ -94,11 +156,11 @@ export const App: React.FC = () => {
       />
 
       <main className="main-viewport">
-        <VisualizerCanvas config={config} />
-        <ControlPanel config={config} onChangeConfig={setConfig} />
+        <VisualizerCanvas config={config} onToggleFullscreen={toggleFullscreen} isFullscreen={isFullscreen} />
+        {!isFullscreen && <ControlPanel config={config} onChangeConfig={setConfig} />}
       </main>
 
-      <AudioPlayerBar songMeta={songMeta} />
+      {!isFullscreen && <AudioPlayerBar songMeta={songMeta} />}
 
       <ExportModal
         isOpen={isExportModalOpen}
