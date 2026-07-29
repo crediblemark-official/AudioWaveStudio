@@ -53,15 +53,6 @@ jobs:
             cp "$FFMPEG_BIN" src-tauri/binaries/ffmpeg-x86_64-apple-darwin
           fi
 
-      - name: Prepare sidecar ffmpeg binary for Linux
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          FFMPEG_BIN=$(which ffmpeg || echo "")
-          mkdir -p src-tauri/binaries
-          if [ -n "$FFMPEG_BIN" ]; then
-            cp "$FFMPEG_BIN" src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
-          fi
-
       - name: Prepare sidecar ffmpeg binary for Windows
         if: matrix.platform == 'windows-latest'
         shell: bash
