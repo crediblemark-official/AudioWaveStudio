@@ -1,5 +1,6 @@
 import { SongMetadata } from '../types/visualizer';
 import { rustBridge } from './rustBridge';
+import { listen } from '@tauri-apps/api/event';
 
 export class AudioEngine {
   private audioCtx: AudioContext | null = null;
@@ -23,6 +24,11 @@ export class AudioEngine {
   private rustDecoded: boolean = false;
   private pendingFileBytes: ArrayBuffer | null = null;
   private pendingFileExt: string = '';
+
+  private listenFreqData: Uint8Array | null = null;
+  private listenTimeData: Uint8Array | null = null;
+  private listenUnlisten: (() => void) | null = null;
+  private isListening: boolean = false;
 
   constructor() {
     // AudioContext will be initialized on user interaction or load
@@ -52,20 +58,74 @@ export class AudioEngine {
     }
   }
 
-  private createAudioBufferFromSamples(samples: number[], sampleRate: number, _channels: number): AudioBuffer | null {
-    if (!this.audioCtx || samples.length === 0) return null;
+  private async createAudioBufferFromChunks(sampleRate: number, totalFrames: number): Promise<AudioBuffer | null> {
+    if (!this.audioCtx || totalFrames === 0) return null;
 
-    // Rust decoder always downmixes to mono (one sample per frame).
-    // Always create a mono AudioBuffer using all samples directly.
-    const numFrames = samples.length;
-    const buffer = this.audioCtx.createBuffer(1, numFrames, sampleRate);
-
+    const buffer = this.audioCtx.createBuffer(1, totalFrames, sampleRate);
     const channelData = buffer.getChannelData(0);
-    for (let i = 0; i < numFrames; i++) {
-      channelData[i] = samples[i];
+
+    // Fetch samples in 5-second chunks to avoid IPC size limits
+    const CHUNK_SEC = 5.0;
+    let offset = 0;
+    for (let t = 0; offset < totalFrames; t += CHUNK_SEC) {
+      const b64 = await rustBridge.getAudioChunkB64(t, CHUNK_SEC);
+      if (!b64) break;
+
+      const binaryStr = atob(b64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) {
+        bytes[i] = binaryStr.charCodeAt(i);
+      }
+      const float32 = new Float32Array(bytes.buffer, 0, bytes.byteLength >> 2);
+      channelData.set(float32, offset);
+      offset += float32.length;
+    }
+
+    // Trim buffer if fewer frames were loaded
+    if (offset < totalFrames) {
+      const trimmed = this.audioCtx.createBuffer(1, offset, sampleRate);
+      trimmed.getChannelData(0).set(channelData.subarray(0, offset));
+      return trimmed;
     }
 
     return buffer;
+  }
+
+  public async startListening(_deviceId?: string): Promise<string> {
+    if (this.isListening) throw new Error('Already listening');
+    this.stop();
+    this.listenFreqData = null;
+    this.listenTimeData = null;
+
+    const src = await rustBridge.startSystemListen();
+
+    this.listenUnlisten = await listen<{ freq_data: number[]; time_data: number[] }>(
+      'listen-freq-data',
+      (event) => {
+        this.listenFreqData = new Uint8Array(event.payload.freq_data);
+        if (event.payload.time_data) {
+          this.listenTimeData = new Uint8Array(event.payload.time_data);
+        }
+      },
+    );
+
+    this.isListening = true;
+    return src;
+  }
+
+  public async stopListening(): Promise<void> {
+    if (this.listenUnlisten) {
+      this.listenUnlisten();
+      this.listenUnlisten = null;
+    }
+    await rustBridge.stopSystemListen();
+    this.isListening = false;
+    this.listenFreqData = null;
+    this.listenTimeData = null;
+  }
+
+  public getIsListening(): boolean {
+    return this.isListening;
   }
 
   public async loadAudioPath(filePath: string): Promise<SongMetadata> {
@@ -76,7 +136,8 @@ export class AudioEngine {
     this.pendingFileBytes = null;
     this.pendingFileExt = '';
 
-    // Rust decode → PCM samples → create AudioBuffer (no browser GStreamer dependency)
+    let fullDuration = 0;
+
     try {
       console.log('[AudioEngine] Calling Rust decode...');
       const result = await rustBridge.decodeAudioPlayback(filePath);
@@ -84,24 +145,19 @@ export class AudioEngine {
         sampleRate: result.sample_rate,
         channels: result.channels,
         duration: result.duration,
-        samplesLength: result.samples.length,
+        samplesCount: result.samples_count,
+        fullDuration: result.full_duration,
       });
-      this.audioBuffer = this.createAudioBufferFromSamples(result.samples, result.sample_rate, result.channels);
+      fullDuration = result.full_duration;
+      this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
       console.log('[AudioEngine] AudioBuffer created:', this.audioBuffer ? {
         duration: this.audioBuffer.duration,
         length: this.audioBuffer.length,
-        numberOfChannels: this.audioBuffer.numberOfChannels,
-        sampleRate: this.audioBuffer.sampleRate,
       } : 'NULL');
-      // Update songMeta duration from actual decode
-      if (this.songMeta) {
-        this.songMeta.duration = result.duration;
-      }
     } catch (e) {
       console.error('[AudioEngine] Rust audio decode FAILED:', e);
     }
 
-    // Extract filename and title
     const fileName = filePath.split(/[/\\]/).pop() || 'Track';
     const fileNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
     const parts = fileNameWithoutExt.split(' - ');
@@ -112,7 +168,7 @@ export class AudioEngine {
       fileName,
       title,
       artist,
-      duration: this.audioBuffer ? this.audioBuffer.duration : 0,
+      duration: fullDuration || (this.audioBuffer ? this.audioBuffer.duration : 0),
       audioUrl: filePath,
     };
 
@@ -148,6 +204,7 @@ export class AudioEngine {
     }
 
     // Rust decode → PCM samples → create AudioBuffer
+    let fullDuration = 0;
     if (audioFilePath) {
       try {
         console.log('[AudioEngine] Rust decode from path:', audioFilePath);
@@ -156,9 +213,11 @@ export class AudioEngine {
           sampleRate: result.sample_rate,
           channels: result.channels,
           duration: result.duration,
-          samplesLength: result.samples.length,
+          samplesCount: result.samples_count,
+          fullDuration: result.full_duration,
         });
-        this.audioBuffer = this.createAudioBufferFromSamples(result.samples, result.sample_rate, result.channels);
+        fullDuration = result.full_duration;
+        this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
       } catch (e) {
         console.error('[AudioEngine] Rust audio decode FAILED:', e);
       }
@@ -174,7 +233,7 @@ export class AudioEngine {
       fileName: file.name,
       title: title || 'Untitled Track',
       artist: artist || 'Unknown Artist',
-      duration: this.audioBuffer ? this.audioBuffer.duration : 0,
+      duration: fullDuration || (this.audioBuffer ? this.audioBuffer.duration : 0),
       audioUrl: audioFilePath,
     };
 
@@ -340,7 +399,15 @@ export class AudioEngine {
   }
 
   public getFrequencyData(uint8Array: Uint8Array): Uint8Array {
-    if (this.analyser) {
+    if (this.isListening && this.listenFreqData) {
+      const len = Math.min(uint8Array.length, this.listenFreqData.length);
+      uint8Array.set(this.listenFreqData.subarray(0, len));
+      if (len < uint8Array.length) {
+        uint8Array.fill(0, len);
+      }
+      return uint8Array;
+    }
+    if (this.audioBuffer && this.analyser) {
       this.analyser.getByteFrequencyData(uint8Array as unknown as Uint8Array<ArrayBuffer>);
     } else {
       uint8Array.fill(0);
@@ -349,7 +416,15 @@ export class AudioEngine {
   }
 
   public getTimeDomainData(uint8Array: Uint8Array): Uint8Array {
-    if (this.analyser) {
+    if (this.isListening && this.listenTimeData) {
+      const len = Math.min(uint8Array.length, this.listenTimeData.length);
+      uint8Array.set(this.listenTimeData.subarray(0, len));
+      if (len < uint8Array.length) {
+        uint8Array.fill(128, len);
+      }
+      return uint8Array;
+    }
+    if (this.audioBuffer && this.analyser) {
       this.analyser.getByteTimeDomainData(uint8Array as unknown as Uint8Array<ArrayBuffer>);
     } else {
       uint8Array.fill(128);

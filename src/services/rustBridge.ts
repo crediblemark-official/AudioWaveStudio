@@ -12,7 +12,8 @@ export interface AudioDecodeResult {
   sample_rate: number;
   channels: number;
   duration: number;
-  samples: number[];
+  full_duration: number;
+  samples_count: number;
 }
 
 export interface SpectrumResultRust {
@@ -76,6 +77,10 @@ export class RustBridge {
 
   public async decodeAudioPlayback(filePath: string): Promise<AudioDecodeResult> {
     return await invoke<AudioDecodeResult>('decode_audio_playback', { filePath });
+  }
+
+  public async getAudioChunkB64(startSec: number, durationSec: number): Promise<string> {
+    return await invoke<string>('get_audio_chunk_b64', { startSec, durationSec });
   }
 
   public async readFileBytes(path: string): Promise<Uint8Array> {
@@ -166,6 +171,14 @@ export class RustBridge {
       outputMp4Path,
       includeAudio,
     });
+  }
+
+  public async startSystemListen(): Promise<string> {
+    return await invoke<string>('start_system_listen');
+  }
+
+  public async stopSystemListen(): Promise<void> {
+    await invoke('stop_system_listen');
   }
 
   public async exportMp4Native(

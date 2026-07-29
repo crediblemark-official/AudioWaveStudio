@@ -1,10 +1,10 @@
-export type VisualizerStyle = 'spectrum' | 'radial' | 'oscilloscope' | 'equalizer' | 'minimal' | 'waveformFill' | 'circularBars' | 'smoothSpectrum';
+export type VisualizerStyle = 'spectrum' | 'radial' | 'oscilloscope' | 'equalizer' | 'minimal' | 'waveformFill' | 'circularBars' | 'smoothSpectrum' | 'pulseRings' | 'vuMeter' | 'auroraWave' | 'flameFire' | 'spiralGalaxy' | 'threeD' | 'api3D' | 'neonCity3D' | 'speaker3D' | 'speakerTrio' | 'speakerSplatter';
 
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 
 export type ColorThemeName = 'cyberpunk' | 'synthwave' | 'emerald' | 'violet' | 'gold' | 'custom';
 
-export type MusicNoteStyle = 'float' | 'bounce' | 'spiral' | 'wave' | 'burst';
+export type MusicNoteStyle = 'float' | 'bounce' | 'spiral' | 'wave' | 'burst' | 'confined';
 export type ParticleStyle = 'float' | 'bounce' | 'wave' | 'static' | 'confined';
 
 export type ScreenEffect = 'none' | 'shake' | 'glitch' | 'chromatic' | 'vignette' | 'pulse';
@@ -38,8 +38,8 @@ export interface BackgroundSettings {
   radialCenterImageUri?: string;
   musicNoteDensity?: number;
   musicNoteSize?: number;
-  musicNoteSpeed?: number;
   musicNoteCount?: number;
+  musicNoteSensitivity?: number;
 }
 
 export interface TextSettings {
@@ -70,6 +70,8 @@ export interface AudioReactivitySettings {
   mirrorBars: boolean;
   showPeaks: boolean;
   peakColor: string;
+  fireWidthRatio?: number;
+  fireHeightScale?: number;
 }
 
 export interface ExportSettings {
@@ -106,6 +108,7 @@ export interface VisualizerConfig {
   screenEffects: ScreenEffectsSettings;
   positionX: number;
   positionY: number;
+  scale: number;
 }
 
 export interface ThemePreset {

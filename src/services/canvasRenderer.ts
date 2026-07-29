@@ -9,6 +9,17 @@ import { renderMinimalWaveVisualizer } from './renderers/minimalWave';
 import { renderWaveformFill } from './renderers/waveformFill';
 import { renderCircularBars } from './renderers/circularBars';
 import { renderSmoothSpectrum } from './renderers/smoothSpectrum';
+import { renderPulseRings } from './renderers/pulseRings';
+import { renderVuMeter } from './renderers/vuMeter';
+import { renderAuroraWave } from './renderers/auroraWave';
+import { renderFlameFire } from './renderers/flameFire';
+import { renderSpiralGalaxy } from './renderers/spiralGalaxy';
+import { renderThreeD } from './renderers/threeD';
+import { renderApi3D } from './renderers/api3D';
+import { renderNeonCity3D } from './renderers/neonCity3D';
+import { renderSpeaker3D } from './renderers/speaker3D';
+import { renderSpeakerTrio } from './renderers/speakerTrio';
+import { renderSpeakerSplatter } from './renderers/speakerSplatter';
 import { renderMusicNotes } from './renderers/musicNotes';
 import { renderTextOverlay } from './renderers/textOverlay';
 import { renderParticles, initParticles } from './renderers/particles';
@@ -30,8 +41,11 @@ export class CanvasRenderer {
 
   private rotationAngle: number = 0;
   private bassEnergy: number = 0;
+  private bassEnergyRaw: number = 0;
   private beatStrength: number = 0;
+  private beatStrengthRaw: number = 0;
   private prevTargetBass: number = 0;
+  private prevRawBass: number = 0;
   private bassFloor: number = 0;
 
   private exportFreqData: Uint8Array | null = null;
@@ -46,7 +60,9 @@ export class CanvasRenderer {
     freqData: this.freqData,
     timeData: this.timeData,
     bassEnergy: 0,
+    bassEnergyRaw: 0,
     beatStrength: 0,
+    beatStrengthRaw: 0,
     peakData: this.peakData,
     particles: this.particles,
     musicNotes: this.musicNotes,
@@ -123,12 +139,15 @@ export class CanvasRenderer {
     const height = this.canvas.height;
 
     let targetBass: number;
+    let rawBass: number;
 
     if (this.exportFreqData) {
       this.freqData = this.exportFreqData;
       this.timeData = this.exportTimeData!;
       this.bassEnergy = this.exportBassEnergy;
+      this.bassEnergyRaw = this.exportBassEnergy;
       targetBass = this.exportBassEnergy;
+      rawBass = targetBass;
     } else {
       const fftSize = config.reactivity.fftSize;
       if (this.freqData.length !== fftSize / 2) {
@@ -143,8 +162,10 @@ export class CanvasRenderer {
       for (let i = 0; i < bassBins; i++) {
         bassSum += this.freqData[i];
       }
-      targetBass = (bassSum / (bassBins * 255)) * config.reactivity.bassMultiplier;
+       rawBass = bassSum / (bassBins * 255);
+       targetBass = rawBass * (config.reactivity.bassMultiplier || 1.0) * (config.reactivity.sensitivity || 1.0);
       this.bassEnergy += (targetBass - this.bassEnergy) * 0.2;
+      this.bassEnergyRaw += (rawBass - this.bassEnergyRaw) * 0.2;
     }
 
     if (targetBass < this.bassFloor) {
@@ -156,11 +177,17 @@ export class CanvasRenderer {
 
     const onset = Math.max(0, targetBass - this.prevTargetBass);
     this.prevTargetBass = targetBass;
-    if (onset > 0.06) {
-      this.beatStrength = Math.max(onset * 5, this.beatStrength * 0.5);
+    if (onset > 0.03) {
+      this.beatStrength = Math.max(onset * 6, this.beatStrength * 0.6);
     } else {
-      this.beatStrength *= 0.5;
+      this.beatStrength *= 0.7;
     }
+
+    const rawOnset = Math.max(0, rawBass - (this.prevRawBass || 0));
+    this.prevRawBass = rawBass;
+    this.beatStrengthRaw = rawOnset > 0.06
+      ? Math.max(rawOnset * 5, this.beatStrengthRaw * 0.5)
+      : this.beatStrengthRaw * 0.5;
 
     const r = this.rctx;
     r.width = width;
@@ -169,7 +196,9 @@ export class CanvasRenderer {
     r.freqData = this.freqData;
     r.timeData = this.timeData;
     r.bassEnergy = this.bassEnergy;
+    r.bassEnergyRaw = this.bassEnergyRaw;
     r.beatStrength = this.beatStrength;
+    r.beatStrengthRaw = this.beatStrengthRaw;
     r.peakData = this.peakData;
     r.particles = this.particles;
     r.musicNotes = this.musicNotes;
@@ -185,7 +214,18 @@ export class CanvasRenderer {
 
     renderBackground(r);
 
+    const overlay = config.background.overlayOpacity || 0;
+    if (overlay > 0) {
+      this.ctx.fillStyle = `rgba(10, 10, 15, ${overlay})`;
+      this.ctx.fillRect(0, 0, width, height);
+    }
+
     this.ctx.save();
+    const sx = config.scale ?? 1;
+    if (sx !== 1) {
+      this.ctx.translate(width * (1 - sx) / 2, height * (1 - sx) / 2);
+      this.ctx.scale(sx, sx);
+    }
     this.ctx.translate(config.positionX || 0, config.positionY || 0);
     switch (config.style) {
       case 'radial': renderRadialVisualizer(r); break;
@@ -195,6 +235,17 @@ export class CanvasRenderer {
       case 'waveformFill': renderWaveformFill(r); break;
       case 'circularBars': renderCircularBars(r); break;
       case 'smoothSpectrum': renderSmoothSpectrum(r); break;
+      case 'pulseRings': renderPulseRings(r); break;
+      case 'vuMeter': renderVuMeter(r); break;
+      case 'auroraWave': renderAuroraWave(r); break;
+      case 'flameFire': renderFlameFire(r); break;
+      case 'spiralGalaxy': renderSpiralGalaxy(r); break;
+      case 'threeD': renderThreeD(r); break;
+      case 'api3D': renderApi3D(r); break;
+      case 'neonCity3D': renderNeonCity3D(r); break;
+      case 'speaker3D': renderSpeaker3D(r); break;
+      case 'speakerTrio': renderSpeakerTrio(r); break;
+      case 'speakerSplatter': renderSpeakerSplatter(r); break;
       case 'spectrum':
       default: renderSpectrumBars(r); break;
     }
@@ -210,12 +261,6 @@ export class CanvasRenderer {
     renderTextOverlay(r);
 
     this.ctx.restore();
-
-    const overlay = config.background.overlayOpacity || 0;
-    if (overlay > 0) {
-      this.ctx.fillStyle = `rgba(10, 10, 15, ${overlay})`;
-      this.ctx.fillRect(0, 0, width, height);
-    }
 
     applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor);
 

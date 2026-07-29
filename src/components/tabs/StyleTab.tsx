@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import {
-  Layers, Circle, Radio, Grid, Minus, AudioWaveform, CircleDot, LineChart, Image as ImageIcon,
+  Layers, Circle, Radio, Grid, Minus, AudioWaveform, CircleDot, LineChart, Disc, Image as ImageIcon,
 } from 'lucide-react';
 import { VisualizerConfig, VisualizerStyle } from '../../types/visualizer';
 
@@ -12,6 +12,9 @@ interface Props {
 function BarChartIcon({ size }: { size: number }) {
   return <Layers size={size} />;
 }
+
+const barStyles: VisualizerStyle[] = ['spectrum', 'radial', 'equalizer', 'minimal', 'smoothSpectrum', 'circularBars', 'threeD', 'api3D', 'neonCity3D', 'speaker3D', 'speakerTrio', 'speakerSplatter'];
+const sensitivityStyles: VisualizerStyle[] = ['spectrum', 'radial', 'equalizer', 'minimal', 'smoothSpectrum', 'circularBars', 'oscilloscope', 'waveformFill', 'vuMeter', 'flameFire', 'threeD', 'api3D', 'neonCity3D', 'speaker3D', 'speakerTrio', 'speakerSplatter'];
 
 export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
   const handleStyleChange = (style: VisualizerStyle) => {
@@ -67,19 +70,58 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
         <button className={`style-card ${config.style === 'smoothSpectrum' ? 'selected' : ''}`} onClick={() => handleStyleChange('smoothSpectrum')}>
           <LineChart size={24} /><span>Smooth Spectrum</span>
         </button>
+        <button className={`style-card ${config.style === 'pulseRings' ? 'selected' : ''}`} onClick={() => handleStyleChange('pulseRings')}>
+          <Radio size={24} /><span>Pulse Rings</span>
+        </button>
+        <button className={`style-card ${config.style === 'vuMeter' ? 'selected' : ''}`} onClick={() => handleStyleChange('vuMeter')}>
+          <CircleDot size={24} /><span>VU Meter</span>
+        </button>
+        <button className={`style-card ${config.style === 'auroraWave' ? 'selected' : ''}`} onClick={() => handleStyleChange('auroraWave')}>
+          <Layers size={24} /><span>Aurora Wave</span>
+        </button>
+        <button className={`style-card ${config.style === 'flameFire' ? 'selected' : ''}`} onClick={() => handleStyleChange('flameFire')}>
+          <Circle size={24} /><span>Flame Fire</span>
+        </button>
+        <button className={`style-card ${config.style === 'spiralGalaxy' ? 'selected' : ''}`} onClick={() => handleStyleChange('spiralGalaxy')}>
+          <CircleDot size={24} /><span>Spiral Galaxy</span>
+        </button>
+        <button className={`style-card ${config.style === 'threeD' ? 'selected' : ''}`} onClick={() => handleStyleChange('threeD')}>
+          <Grid size={24} /><span>3D Blocks</span>
+        </button>
+        <button className={`style-card ${config.style === 'api3D' ? 'selected' : ''}`} onClick={() => handleStyleChange('api3D')}>
+          <CircleDot size={24} /><span>Fire 3D</span>
+        </button>
+        <button className={`style-card ${config.style === 'neonCity3D' ? 'selected' : ''}`} onClick={() => handleStyleChange('neonCity3D')}>
+          <Grid size={24} /><span>Neon City 3D</span>
+        </button>
+        <button className={`style-card ${config.style === 'speaker3D' ? 'selected' : ''}`} onClick={() => handleStyleChange('speaker3D')}>
+          <Radio size={24} /><span>Speaker 3D</span>
+        </button>
+        <button className={`style-card ${config.style === 'speakerTrio' ? 'selected' : ''}`} onClick={() => handleStyleChange('speakerTrio')}>
+          <Radio size={24} /><span>Speaker Trio</span>
+        </button>
+        <button className={`style-card ${config.style === 'speakerSplatter' ? 'selected' : ''}`} onClick={() => handleStyleChange('speakerSplatter')}>
+          <Disc size={24} /><span>Speaker Splatter</span>
+        </button>
       </div>
 
-      <div className="control-group mt-4">
-        <label className="label-row"><span>Bar Count ({config.reactivity.barCount})</span></label>
-        <input type="range" min={16} max={128} step={4} value={config.reactivity.barCount}
-          onChange={(e) => handleReactivityChange('barCount', parseInt(e.target.value))} className="input-range" />
-      </div>
+      <hr className="section-divider" />
 
-      <div className="control-group">
-        <label className="label-row"><span>Sensitivity ({config.reactivity.sensitivity.toFixed(1)}x)</span></label>
-        <input type="range" min={0.5} max={2.5} step={0.1} value={config.reactivity.sensitivity}
-          onChange={(e) => handleReactivityChange('sensitivity', parseFloat(e.target.value))} className="input-range" />
-      </div>
+      {barStyles.includes(config.style) && (
+        <div className="control-group mt-4">
+          <label className="label-row"><span>Bar Count ({config.reactivity.barCount})</span></label>
+          <input type="range" min={16} max={128} step={4} value={config.reactivity.barCount}
+            onChange={(e) => handleReactivityChange('barCount', parseInt(e.target.value))} className="input-range" />
+        </div>
+      )}
+
+      {sensitivityStyles.includes(config.style) && (
+        <div className="control-group">
+          <label className="label-row"><span>Sensitivity ({config.reactivity.sensitivity.toFixed(1)}x)</span></label>
+          <input type="range" min={0.5} max={2.5} step={0.1} value={config.reactivity.sensitivity}
+            onChange={(e) => handleReactivityChange('sensitivity', parseFloat(e.target.value))} className="input-range" />
+        </div>
+      )}
 
       <div className="control-group">
         <label className="label-row"><span>Bass Pulse Boost ({config.reactivity.bassMultiplier.toFixed(1)}x)</span></label>
@@ -87,7 +129,46 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
           onChange={(e) => handleReactivityChange('bassMultiplier', parseFloat(e.target.value))} className="input-range" />
       </div>
 
-      <h3 className="section-title">Position</h3>
+      {config.style === 'api3D' && (
+        <>
+          <h3 className="section-title mt-3">Fire 3D Dimension Controls</h3>
+          <div className="control-group">
+            <label className="label-row">
+              <span>Fire Wave Width / Lebar Api ({Math.round((config.reactivity.fireWidthRatio ?? 0.94) * 100)}%)</span>
+            </label>
+            <input
+              type="range"
+              min={0.3}
+              max={1.0}
+              step={0.02}
+              value={config.reactivity.fireWidthRatio ?? 0.94}
+              onChange={(e) => handleReactivityChange('fireWidthRatio', parseFloat(e.target.value))}
+              className="input-range"
+            />
+          </div>
+          <div className="control-group">
+            <label className="label-row">
+              <span>Fire Wave Height / Tinggi Api ({(config.reactivity.fireHeightScale ?? 1.0).toFixed(1)}x)</span>
+            </label>
+            <input
+              type="range"
+              min={0.3}
+              max={2.5}
+              step={0.1}
+              value={config.reactivity.fireHeightScale ?? 1.0}
+              onChange={(e) => handleReactivityChange('fireHeightScale', parseFloat(e.target.value))}
+              className="input-range"
+            />
+          </div>
+        </>
+      )}
+
+      <h3 className="section-title">Scale & Position</h3>
+      <div className="control-group">
+        <label className="label-row"><span>Scale ({Math.round(config.scale * 100)}%)</span></label>
+        <input type="range" min={0.1} max={2.0} step={0.05} value={config.scale}
+          onChange={(e) => updateConfig((prev) => ({ ...prev, scale: parseFloat(e.target.value) }))} className="input-range" />
+      </div>
       <div className="control-group">
         <label className="label-row"><span>Horizontal X ({config.positionX > 0 ? '+' : ''}{config.positionX})</span></label>
         <input type="range" min={-500} max={500} step={1} value={config.positionX}

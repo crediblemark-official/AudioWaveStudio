@@ -7,7 +7,7 @@ import { ExportModal } from './components/ExportModal';
 import { DEFAULT_CONFIG, PRESETS } from './utils/presets';
 import { SongMetadata, VisualizerConfig } from './types/visualizer';
 import { audioEngine } from './services/audioEngine';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, Headphones } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [config, setConfig] = useState<VisualizerConfig>(DEFAULT_CONFIG);
@@ -15,6 +15,29 @@ export const App: React.FC = () => {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
+  const [isListening, setIsListening] = useState<boolean>(false);
+  const [listenError, setListenError] = useState<string>('');
+
+  const handleStartListen = async (deviceId?: string) => {
+    setIsLoading(true);
+    setListenError('');
+    try {
+      await audioEngine.startListening(deviceId);
+      setIsListening(true);
+      setSongMeta(null);
+    } catch (err) {
+      setListenError(err instanceof Error ? err.message : 'Failed to access audio input');
+      console.error('[App] Listen failed:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStopListen = () => {
+    audioEngine.stopListening();
+    setIsListening(false);
+    setListenError('');
+  };
 
   const handleLoadSong = async (file: File) => {
     setIsLoading(true);
@@ -153,6 +176,10 @@ export const App: React.FC = () => {
         onLoadSongPath={handleLoadSongPath}
         onApplyPreset={handleApplyPreset}
         onOpenExport={() => setIsExportModalOpen(true)}
+        isListening={isListening}
+        onStartListen={handleStartListen}
+        onStopListen={handleStopListen}
+        listenError={listenError}
       />
 
       <main className="main-viewport">
@@ -160,7 +187,23 @@ export const App: React.FC = () => {
         {!isFullscreen && <ControlPanel config={config} onChangeConfig={setConfig} />}
       </main>
 
-      {!isFullscreen && <AudioPlayerBar songMeta={songMeta} />}
+      {!isFullscreen && !isListening && <AudioPlayerBar songMeta={songMeta} />}
+      {!isFullscreen && isListening && (
+        <div className="audio-player-bar listening-bar">
+          <div className="player-track-info">
+            <Headphones size={20} className="text-secondary" />
+            <div className="track-details">
+              <span className="track-title">Listening</span>
+              <span className="track-artist">Capturing system audio via loopback</span>
+            </div>
+          </div>
+          <div className="player-center">
+            <button className="btn btn-primary" onClick={handleStopListen}>
+              Stop Listening
+            </button>
+          </div>
+        </div>
+      )}
 
       <ExportModal
         isOpen={isExportModalOpen}

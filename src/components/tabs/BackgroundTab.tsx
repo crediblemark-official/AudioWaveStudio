@@ -107,7 +107,7 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
           <div className="control-group mt-2">
             <div className="picker-item">
               <span>Color</span>
-              <input type="color" value={config.background.particleColor}
+              <input type="color" value={config.background.particleColor || '#00f0ff'}
                 onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, particleColor: e.target.value } }))} />
             </div>
           </div>
@@ -168,31 +168,32 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
                 { value: 'spiral', label: 'Spiral' },
                 { value: 'wave', label: 'Sinusoidal' },
                 { value: 'burst', label: 'Burst' },
+                { value: 'confined', label: 'Confined' },
               ]}
               onChange={(val) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteStyle: val as MusicNoteStyle } }))} />
           </div>
           <div className="control-group">
-            <label className="label-row"><span>Note Density ({Math.round((config.background.musicNoteDensity ?? 0.5) * 100)}%)</span></label>
-            <input type="range" min={0} max={1} step={0.05} value={config.background.musicNoteDensity ?? 0.5}
+            <label className="label-row"><span>Note Density ({Math.round((config.background.musicNoteDensity ?? 1.0) * 100)}%)</span></label>
+            <input type="range" min={0.1} max={1} step={0.05} value={config.background.musicNoteDensity ?? 1.0}
               onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteDensity: parseFloat(e.target.value) } }))}
               className="input-range" />
           </div>
           <div className="control-group">
-            <label className="label-row"><span>Note Size ({config.background.musicNoteSize ?? 24}px)</span></label>
-            <input type="range" min={8} max={64} step={2} value={config.background.musicNoteSize ?? 24}
+            <label className="label-row"><span>Note Size ({config.background.musicNoteSize ?? 60}px)</span></label>
+            <input type="range" min={16} max={120} step={4} value={config.background.musicNoteSize ?? 60}
               onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteSize: parseInt(e.target.value) } }))}
               className="input-range" />
           </div>
           <div className="control-group">
-            <label className="label-row"><span>Float Speed ({((config.background.musicNoteSpeed ?? 1.0) * 100).toFixed(0)}%)</span></label>
-            <input type="range" min={0.2} max={3} step={0.1} value={config.background.musicNoteSpeed ?? 1.0}
-              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteSpeed: parseFloat(e.target.value) } }))}
+            <label className="label-row"><span>Max Count ({config.background.musicNoteCount ?? 80})</span></label>
+            <input type="range" min={10} max={80} step={5} value={config.background.musicNoteCount ?? 80}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteCount: parseInt(e.target.value) } }))}
               className="input-range" />
           </div>
           <div className="control-group">
-            <label className="label-row"><span>Max Count ({config.background.musicNoteCount ?? 40})</span></label>
-            <input type="range" min={5} max={80} step={5} value={config.background.musicNoteCount ?? 40}
-              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteCount: parseInt(e.target.value) } }))}
+            <label className="label-row"><span>Beat Sensitivity ({Math.round((config.background.musicNoteSensitivity ?? 1.0) * 100)}%)</span></label>
+            <input type="range" min={0} max={2} step={0.1} value={config.background.musicNoteSensitivity ?? 1.0}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, musicNoteSensitivity: parseFloat(e.target.value) } }))}
               className="input-range" />
           </div>
         </>

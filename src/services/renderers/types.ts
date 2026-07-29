@@ -8,6 +8,7 @@ export interface Particle {
   vy: number;
   alpha: number;
   color: string;
+  phase?: number;
 }
 
 export interface MusicNote {
@@ -33,7 +34,9 @@ export interface RenderContext {
   freqData: Uint8Array;
   timeData: Uint8Array;
   bassEnergy: number;
+  bassEnergyRaw: number;
   beatStrength: number;
+  beatStrengthRaw: number;
   peakData: number[];
   particles: Particle[];
   musicNotes: MusicNote[];

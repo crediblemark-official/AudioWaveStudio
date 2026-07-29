@@ -1,5 +1,5 @@
-import React, { useRef } from 'react';
-import { Activity, Upload, Film, Sparkles, Minus, Square, X } from 'lucide-react';
+import React, { useRef, useState, useEffect } from 'react';
+import { Activity, Upload, Film, Sparkles, Minus, Square, X, Headphones, StopCircle } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -15,6 +15,10 @@ interface NavbarProps {
   onLoadSongPath: (path: string) => void;
   onApplyPreset: (presetId: string) => void;
   onOpenExport: () => void;
+  isListening: boolean;
+  onStartListen: (deviceId?: string) => void;
+  onStopListen: () => void;
+  listenError: string;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,10 +26,37 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLoadSong,
   onLoadSongPath,
   onApplyPreset,
-  onOpenExport
+  onOpenExport,
+  isListening,
+  onStartListen,
+  onStopListen,
+  listenError,
 }) => {
   const audioInputRef = useRef<HTMLInputElement>(null);
   const [presetValue, setPresetValue] = React.useState('');
+  const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
+  const [showDevicePicker, setShowDevicePicker] = useState(false);
+
+  useEffect(() => {
+    if (showDevicePicker) {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+        setAudioDevices(devices.filter(d => d.kind === 'audioinput'));
+      }).catch(() => {});
+    }
+  }, [showDevicePicker]);
+
+  const handleListenClick = async () => {
+    const devices = await navigator.mediaDevices.enumerateDevices().catch(() => []);
+    const audioInputs = devices.filter(d => d.kind === 'audioinput');
+    if (audioInputs.length === 0) {
+      onStartListen();
+    } else if (audioInputs.length === 1) {
+      onStartListen(audioInputs[0].deviceId);
+    } else {
+      setAudioDevices(audioInputs);
+      setShowDevicePicker(true);
+    }
+  };
 
   const handleOpenAudioDialog = async () => {
     try {
@@ -83,19 +114,52 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             className="btn btn-primary"
             onClick={handleOpenAudioDialog}
+            disabled={isListening}
           >
             <Upload size={16} />
             <span>{songMeta ? 'Change Song' : 'Open Audio File'}</span>
           </button>
+          <button
+            className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
+            onClick={isListening ? onStopListen : handleListenClick}
+          >
+            {isListening ? <StopCircle size={16} /> : <Headphones size={16} />}
+            <span>{isListening ? 'Stop Listen' : 'Listen'}</span>
+          </button>
         </div>
+
+        {showDevicePicker && (
+          <div className="device-picker-overlay" onClick={() => setShowDevicePicker(false)}>
+            <div className="device-picker" onClick={e => e.stopPropagation()}>
+              <h4>Select Audio Input</h4>
+              {audioDevices.map(d => (
+                <button key={d.deviceId} className="device-option" onClick={() => {
+                  onStartListen(d.deviceId);
+                  setShowDevicePicker(false);
+                }}>
+                  {d.label || `Input ${d.deviceId.slice(0, 8)}...`}
+                </button>
+              ))}
+              <button className="device-option cancel" onClick={() => setShowDevicePicker(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {listenError && (
+          <div className="listen-error-toast">
+            <span>Listen failed: {listenError}</span>
+          </div>
+        )}
       </div>
 
       <div className="navbar-right">
         {/* Preset Selector */}
-        <div className="preset-selector">
-          <Sparkles size={16} className="preset-icon" />
+        <div className="preset-selector-wrapper">
           <CustomSelect
             value={presetValue}
+            icon={<Sparkles size={16} className="preset-icon" />}
             onChange={(v) => {
               if (!v) return;
               setPresetValue(v);

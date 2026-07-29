@@ -6,6 +6,7 @@ mod renderer;
 mod video_encoder;
 
 use audio_decoder::AudioData;
+use base64::{Engine as _, engine::general_purpose};
 use fft_analyzer::FftAnalyzer;
 use ffmpeg::resolve_ffmpeg;
 use image::codecs::jpeg::JpegEncoder;
@@ -22,9 +23,14 @@ struct ExportSession {
   stderr_handle: std::process::ChildStderr,
 }
 
+struct ListenSession {
+  child: Child,
+}
+
 struct AppState {
   audio_data: Mutex<Option<Arc<AudioData>>>,
   export_session: Mutex<Option<ExportSession>>,
+  listen_session: Mutex<Option<ListenSession>>,
   prev_smoothed: Mutex<Option<Vec<f32>>>,
 }
 
@@ -40,7 +46,8 @@ pub struct AudioDecodeResult {
   pub sample_rate: u32,
   pub channels: usize,
   pub duration: f64,
-  pub samples: Vec<f32>,
+  pub full_duration: f64,
+  pub samples_count: usize,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -95,13 +102,37 @@ async fn decode_audio_playback(
     sample_rate: audio.sample_rate,
     channels: audio.channels,
     duration: audio.duration_seconds,
-    samples: audio.samples.clone(),
+    full_duration: audio.duration_seconds,
+    samples_count: audio.samples.len(),
   };
 
   let mut guard = state.audio_data.lock().map_err(|e| e.to_string())?;
   *guard = Some(Arc::new(audio));
 
   Ok(result)
+}
+
+#[tauri::command]
+async fn get_audio_chunk_b64(
+  state: tauri::State<'_, AppState>,
+  start_sec: f64,
+  duration_sec: f64,
+) -> Result<String, String> {
+  let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
+  let audio = guard.as_ref().ok_or_else(|| "No audio loaded".to_string())?;
+
+  let sample_rate = audio.sample_rate as f64;
+  let start_frame = (start_sec * sample_rate).round() as usize;
+  let num_frames = (duration_sec * sample_rate).round() as usize;
+  let end_frame = (start_frame + num_frames).min(audio.samples.len());
+
+  if start_frame >= audio.samples.len() {
+    return Ok(String::new());
+  }
+
+  let chunk = &audio.samples[start_frame..end_frame];
+  let bytes: Vec<u8> = chunk.iter().flat_map(|&s| s.to_le_bytes()).collect();
+  Ok(general_purpose::STANDARD.encode(&bytes))
 }
 
 #[tauri::command]
@@ -428,6 +459,107 @@ async fn save_upload_to_temp(bytes: Vec<u8>, ext: String) -> Result<String, Stri
   .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn start_system_listen(
+  app_handle: tauri::AppHandle,
+  state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+  use std::io::Read;
+
+  let pw_output = std::process::Command::new("pw-dump")
+    .arg("-N")
+    .output()
+    .map_err(|e| format!("pw-dump: {}", e))?;
+
+  let monitors: Vec<String> = serde_json::from_slice::<serde_json::Value>(&pw_output.stdout)
+    .map_err(|e| format!("JSON: {}", e))?
+    .as_array()
+    .ok_or("Not array")?
+    .iter()
+    .filter_map(|obj| {
+      let props = obj.get("info")?.get("props")?;
+      if props.get("media.class")?.as_str()? == "Audio/Sink" {
+        Some(format!("{}.monitor", props.get("node.name")?.as_str()?))
+      } else { None }
+    })
+    .collect();
+
+  let src = monitors.first().ok_or("No sink found")?.clone();
+
+  let mut child = std::process::Command::new("ffmpeg")
+    .args(["-f", "pulse", "-i", &src, "-ac", "1", "-ar", "44100", "-f", "f32le", "-"])
+    .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::null())
+    .spawn()
+    .map_err(|e| format!("ffmpeg: {}", e))?;
+
+  let mut stdout = child.stdout.take().ok_or("No stdout")?;
+
+  {
+    let mut guard = state.listen_session.lock().map_err(|e| e.to_string())?;
+    *guard = Some(ListenSession { child });
+  }
+
+  let handle = app_handle.clone();
+  let fft_size = 1024usize;
+
+  std::thread::spawn(move || {
+    let analyzer = fft_analyzer::FftAnalyzer::new(fft_size);
+    let mut samples = Vec::with_capacity(fft_size * 2);
+    let mut raw = vec![0u8; 8192];
+
+    loop {
+      let n = match stdout.read(&mut raw) {
+        Ok(0) => break,
+        Ok(n) => n,
+        Err(e) => { eprintln!("[Listen] read err: {}", e); break; }
+      };
+
+      let converted: Vec<f32> = raw[..n].chunks_exact(4)
+        .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+        .collect();
+      samples.extend(converted);
+
+      while samples.len() >= fft_size {
+        let (spectrum, bass_raw) = match analyzer.compute_spectrum(&samples[..fft_size], 256) {
+          Ok(r) => r,
+          Err(_) => { samples.drain(0..fft_size / 2); continue; }
+        };
+
+        let freq_data: Vec<u8> = spectrum.iter().map(|&mag| {
+          ((20.0 * (mag.max(1e-10)).log10() + 100.0) / 70.0 * 255.0).clamp(0.0, 255.0).round() as u8
+        }).collect();
+
+        let time_data: Vec<u8> = samples[..fft_size].iter().map(|&s| {
+          ((s * 127.0 + 128.0).round() as i16).clamp(0, 255) as u8
+        }).collect();
+
+        samples.drain(0..fft_size / 2);
+
+        let _ = handle.emit("listen-freq-data", serde_json::json!({
+          "freq_data": freq_data,
+          "time_data": time_data,
+          "bass_energy": (bass_raw * 4.0).min(1.0),
+        }));
+      }
+    }
+  });
+
+  Ok(src)
+}
+
+#[tauri::command]
+async fn stop_system_listen(state: tauri::State<'_, AppState>) -> Result<(), String> {
+  let mut guard = state.listen_session.lock().map_err(|_| "lock")?;
+  if let Some(mut s) = guard.take() {
+    let _ = std::process::Command::new("kill")
+      .args(["-TERM", &s.child.id().to_string()])
+      .output();
+    let _ = s.child.wait();
+  }
+  Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -436,11 +568,13 @@ pub fn run() {
     .manage(AppState {
       audio_data: Mutex::new(None),
       export_session: Mutex::new(None),
+      listen_session: Mutex::new(None),
       prev_smoothed: Mutex::new(None),
     })
     .invoke_handler(tauri::generate_handler![
       decode_audio,
       decode_audio_playback,
+      get_audio_chunk_b64,
       read_file_bytes,
       copy_file_to_path,
       check_ffmpeg,
@@ -453,7 +587,9 @@ pub fn run() {
       write_frame,
       write_frame_rgba,
       finish_export_session,
-      convert_webm_to_mp4
+      convert_webm_to_mp4,
+      start_system_listen,
+      stop_system_listen
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
