@@ -2,25 +2,12 @@ use std::process::Command;
 use tauri::Manager;
 
 pub fn resolve_ffmpeg(app_handle: &tauri::AppHandle) -> Result<String, String> {
-  // 1. Check sidecar in resource dir (bundled in production builds)
-  if let Ok(path) = app_handle.path().resolve("binaries/ffmpeg", tauri::path::BaseDirectory::Resource) {
-    if path.exists() {
-      return Ok(path.to_string_lossy().to_string());
-    }
-    // Windows variant
-    let mut win_path = path;
-    win_path.set_extension("exe");
-    if win_path.exists() {
-      return Ok(win_path.to_string_lossy().to_string());
-    }
-  }
-
-  // 2. Check PATH (system-installed ffmpeg)
+  // 1. Check PATH (system-installed ffmpeg)
   if is_in_path("ffmpeg") {
     return Ok("ffmpeg".to_string());
   }
 
-  // 3. Check app data dir (previously auto-installed)
+  // 2. Check app data dir (previously auto-installed)
   if let Ok(data_dir) = app_handle.path().app_data_dir() {
     let candidates = [
       data_dir.join("ffmpeg").join("ffmpeg"),

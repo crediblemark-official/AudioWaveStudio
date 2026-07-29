@@ -51,27 +51,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev ffmpeg
 
-      - name: Prepare sidecar ffmpeg binary for macOS
-        if: matrix.platform == 'macos-latest'
-        run: |
-          brew install ffmpeg || true
-          FFMPEG_BIN=$(which ffmpeg || echo "")
-          mkdir -p src-tauri/binaries
-          if [ -n "$FFMPEG_BIN" ]; then
-            cp "$FFMPEG_BIN" src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-            cp "$FFMPEG_BIN" src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-          fi
-
-      - name: Prepare sidecar ffmpeg binary for Windows
-        if: matrix.platform == 'windows-latest'
-        shell: bash
-        run: |
-          choco install ffmpeg --no-progress || true
-          mkdir -p src-tauri/binaries
-          if [ -f "/c/ProgramData/chocolatey/bin/ffmpeg.exe" ]; then
-            cp /c/ProgramData/chocolatey/bin/ffmpeg.exe src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
-          fi
-
       - name: Install frontend dependencies
         run: npm ci
 
