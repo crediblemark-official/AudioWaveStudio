@@ -20,9 +20,8 @@ import { renderNeonCity3D } from './renderers/neonCity3D';
 import { renderSpeaker3D } from './renderers/speaker3D';
 import { renderSpeakerTrio } from './renderers/speakerTrio';
 import { renderSpeakerSplatter } from './renderers/speakerSplatter';
-import { renderMusicNotes } from './renderers/musicNotes';
+import { renderMusicNotes, renderParticles, initParticles } from './renderers/background/index';
 import { renderTextOverlay } from './renderers/textOverlay';
-import { renderParticles, initParticles } from './renderers/particles';
 import { applyScreenEffects, getShakeOffset } from './renderers/screenEffects';
 import type { RenderContext, MusicNote } from './renderers/types';
 

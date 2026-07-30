@@ -18,14 +18,21 @@ export interface ColorTheme {
   glowColor: string;
 }
 
+export type BackgroundFillType = 'solid' | 'gradient';
+export type BackgroundEffect = 'none' | 'grid' | 'particles' | 'musicNotes' | 'aurora' | 'noise' | 'bokeh' | 'starfield' | 'nebula' | 'psychedelic';
+
 export interface BackgroundSettings {
-  mode: 'solid' | 'gradient' | 'customImage' | 'grid';
+  mode: 'solid' | 'gradient' | 'customImage' | 'grid' | 'aurora' | 'noise' | 'bokeh' | 'starfield' | 'nebula' | 'psychedelic';
+  fillType?: BackgroundFillType;
+  effect?: BackgroundEffect;
+  effects?: BackgroundEffect[];
   solidColor: string;
   gradientStart: string;
   gradientEnd: string;
   blurAmount: number; // 0 to 20 px
   overlayOpacity: number; // 0 to 1
   customImageUri?: string;
+  imageOpacity?: number; // 0 to 1
   gridColor?: string;
   gridSize?: number;
   gridLineWidth?: number;
@@ -43,6 +50,27 @@ export interface BackgroundSettings {
   musicNoteSize?: number;
   musicNoteCount?: number;
   musicNoteSensitivity?: number;
+  // Starfield settings
+  starCount?: number;
+  starSpeed?: number;
+  starBrightness?: number;
+  // Nebula settings
+  nebulaIntensity?: number;
+  nebulaSpeed?: number;
+  // Aurora settings
+  auroraSpeed?: number;
+  auroraAmplitude?: number;
+  auroraOpacity?: number;
+  // Film Grain Noise settings
+  grainOpacity?: number;
+  // Bokeh settings
+  bokehCount?: number;
+  bokehSize?: number;
+  bokehOpacity?: number;
+  // Psychedelic settings
+  psychedelicSpeed?: number;
+  psychedelicBands?: number;
+  psychedelicLineWidth?: number;
 }
 
 export interface TextSettings {

@@ -1,4 +1,4 @@
-import { RenderContext } from './types';
+import { RenderContext } from '../types';
 
 const SYMBOLS = ['♩', '♪', '♫', '♬'];
 
