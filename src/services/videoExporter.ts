@@ -106,10 +106,7 @@ export class VideoExporter {
       // Start FFmpeg session FIRST, then stream frames as they're captured
       await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);
 
-      while (this.isExporting) {
-        const elapsedSec = (Date.now() - startTime) / 1000;
-        if (elapsedSec >= duration || frameCount >= totalFrames) break;
-
+      while (this.isExporting && frameCount < totalFrames) {
         const frameStart = Date.now();
 
         const imageData = captureCtx.getImageData(0, 0, width, height);

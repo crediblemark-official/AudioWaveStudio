@@ -65,12 +65,24 @@ export class AudioEngine {
     const buffer = this.audioCtx.createBuffer(1, totalFrames, sampleRate);
     const channelData = buffer.getChannelData(0);
 
-    // Fetch samples in 5-second chunks to avoid IPC size limits
-    const CHUNK_SEC = 5.0;
+    // Fetch samples in 2-second chunks to avoid IPC size limits
+    const CHUNK_SEC = 2.0;
     let offset = 0;
+    let failedChunks = 0;
     for (let t = 0; offset < totalFrames; t += CHUNK_SEC) {
-      const b64 = await rustBridge.getAudioChunkB64(t, CHUNK_SEC);
-      if (!b64) break;
+      let b64: string;
+      try {
+        b64 = await rustBridge.getAudioChunkB64(t, CHUNK_SEC);
+      } catch (e) {
+        console.warn(`[AudioEngine] Chunk at ${t}s failed:`, e);
+        failedChunks++;
+        if (failedChunks >= 3) break;
+        continue;
+      }
+      if (!b64) {
+        console.warn(`[AudioEngine] Empty chunk at ${t}s — end of audio`);
+        break;
+      }
 
       const binaryStr = atob(b64);
       const bytes = new Uint8Array(binaryStr.length);
@@ -84,6 +96,7 @@ export class AudioEngine {
 
     // Trim buffer if fewer frames were loaded
     if (offset < totalFrames) {
+      console.warn(`[AudioEngine] Loaded ${offset}/${totalFrames} samples — audio truncated`);
       const trimmed = this.audioCtx.createBuffer(1, offset, sampleRate);
       trimmed.getChannelData(0).set(channelData.subarray(0, offset));
       return trimmed;
