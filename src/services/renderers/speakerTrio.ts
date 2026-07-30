@@ -32,10 +32,18 @@ function initNotes(width: number, height: number) {
   }
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
 export function renderSpeakerTrio(r: RenderContext) {
   const { ctx: c, width, height, config, freqData, bassEnergy: be, beatStrength: bs } = r;
   const sensitivity = config.reactivity.sensitivity;
   const theme = config.theme;
+  const [pR, pG, pB] = hexToRgb(theme.primaryColor);
+  const [sR, sG, sB] = hexToRgb(theme.secondaryColor);
+  const [aR, aG, aB] = hexToRgb(theme.accentColor);
 
   initNotes(width, height);
 
@@ -45,24 +53,25 @@ export function renderSpeakerTrio(r: RenderContext) {
 
   c.save();
 
-  // --- PASS 1: BACKGROUND HALFTONE / PIXEL MATRIX EQUALIZER (SYMMETRICAL MIRRORED BARS) ---
-  const halfCount = 36;
+  // --- PASS 1: SYMMETRICAL MIRRORED SPECTRUM BARS ---
+  const halfCount = 40;
   const step = Math.max(1, Math.floor((freqData.length * 0.5) / halfCount));
-  const startX = width * 0.03;
-  const halfW = (centerX - startX);
+  const startX = width * 0.04;
+  const halfW = centerX - startX - 4;
+  const barW = Math.max(2, (halfW / halfCount) - 1.5);
+  const maxBarH = height * 0.32;
 
-  // Horizontal central baseline
-  c.shadowBlur = 15 + be * 15;
+  // Central glow baseline
+  c.shadowBlur = 18 + be * 15;
   c.shadowColor = theme.glowColor || '#FF0055';
   c.strokeStyle = theme.primaryColor || '#FF3366';
-  c.lineWidth = 2;
+  c.lineWidth = 1.5;
   c.beginPath();
-  c.moveTo(0, centerY);
-  c.lineTo(width, centerY);
+  c.moveTo(startX, centerY);
+  c.lineTo(width - startX, centerY);
   c.stroke();
 
-  c.shadowBlur = 6;
-  c.shadowColor = theme.primaryColor || '#FF0055';
+  c.shadowBlur = 0;
 
   for (let i = 0; i < halfCount; i++) {
     let sum = 0;
@@ -70,33 +79,30 @@ export function renderSpeakerTrio(r: RenderContext) {
       sum += freqData[i * step + j] || 0;
     }
     const val = (sum / step / 255) * sensitivity;
-    if (val < 0.01) continue;
+    if (val < 0.02) continue;
 
-    const barH = val * height * 0.35;
-    const dotSize = 4;
-    const dotGap = 6;
-    const dotsCount = Math.min(Math.floor(barH / dotGap), 8);
+    const barH = Math.max(1, val * maxBarH);
+    const xLeft = startX + i * (barW + 1.5);
+    const xRight = width - startX - (i + 1) * (barW + 1.5);
+    const yTop = centerY - barH;
 
-    const xLeft = centerX - (i / (halfCount - 1)) * halfW;
-    const xRight = centerX + (i / (halfCount - 1)) * halfW;
+    const mix = i / halfCount;
+    const r = Math.round(pR + (sR - pR) * mix);
+    const g = Math.round(pG + (sG - pG) * mix);
+    const b = Math.round(pB + (sB - pB) * mix);
+    const bright = 0.5 + val * 0.5;
 
-    for (let d = 0; d < dotsCount; d++) {
-      const yUp = centerY - d * dotGap;
-      const yDown = centerY + d * dotGap;
-      const ratio = d / dotsCount;
+    c.fillStyle = `rgb(${Math.round(r * bright)}, ${Math.round(g * bright)}, ${Math.round(b * bright)})`;
+    c.shadowBlur = 8 + val * 12;
+    c.shadowColor = theme.glowColor;
+    c.fillRect(xLeft, yTop, barW, barH);
+    c.fillRect(xRight, yTop, barW, barH);
 
-      let dotColor = '#FF0055';
-      if (ratio > 0.75) dotColor = '#FFFFFF';
-      else if (ratio > 0.45) dotColor = '#FF6600';
-      else dotColor = theme.primaryColor || '#FF0055';
-
-      c.fillStyle = dotColor;
-      c.fillRect(xLeft, yUp, dotSize, dotSize);
-      c.fillRect(xLeft, yDown, dotSize, dotSize);
-      if (i > 0) {
-        c.fillRect(xRight, yUp, dotSize, dotSize);
-        c.fillRect(xRight, yDown, dotSize, dotSize);
-      }
+    if (val > 0.15) {
+      c.fillStyle = `rgba(${aR}, ${aG}, ${aB}, ${val * 0.3})`;
+      c.shadowBlur = 0;
+      c.fillRect(xLeft, yTop, barW, 1.5);
+      c.fillRect(xRight, yTop, barW, 1.5);
     }
   }
 
@@ -123,7 +129,7 @@ export function renderSpeakerTrio(r: RenderContext) {
     c.save();
     c.translate(n.x, n.y);
     c.rotate(n.rotation);
-    c.fillStyle = `rgba(30, 30, 40, ${n.alpha})`;
+    c.fillStyle = `rgba(${aR}, ${aG}, ${aB}, ${n.alpha})`;
     c.fillText(n.symbol, 0, 0);
     c.restore();
   }

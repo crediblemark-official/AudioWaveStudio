@@ -82,13 +82,18 @@ export function renderApi3D(r: RenderContext) {
   }
 
   const theme = config.theme;
+  function hexToRgb(hex: string): [number, number, number] {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  const [aR, aG, aB] = hexToRgb(theme.accentColor);
 
   c.save();
 
   // --- PASS 1: PLASMA SMOKE GLOW CLOUD ---
   c.globalCompositeOperation = 'lighter';
   c.shadowBlur = 40 + be * 20;
-  c.shadowColor = theme.glowColor || theme.primaryColor;
+  c.shadowColor = theme.glowColor;
 
   const cloudGrad = c.createLinearGradient(0, centerY - height * 0.2, 0, centerY + height * 0.2);
   cloudGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
@@ -132,7 +137,7 @@ export function renderApi3D(r: RenderContext) {
   c.stroke();
 
   // Sub-thread 2
-  c.strokeStyle = theme.accentColor || theme.secondaryColor;
+  c.strokeStyle = theme.accentColor;
   c.globalAlpha = 0.35;
   c.lineWidth = 1.0;
   c.beginPath();
@@ -153,7 +158,7 @@ export function renderApi3D(r: RenderContext) {
 
   // --- PASS 4: VERTICAL LIGHT NEEDLES ON HIGH PEAKS ---
   c.shadowBlur = 15;
-  c.shadowColor = theme.glowColor || theme.primaryColor;
+  c.shadowColor = theme.glowColor;
   for (let i = 0; i < pointCount; i += 3) {
     const disp = displacements[i];
     const absDisp = Math.abs(disp);
@@ -164,7 +169,7 @@ export function renderApi3D(r: RenderContext) {
 
       const needleGrad = c.createLinearGradient(0, py - needleH * 0.5, 0, py + needleH * 0.5);
       needleGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-      needleGrad.addColorStop(0.5, (theme.accentColor || '#FFFFFF') + 'CC');
+      needleGrad.addColorStop(0.5, `rgba(${aR}, ${aG}, ${aB}, 0.8)`);
       needleGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
       c.strokeStyle = needleGrad;
@@ -179,7 +184,7 @@ export function renderApi3D(r: RenderContext) {
   // --- PASS 5: MAIN GLOWING NEON WAVEFORM (HERO LINE) ---
   // 5A: Outer Neon Bloom
   c.shadowBlur = 28 + be * 18;
-  c.shadowColor = theme.glowColor || theme.primaryColor;
+  c.shadowColor = theme.glowColor;
   c.strokeStyle = theme.secondaryColor;
   c.globalAlpha = 0.65;
   c.lineWidth = 7.5;
@@ -201,15 +206,15 @@ export function renderApi3D(r: RenderContext) {
 
   // 5B: Inner Primary Line
   c.shadowBlur = 16;
-  c.shadowColor = theme.glowColor || theme.primaryColor;
+  c.shadowColor = theme.glowColor;
   c.strokeStyle = theme.primaryColor;
   c.lineWidth = 3.6;
   c.stroke();
 
   // 5C: White-Hot / Accent Core
   c.shadowBlur = 8;
-  c.shadowColor = theme.accentColor || '#FFFFFF';
-  c.strokeStyle = theme.accentColor || '#FFFFFF';
+  c.shadowColor = theme.accentColor;
+  c.strokeStyle = theme.accentColor;
   c.lineWidth = 1.8;
   c.stroke();
 

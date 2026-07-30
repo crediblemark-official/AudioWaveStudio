@@ -32,7 +32,7 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
     <div className="tab-pane">
       <h3 className="section-title">Background Style</h3>
       <div className="btn-group">
-        {(['solid', 'gradient', 'customImage'] as const).map((m) => (
+        {(['solid', 'gradient', 'customImage', 'grid'] as const).map((m) => (
           <button key={m} className={`btn-toggle ${config.background.mode === m ? 'active' : ''}`}
             onClick={() => handleBgModeChange(m)}>
             {m === 'customImage' ? 'Custom Image' : m.charAt(0).toUpperCase() + m.slice(1)}
@@ -72,6 +72,27 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
           </button>
           <input type="file" ref={bgImageInputRef} onChange={handleBgImageUpload} accept="image/*" className="hidden-input" />
         </div>
+      )}
+
+      {config.background.mode === 'grid' && (
+        <>
+          <div className="control-group mt-3">
+            <label className="label-row"><span>Background Color</span></label>
+            <input type="color" value={config.background.solidColor}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, solidColor: e.target.value } }))} />
+          </div>
+          <div className="control-group">
+            <label className="label-row"><span>Grid Color</span></label>
+            <input type="color" value={config.background.gridColor || '#ffffff'}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, gridColor: e.target.value } }))} />
+          </div>
+          <div className="control-group">
+            <label className="label-row"><span>Grid Size ({config.background.gridSize || 40}px)</span></label>
+            <input type="range" min={10} max={120} step={5} value={config.background.gridSize || 40}
+              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, gridSize: parseInt(e.target.value) } }))}
+              className="input-range" />
+          </div>
+        </>
       )}
 
       <div className="control-group mt-3">

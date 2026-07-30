@@ -1,83 +1,34 @@
 import { RenderContext } from './types';
 
-interface DotParticle {
-  x: number;
-  y: number;
-  r: number;
-  color: string;
-}
-
-let staticDotsLeft: DotParticle[] = [];
-let staticDotsRight: DotParticle[] = [];
-let staticDotsTop: DotParticle[] = [];
-let staticSplatterDots: DotParticle[] = [];
+let staticSplatterDots: { x: number; y: number; r: number }[] = [];
+let arcRotation = 0;
 
 function initSplatterElements(centerX: number, centerY: number, baseR: number) {
-  if (staticDotsLeft.length > 0) return;
+  if (staticSplatterDots.length > 0) return;
 
-  // 1. Blue Halftone Arc Array (Top-Left)
-  for (let ring = 1; ring <= 6; ring++) {
-    const radius = baseR * (0.8 + ring * 0.35);
-    const dotsInRing = 6 + ring * 2;
-    const startAngle = Math.PI * 0.95;
-    const endAngle = Math.PI * 1.45;
-    const dotR = 1.8 + ring * 1.3;
-
-    for (let i = 0; i < dotsInRing; i++) {
-      const angle = startAngle + (i / (dotsInRing - 1)) * (endAngle - startAngle);
-      const x = centerX + Math.cos(angle) * radius - ring * 3;
-      const y = centerY + Math.sin(angle) * radius - ring * 2;
-      staticDotsLeft.push({ x, y, r: dotR, color: i % 2 === 0 ? '#00B0FF' : '#00E5FF' });
-    }
-  }
-
-  // 2. Magenta Halftone Arc Array (Bottom-Right)
-  for (let ring = 1; ring <= 6; ring++) {
-    const radius = baseR * (0.8 + ring * 0.35);
-    const dotsInRing = 6 + ring * 2;
-    const startAngle = Math.PI * 0.05;
-    const endAngle = Math.PI * 0.55;
-    const dotR = 1.8 + ring * 1.3;
-
-    for (let i = 0; i < dotsInRing; i++) {
-      const angle = startAngle + (i / (dotsInRing - 1)) * (endAngle - startAngle);
-      const x = centerX + Math.cos(angle) * radius + ring * 3;
-      const y = centerY + Math.sin(angle) * radius + ring * 3;
-      staticDotsRight.push({ x, y, r: dotR, color: i % 2 === 0 ? '#FF007F' : '#FF40A0' });
-    }
-  }
-
-  // 3. White & Silver Halftone Array (Top-Right)
-  for (let ring = 1; ring <= 5; ring++) {
-    const radius = baseR * (0.9 + ring * 0.38);
-    const dotsInRing = 5 + ring * 2;
-    const startAngle = -Math.PI * 0.45;
-    const endAngle = -Math.PI * 0.05;
-    const dotR = 2.2 + ring * 1.3;
-
-    for (let i = 0; i < dotsInRing; i++) {
-      const angle = startAngle + (i / (dotsInRing - 1)) * (endAngle - startAngle);
-      const x = centerX + Math.cos(angle) * radius;
-      const y = centerY + Math.sin(angle) * radius;
-      const color = i % 2 === 0 ? '#FFFFFF' : '#888899';
-      staticDotsTop.push({ x, y, r: dotR, color });
-    }
-  }
-
-  // 4. Random Splatter Dots
   for (let i = 0; i < 45; i++) {
     const angle = Math.random() * Math.PI * 2;
     const dist = baseR * (0.4 + Math.random() * 1.3);
     const x = centerX + Math.cos(angle) * dist;
     const y = centerY + Math.sin(angle) * dist + baseR * 0.2;
     const r = 1.2 + Math.random() * 4.5;
-    staticSplatterDots.push({ x, y, r, color: Math.random() > 0.4 ? '#FFFFFF' : '#444455' });
+    staticSplatterDots.push({ x, y, r });
   }
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
 export function renderSpeakerSplatter(r: RenderContext) {
   const { ctx: c, width, height, config, freqData, bassEnergy: be, beatStrength: bs } = r;
   const sensitivity = config.reactivity.sensitivity;
+  const theme = config.theme;
+  const [pR, pG, pB] = hexToRgb(theme.primaryColor);
+  const [sR, sG, sB] = hexToRgb(theme.secondaryColor);
+  const [aR, aG, aB] = hexToRgb(theme.accentColor);
+  const [gR, gG, gB] = hexToRgb(theme.glowColor);
 
   const centerX = width / 2;
   const centerY = height / 2;
@@ -95,63 +46,97 @@ export function renderSpeakerSplatter(r: RenderContext) {
 
   c.save();
 
-  // --- PASS 1: HALFTONE DOT ARRAYS (NEON GLOW ON BLACK BG) ---
-  const pulseScale = 1.0 + be * 0.10 + bs * 0.06;
+  // --- PASS 1: NEON GRADIENT ARCS (SOFT FEATHERED) ---
+  const pulse = 1 + be * 0.18 + bs * 0.12;
+  const arcAlpha = 0.25 + be * 0.25 + freqAvg * 0.15;
+  const wide = 1 + be * 0.15;
 
-  // Blue Halftone Dots (Top-Left)
-  c.shadowBlur = 8;
-  for (let i = 0; i < staticDotsLeft.length; i++) {
-    const dot = staticDotsLeft[i];
-    const dx = centerX + (dot.x - centerX) * pulseScale;
-    const dy = centerY + (dot.y - centerY) * pulseScale;
-    const rSize = dot.r * (1 + be * 0.25 + freqAvg * 0.2);
+  arcRotation += 0.02;
 
-    c.shadowColor = dot.color;
-    c.fillStyle = dot.color;
-    c.beginPath();
-    c.arc(dx, dy, Math.max(1, rSize), 0, Math.PI * 2);
-    c.fill();
-  }
+  const softStroke = (
+    cx: number, cy: number, radius: number,
+    startAngle: number, endAngle: number, color: string, alpha: number,
+  ) => {
+    const layers = [
+      { w: 10, a: 0.08 },
+      { w: 6, a: 0.15 },
+      { w: 2, a: 0.4 },
+    ];
+    for (const layer of layers) {
+      c.lineWidth = layer.w;
+      c.strokeStyle = `rgba(${color}, ${alpha * layer.a})`;
+      c.beginPath();
+      c.arc(cx, cy, radius, startAngle, endAngle);
+      c.stroke();
+    }
+  };
 
-  // Magenta Halftone Dots (Bottom-Right)
-  for (let i = 0; i < staticDotsRight.length; i++) {
-    const dot = staticDotsRight[i];
-    const dx = centerX + (dot.x - centerX) * pulseScale;
-    const dy = centerY + (dot.y - centerY) * pulseScale;
-    const rSize = dot.r * (1 + be * 0.25 + freqAvg * 0.2);
-
-    c.shadowColor = dot.color;
-    c.fillStyle = dot.color;
-    c.beginPath();
-    c.arc(dx, dy, Math.max(1, rSize), 0, Math.PI * 2);
-    c.fill();
-  }
-
-  // White & Silver Halftone Dots (Top-Right)
-  c.shadowBlur = 6;
-  for (let i = 0; i < staticDotsTop.length; i++) {
-    const dot = staticDotsTop[i];
-    const dx = centerX + (dot.x - centerX) * pulseScale;
-    const dy = centerY + (dot.y - centerY) * pulseScale;
-    const rSize = dot.r * (1 + be * 0.2 + freqAvg * 0.2);
-
-    c.shadowColor = dot.color;
-    c.fillStyle = dot.color;
-    c.beginPath();
-    c.arc(dx, dy, Math.max(1, rSize), 0, Math.PI * 2);
-    c.fill();
-  }
-
-  // --- PASS 2: GREY BRUSH SMEAR (LOWER-LEFT) ---
   c.save();
-  c.shadowBlur = 0;
-  c.fillStyle = 'rgba(80, 85, 100, 0.45)';
-  c.translate(centerX - baseR * 1.3, centerY + baseR * 0.9);
-  c.rotate(-Math.PI * 0.22);
-  c.beginPath();
-  c.ellipse(0, 0, baseR * 1.4, baseR * 0.45, 0, 0, Math.PI * 2);
-  c.fill();
+  c.shadowBlur = 30;
+  c.lineCap = 'round';
+
+  // Primary arc (top-left)
+  c.shadowColor = theme.primaryColor;
+  for (let r = 1; r <= 4; r++) {
+    const radius = baseR * (1.0 + r * 0.35) * pulse;
+    const spread = (Math.PI * 0.60) * wide;
+    const baseAngle = Math.PI * 1.18;
+    const fade = Math.max(0.08, 1 - (r - 1) * 0.28);
+    softStroke(centerX - 6, centerY - 4, radius,
+      baseAngle - spread * 0.5 + arcRotation,
+      baseAngle + spread * 0.5 + arcRotation,
+      `${pR}, ${pG}, ${pB}`, arcAlpha * fade);
+  }
+
+  // Secondary arc (bottom-right)
+  c.shadowColor = theme.secondaryColor;
+  for (let r = 1; r <= 4; r++) {
+    const radius = baseR * (1.0 + r * 0.35) * pulse;
+    const spread = (Math.PI * 0.56) * wide;
+    const baseAngle = Math.PI * 0.30;
+    const fade = Math.max(0.08, 1 - (r - 1) * 0.28);
+    softStroke(centerX + 6, centerY + 4, radius,
+      baseAngle - spread * 0.5 - arcRotation,
+      baseAngle + spread * 0.5 - arcRotation,
+      `${sR}, ${sG}, ${sB}`, arcAlpha * fade);
+  }
+
+  // Accent arc (top-right)
+  c.shadowColor = theme.accentColor;
+  for (let r = 1; r <= 3; r++) {
+    const radius = baseR * (1.1 + r * 0.38) * pulse;
+    const spread = (Math.PI * 0.46) * wide;
+    const baseAngle = -Math.PI * 0.25;
+    const fade = Math.max(0.08, 1 - (r - 1) * 0.4);
+    softStroke(centerX + 2, centerY - 2, radius,
+      baseAngle - spread * 0.5 + arcRotation,
+      baseAngle + spread * 0.5 + arcRotation,
+      `${aR}, ${aG}, ${aB}`, arcAlpha * fade * 0.7);
+  }
+
   c.restore();
+
+  // --- PASS 2: LIGHT BURST FROM BEHIND SPEAKERS ---
+  const glowIntensity = 0.3 + be * 0.25 + bs * 0.15;
+  const glowRadius = baseR * 2.8 * pulse;
+
+  for (const pos of [
+    { x: centerX, y: centerY },
+    { x: centerX - baseR * 0.92, y: centerY + baseR * 0.06 },
+    { x: centerX + baseR * 0.92, y: centerY + baseR * 0.06 },
+  ]) {
+    const grad = c.createRadialGradient(pos.x, pos.y, 0, pos.x, pos.y, glowRadius);
+    grad.addColorStop(0, `rgba(${gR}, ${gG}, ${gB}, ${glowIntensity * 0.5})`);
+    grad.addColorStop(0.15, `rgba(${pR}, ${pG}, ${pB}, ${glowIntensity * 0.2})`);
+    grad.addColorStop(0.4, `rgba(${sR}, ${sG}, ${sB}, ${glowIntensity * 0.08})`);
+    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    c.fillStyle = grad;
+    c.globalCompositeOperation = 'screen';
+    c.beginPath();
+    c.arc(pos.x, pos.y, glowRadius, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalCompositeOperation = 'source-over';
 
   // --- PASS 3: DARK INK SPLATTER POOL & PAINT DRIPS UNDER SPEAKERS ---
   const inkY = centerY + baseR * 0.25;
@@ -161,18 +146,19 @@ export function renderSpeakerSplatter(r: RenderContext) {
   c.fill();
 
   // Scattered Splatter Dots around central splash
+  const splatterColors = [theme.primaryColor, theme.secondaryColor, theme.accentColor];
   for (let i = 0; i < staticSplatterDots.length; i++) {
     const s = staticSplatterDots[i];
     const sx = centerX + (s.x - centerX) * (1 + be * 0.15);
     const sy = centerY + (s.y - centerY) * (1 + be * 0.15);
-    c.fillStyle = s.color;
+    c.fillStyle = splatterColors[i % 3];
     c.beginPath();
     c.arc(sx, sy, s.r * (1 + bs * 0.3), 0, Math.PI * 2);
     c.fill();
   }
 
   // Vertical Paint Drips extending down
-  c.strokeStyle = '#FFFFFF';
+  c.strokeStyle = theme.accentColor;
   c.lineCap = 'round';
   const dripXs = [-0.85, -0.55, -0.15, 0.15, 0.5, 0.8];
   const dripLens = [30, 55, 75, 45, 65, 25];
@@ -185,20 +171,20 @@ export function renderSpeakerSplatter(r: RenderContext) {
 
     c.lineWidth = thick;
     c.shadowBlur = 6;
-    c.shadowColor = '#FFFFFF';
+    c.shadowColor = theme.glowColor;
     c.beginPath();
     c.moveTo(dx, dy);
     c.lineTo(dx, dy + len);
     c.stroke();
 
     // Round drop tip
-    c.fillStyle = '#FFFFFF';
+    c.fillStyle = theme.accentColor;
     c.beginPath();
     c.arc(dx, dy + len + thick * 0.5, thick * 1.2, 0, Math.PI * 2);
     c.fill();
   }
 
-  // --- PASS 4: TRIPLE CLUSTERED CHROME SPEAKERS (SCALED DOWN) ---
+  // --- PASS 3: TRIPLE CLUSTERED CHROME SPEAKERS (SCALED DOWN) ---
   const centerR = baseR * 1.15 * (1 + be * 0.10);
   const leftR = baseR * 0.88 * (1 + be * 0.07);
   const rightR = baseR * 0.88 * (1 + be * 0.07);

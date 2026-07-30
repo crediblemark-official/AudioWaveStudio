@@ -11,9 +11,10 @@ const effectOptions: { value: ScreenEffect; label: string; desc: string }[] = [
   { value: 'none', label: 'None', desc: 'No effect' },
   { value: 'shake', label: 'Screen Shake', desc: 'Canvas vibrates with the beat' },
   { value: 'glitch', label: 'Digital Glitch', desc: 'Random slice displacement & color artifacts' },
-  { value: 'chromatic', label: 'Chromatic Aberration', desc: 'RGB channel splitting' },
+
   { value: 'vignette', label: 'Pulsing Vignette', desc: 'Edges darken on bass hits' },
   { value: 'pulse', label: 'White Pulse', desc: 'Bright flash on each beat' },
+  { value: 'spotlight', label: 'Stage Spotlight', desc: 'Concert light beams from above' },
 ];
 
 export const EffectsTab: React.FC<Props> = ({ config, updateConfig }) => {
@@ -60,16 +61,6 @@ export const EffectsTab: React.FC<Props> = ({ config, updateConfig }) => {
               </label>
               <input type="range" min={0} max={1} step={0.05} value={s.glitchIntensity}
                 onChange={(e) => handleChange('glitchIntensity', parseFloat(e.target.value))} className="input-range" />
-            </div>
-          )}
-
-          {showIntensity && s.mainEffect === 'chromatic' && (
-            <div className="control-group">
-              <label className="label-row">
-                <span>Chromatic Strength ({Math.round(s.chromaticIntensity * 100)}%)</span>
-              </label>
-              <input type="range" min={0} max={1} step={0.05} value={s.chromaticIntensity}
-                onChange={(e) => handleChange('chromaticIntensity', parseFloat(e.target.value))} className="input-range" />
             </div>
           )}
 

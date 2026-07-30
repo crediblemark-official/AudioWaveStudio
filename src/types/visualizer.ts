@@ -7,7 +7,7 @@ export type ColorThemeName = 'cyberpunk' | 'synthwave' | 'emerald' | 'violet' | 
 export type MusicNoteStyle = 'float' | 'bounce' | 'spiral' | 'wave' | 'burst' | 'confined';
 export type ParticleStyle = 'float' | 'bounce' | 'wave' | 'static' | 'confined';
 
-export type ScreenEffect = 'none' | 'shake' | 'glitch' | 'chromatic' | 'vignette' | 'pulse';
+export type ScreenEffect = 'none' | 'shake' | 'glitch' | 'vignette' | 'pulse' | 'spotlight';
 
 export interface ColorTheme {
   name: ColorThemeName;
@@ -19,13 +19,16 @@ export interface ColorTheme {
 }
 
 export interface BackgroundSettings {
-  mode: 'solid' | 'gradient' | 'customImage';
+  mode: 'solid' | 'gradient' | 'customImage' | 'grid';
   solidColor: string;
   gradientStart: string;
   gradientEnd: string;
   blurAmount: number; // 0 to 20 px
   overlayOpacity: number; // 0 to 1
   customImageUri?: string;
+  gridColor?: string;
+  gridSize?: number;
+  gridLineWidth?: number;
   showParticles: boolean;
   particleStyle?: ParticleStyle;
   particleColor: string;
@@ -86,8 +89,8 @@ export interface ScreenEffectsSettings {
   mainEffect: ScreenEffect;
   shakeIntensity: number;
   glitchIntensity: number;
-  chromaticIntensity: number;
   pulseIntensity: number;
+  spotlightColor: string;
 }
 
 export interface SongMetadata {

@@ -3,10 +3,18 @@ import { RenderContext } from './types';
 let frameHistory: Uint8Array[] = [];
 const HISTORY_DEPTH = 12;
 
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
 export function renderNeonCity3D(r: RenderContext) {
   const { ctx: c, width, height, config, freqData } = r;
   const barCount = Math.min(64, Math.max(36, config.reactivity.barCount));
   const sensitivity = config.reactivity.sensitivity;
+  const theme = config.theme;
+  const [pR, pG, pB] = hexToRgb(theme.primaryColor);
+  const [sR, sG, sB] = hexToRgb(theme.secondaryColor);
 
   const centerX = width / 2;
   const floorY = height * 0.58;
@@ -42,19 +50,13 @@ export function renderNeonCity3D(r: RenderContext) {
     vals2D.push(rowVals);
   }
 
-  // Smooth hue mapping matching images.jpeg:
-  // Left: Pink/Magenta (0-15%) -> Cyan/Blue (15-45%)
-  // Right: Orange/Red (45-75%) -> Gold/Yellow (75-100%)
-  const getHue = (ratio: number): number => {
-    if (ratio < 0.18) {
-      return 290 - (ratio / 0.18) * 40;
-    } else if (ratio < 0.46) {
-      return 250 - ((ratio - 0.18) / 0.28) * 65;
-    } else if (ratio < 0.76) {
-      return 10 + ((ratio - 0.46) / 0.3) * 25;
-    } else {
-      return 35 + ((ratio - 0.76) / 0.24) * 20;
-    }
+  const getColor = (ratio: number, bright: number): [number, number, number] => {
+    const t = ratio;
+    const cr = Math.round(pR + (sR - pR) * t);
+    const cg = Math.round(pG + (sG - pG) * t);
+    const cb = Math.round(pB + (sB - pB) * t);
+    const f = 0.5 + bright * 0.5;
+    return [Math.min(255, Math.round(cr * f)), Math.min(255, Math.round(cg * f)), Math.min(255, Math.round(cb * f))];
   };
 
   // PASS 1: RENDER MAIN 3D BUILDINGS / COLUMNS (Back to Front)
@@ -70,7 +72,7 @@ export function renderNeonCity3D(r: RenderContext) {
       if (val < 0.005) continue;
 
       const freqRatio = i / cols;
-      const hue = getHue(freqRatio);
+      const [cr, cg, cb] = getColor(freqRatio, val);
 
       const maxH = height * 0.45 * scale;
       const bh = Math.max(2, val * maxH);
@@ -82,10 +84,10 @@ export function renderNeonCity3D(r: RenderContext) {
       const dx = Math.max(1, bw * 0.4);
       const dy = Math.max(1, bw * 0.3);
 
-      const frontCol = `hsla(${hue}, 90%, ${40 + val * 25}%, ${rowAlpha * 0.85})`;
-      const topCol = `hsla(${hue}, 100%, ${65 + val * 25}%, ${rowAlpha})`;
-      const sideCol = `hsla(${hue}, 80%, ${20 + val * 15}%, ${rowAlpha * 0.75})`;
-      const strokeCol = `hsla(${hue}, 100%, 75%, ${rowAlpha * 0.6})`;
+      const frontCol = `rgba(${cr}, ${cg}, ${cb}, ${rowAlpha * 0.85})`;
+      const topCol = `rgba(${Math.min(255, cr + 40)}, ${Math.min(255, cg + 40)}, ${Math.min(255, cb + 40)}, ${rowAlpha})`;
+      const sideCol = `rgba(${Math.round(cr * 0.5)}, ${Math.round(cg * 0.5)}, ${Math.round(cb * 0.5)}, ${rowAlpha * 0.75})`;
+      const strokeCol = `rgba(${Math.min(255, cr + 60)}, ${Math.min(255, cg + 60)}, ${Math.min(255, cb + 60)}, ${rowAlpha * 0.6})`;
 
       // Front Face
       c.fillStyle = frontCol;
@@ -119,8 +121,8 @@ export function renderNeonCity3D(r: RenderContext) {
       // Volumetric Vertical Light Beams for high peaks
       if (val > 0.45 && row === 0) {
         const beamGrad = c.createLinearGradient(0, by, 0, 0);
-        beamGrad.addColorStop(0, `hsla(${hue}, 100%, 70%, ${val * 0.35})`);
-        beamGrad.addColorStop(1, `hsla(${hue}, 100%, 70%, 0)`);
+        beamGrad.addColorStop(0, `rgba(${cr}, ${cg}, ${cb}, ${val * 0.35})`);
+        beamGrad.addColorStop(1, `rgba(${cr}, ${cg}, ${cb}, 0)`);
         c.fillStyle = beamGrad;
         c.fillRect(x - 1, 0, bw + 2, by);
       }
@@ -141,7 +143,7 @@ export function renderNeonCity3D(r: RenderContext) {
       if (val < 0.01) continue;
 
       const freqRatio = i / cols;
-      const hue = getHue(freqRatio);
+      const [cr, cg, cb] = getColor(freqRatio, val);
 
       const maxH = height * 0.38 * scale;
       const bh = Math.max(2, val * maxH * 0.8);
@@ -153,9 +155,9 @@ export function renderNeonCity3D(r: RenderContext) {
       const dx = Math.max(1, bw * 0.4);
       const dy = Math.max(1, bw * 0.3);
 
-      const frontRefCol = `hsla(${hue}, 85%, ${40 + val * 20}%, ${refAlpha * 0.6})`;
-      const bottomRefCol = `hsla(${hue}, 90%, ${30 + val * 20}%, ${refAlpha * 0.4})`;
-      const sideRefCol = `hsla(${hue}, 75%, 20%, ${refAlpha * 0.4})`;
+      const frontRefCol = `rgba(${cr}, ${cg}, ${cb}, ${refAlpha * 0.6})`;
+      const bottomRefCol = `rgba(${Math.round(cr * 0.7)}, ${Math.round(cg * 0.7)}, ${Math.round(cb * 0.7)}, ${refAlpha * 0.4})`;
+      const sideRefCol = `rgba(${Math.round(cr * 0.3)}, ${Math.round(cg * 0.3)}, ${Math.round(cb * 0.3)}, ${refAlpha * 0.4})`;
 
       // Mirrored Front Face
       c.fillStyle = frontRefCol;

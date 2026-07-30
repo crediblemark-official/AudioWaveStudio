@@ -5,7 +5,7 @@ interface GalaxyParticle {
   radius: number;
   speed: number;
   size: number;
-  hue: number;
+  color: [number, number, number];
   arm: number;
 }
 
@@ -23,15 +23,22 @@ function initGalaxy() {
       radius: r,
       speed: 0.002 + (1 - r) * 0.008,
       size: 0.5 + r * 2.5,
-      hue: 200 + Math.random() * 60 + arm * 30,
+      color: [100, 150, 255],
       arm,
     });
   }
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
 export function renderSpiralGalaxy(ctx: RenderContext) {
   const { ctx: c, width, height, config, bassEnergy: be, beatStrength: bs } = ctx;
   const theme = config.theme;
+  const [pR, pG, pB] = hexToRgb(theme.primaryColor);
+  const [sR, sG, sB] = hexToRgb(theme.secondaryColor);
   initGalaxy();
 
   const cx = width / 2;
@@ -52,10 +59,15 @@ export function renderSpiralGalaxy(ctx: RenderContext) {
     const alpha = (0.3 + p.radius * 0.4) * (0.5 + be * 0.5);
     const size = p.size * (1 + be * 0.5);
 
+    const mix = p.radius;
+    const r = Math.round(pR + (sR - pR) * mix);
+    const g = Math.round(pG + (sG - pG) * mix);
+    const b = Math.round(pB + (sB - pB) * mix);
+    p.color = [r, g, b];
     c.globalAlpha = alpha;
-    c.fillStyle = `hsl(${p.hue + be * 20}, 80%, ${50 + p.radius * 30}%)`;
+    c.fillStyle = `rgb(${r}, ${g}, ${b})`;
     c.shadowBlur = size * 3 * glowIntensity;
-    c.shadowColor = `hsl(${p.hue + be * 20}, 100%, 60%)`;
+    c.shadowColor = theme.glowColor;
 
     c.beginPath();
     c.arc(x, y, size, 0, Math.PI * 2);

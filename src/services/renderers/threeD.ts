@@ -23,6 +23,15 @@ export function renderThreeD(r: RenderContext) {
   const sensitivity = config.reactivity.sensitivity;
   const theme = config.theme;
 
+  function hexToRgb(hex: string): [number, number, number] {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  const [pR, pG, pB] = hexToRgb(theme.primaryColor);
+  const [sR, sG, sB] = hexToRgb(theme.secondaryColor);
+  const [aR, aG, aB] = hexToRgb(theme.accentColor);
+  const [gR, gG, gB] = hexToRgb(theme.glowColor);
+
   const centerX = width / 2;
   const floorY = height * 0.78;
   const persp = 0.3;
@@ -38,7 +47,7 @@ export function renderThreeD(r: RenderContext) {
         x: Math.random() * width, y: Math.random() * height * 0.7,
         vx: (Math.random() - 0.5) * 0.2, vy: -0.05 - Math.random() * 0.15,
         size: 1 + Math.random() * 2.5, alpha: 0.15 + Math.random() * 0.35,
-        phase: Math.random() * Math.PI * 2, hue: Math.random() * 60 + 200,
+        phase: Math.random() * Math.PI * 2, hue: 0,
       });
     }
   }
@@ -59,11 +68,13 @@ export function renderThreeD(r: RenderContext) {
       const cd = (x - centerX) / (centerX);
       const ps = 1 - Math.abs(cd) * persp;
       const py = floorY - bh * ps - 5;
-      const hue = 200 + (bi / barCount) * 160;
+      const sr = Math.round(pR + (sR - pR) * Math.random());
+      const sg = Math.round(pG + (sG - pG) * Math.random());
+      const sb = Math.round(pB + (sB - pB) * Math.random());
       sparks.push({
         x, y: py, vx: (Math.random() - 0.5) * 4, vy: -3 - Math.random() * 5,
         life: 0, maxLife: 25 + Math.random() * 40, size: 1.5 + Math.random() * 3,
-        color: `hsl(${hue}, 100%, ${60 + Math.random() * 30}%)`,
+        color: `rgb(${sr}, ${sg}, ${sb})`,
         decay: 0.96 + Math.random() * 0.03, trail: [],
       });
     }
@@ -99,13 +110,13 @@ export function renderThreeD(r: RenderContext) {
   c.globalAlpha = 1;
 
   const floorGrad = c.createLinearGradient(0, floorY, 0, height);
-  floorGrad.addColorStop(0, `rgba(25, 15, 45, 0.4)`);
-  floorGrad.addColorStop(0.4, `rgba(15, 10, 35, 0.15)`);
-  floorGrad.addColorStop(1, `rgba(5, 5, 15, 0)`);
+  floorGrad.addColorStop(0, `rgba(${pR}, ${pG}, ${pB}, 0.3)`);
+  floorGrad.addColorStop(0.4, `rgba(${sR}, ${sG}, ${sB}, 0.12)`);
+  floorGrad.addColorStop(1, `rgba(${gR}, ${gG}, ${gB}, 0)`);
   c.fillStyle = floorGrad;
   c.fillRect(0, floorY, width, height - floorY);
 
-  c.strokeStyle = `rgba(120, 80, 200, 0.05)`;
+  c.strokeStyle = `rgba(${gR}, ${gG}, ${gB}, 0.05)`;
   c.lineWidth = 1;
   for (let i = -35; i <= 35; i++) {
     const gx = centerX + i * 12;
@@ -145,12 +156,14 @@ export function renderThreeD(r: RenderContext) {
     bars.push({ x: bx, by, bh, bw, dx, dy, ps, val });
 
     const freqRatio = i / barCount;
-    const hue = 200 + freqRatio * 140;
-    const sat = 85 + be * 15;
-    const lit = 40 + val * 40;
-    const barColor = `hsl(${hue}, ${sat}%, ${lit}%)`;
-    const topColor = `hsl(${hue + 20}, ${sat}%, ${lit + 15}%)`;
-    const sideColor = `hsl(${hue - 10}, ${sat}%, ${lit - 10}%)`;
+    const mix = freqRatio;
+    const bright = 0.4 + val * 0.4;
+    const cr3d = Math.round(pR + (sR - pR) * mix);
+    const cg3d = Math.round(pG + (sG - pG) * mix);
+    const cb3d = Math.round(pB + (sB - pB) * mix);
+    const barColor = `rgb(${Math.round(cr3d * bright)}, ${Math.round(cg3d * bright)}, ${Math.round(cb3d * bright)})`;
+    const topColor = `rgb(${Math.min(255, Math.round(cr3d * bright * 1.3))}, ${Math.min(255, Math.round(cg3d * bright * 1.3))}, ${Math.min(255, Math.round(cb3d * bright * 1.3))})`;
+    const sideColor = `rgb(${Math.round(cr3d * bright * 0.6)}, ${Math.round(cg3d * bright * 0.6)}, ${Math.round(cb3d * bright * 0.6)})`;
 
     const brightBoost = 0.3 + be * 0.3 + (bs > 0.12 ? bs * 0.5 : 0);
 
@@ -190,7 +203,7 @@ export function renderThreeD(r: RenderContext) {
     c.globalAlpha = 1;
 
     if (be > 0.25) {
-      c.fillStyle = `rgba(255, 255, 255, ${(be - 0.25) * 0.35})`;
+      c.fillStyle = `rgba(${aR}, ${aG}, ${aB}, ${(be - 0.25) * 0.35})`;
       c.fillRect(bx, by, bw, Math.min(bh, 2));
     }
   }
@@ -289,12 +302,15 @@ export function renderThreeD(r: RenderContext) {
     const b = bars[i];
     if (b.val < 0.03) continue;
     const freqRatio = i / barCount;
-    const hue = 200 + freqRatio * 140;
     const refY = floorY + 4;
     const refH = b.bh * 0.25;
     const refAlpha = Math.max(0, 0.08 - Math.abs(i - barCount / 2) * 0.003);
+    const mix = freqRatio;
+    const refR = Math.round(pR + (sR - pR) * mix);
+    const refG = Math.round(pG + (sG - pG) * mix);
+    const refB = Math.round(pB + (sB - pB) * mix);
 
-    c.fillStyle = `hsl(${hue}, 80%, 40%)`;
+    c.fillStyle = `rgb(${refR}, ${refG}, ${refB})`;
     c.globalAlpha = refAlpha;
     c.fillRect(b.x, refY, b.bw, refH);
   }
@@ -302,9 +318,9 @@ export function renderThreeD(r: RenderContext) {
 
   for (const m of motes) {
     c.globalAlpha = m.alpha * (0.4 + Math.sin(r.rotationAngle * 2 + m.phase) * 0.25);
-    c.fillStyle = `hsl(${m.hue + be * 20}, 80%, 70%)`;
+    c.fillStyle = `rgb(${pR}, ${pG}, ${pB})`;
     c.shadowBlur = 4;
-    c.shadowColor = c.fillStyle;
+    c.shadowColor = theme.glowColor;
     c.beginPath();
     c.arc(m.x, m.y, m.size * (0.8 + be * 0.3), 0, Math.PI * 2);
     c.fill();

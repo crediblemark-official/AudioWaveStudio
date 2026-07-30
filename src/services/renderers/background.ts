@@ -15,6 +15,28 @@ export function renderBackground(ctx: RenderContext) {
     grad.addColorStop(1, bg.gradientEnd);
     c.fillStyle = grad;
     c.fillRect(0, 0, width, height);
+  } else if (bg.mode === 'grid') {
+    c.fillStyle = bg.solidColor;
+    c.fillRect(0, 0, width, height);
+    const gridColor = bg.gridColor || '#ffffff';
+    const gridSize = bg.gridSize || 40;
+    const lineWidth = bg.gridLineWidth || 1;
+    c.strokeStyle = gridColor;
+    c.lineWidth = lineWidth;
+    c.globalAlpha = 0.12;
+    for (let x = 0; x <= width; x += gridSize) {
+      c.beginPath();
+      c.moveTo(x, 0);
+      c.lineTo(x, height);
+      c.stroke();
+    }
+    for (let y = 0; y <= height; y += gridSize) {
+      c.beginPath();
+      c.moveTo(0, y);
+      c.lineTo(width, y);
+      c.stroke();
+    }
+    c.globalAlpha = 1;
   } else {
     c.fillStyle = bg.solidColor;
     c.fillRect(0, 0, width, height);

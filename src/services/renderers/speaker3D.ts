@@ -15,14 +15,22 @@ export function renderSpeaker3D(r: RenderContext) {
   const bassPulse = 1.0 + be * 0.12 + bs * 0.08;
   const speakerR = baseRadius * bassPulse;
 
+  function hexToRgb(hex: string): [number, number, number] {
+    const h = hex.replace('#', '');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  const [pR, pG, pB] = hexToRgb(theme.primaryColor);
+  const [sR, sG, sB] = hexToRgb(theme.secondaryColor);
+  const [aR, aG, aB] = hexToRgb(theme.accentColor);
+
   if (!_barGrad || _cachedH !== height) {
     _cachedH = height;
     _barGrad = c.createLinearGradient(0, 0, 0, height);
-    _barGrad.addColorStop(0, 'rgba(255, 40, 0, 0.85)');
-    _barGrad.addColorStop(0.2, 'rgba(255, 120, 0, 0.95)');
-    _barGrad.addColorStop(0.5, 'rgba(255, 220, 80, 0.98)');
-    _barGrad.addColorStop(0.8, 'rgba(255, 100, 0, 0.95)');
-    _barGrad.addColorStop(1, 'rgba(200, 20, 0, 0.85)');
+    _barGrad.addColorStop(0, `rgba(${pR}, ${pG}, ${pB}, 0.85)`);
+    _barGrad.addColorStop(0.3, `rgba(${sR}, ${sG}, ${sB}, 0.95)`);
+    _barGrad.addColorStop(0.6, `rgba(${aR}, ${aG}, ${aB}, 0.98)`);
+    _barGrad.addColorStop(0.85, `rgba(${sR}, ${sG}, ${sB}, 0.95)`);
+    _barGrad.addColorStop(1, `rgba(${pR}, ${pG}, ${pB}, 0.85)`);
   }
 
   c.save();
@@ -73,51 +81,41 @@ export function renderSpeaker3D(r: RenderContext) {
     c.fillRect(xLeft, topY, barW, barH * 1.82);
     c.fillRect(xRight, topY, barW, barH * 1.82);
 
-    c.fillStyle = '#FFFFFF';
+    c.fillStyle = theme.accentColor;
     c.fillRect(xLeft - 0.5, topY - 1.5, barW + 1, 1.5);
     c.fillRect(xLeft - 0.5, botY, barW + 1, 1.5);
     c.fillRect(xRight - 0.5, topY - 1.5, barW + 1, 1.5);
     c.fillRect(xRight - 0.5, botY, barW + 1, 1.5);
   }
 
-  // --- PASS 2: SPEAKER AURA & RED RIM LENS FLARES ---
-  // Background radial aura
+  // --- PASS 2: SPEAKER AURA & LENS FLARES ---
   const glowR = speakerR * 1.4;
   const backGlow = c.createRadialGradient(centerX, centerY, speakerR * 0.5, centerX, centerY, glowR);
-  backGlow.addColorStop(0, 'rgba(255, 80, 0, 0.85)');
-  backGlow.addColorStop(0.5, 'rgba(255, 30, 0, 0.4)');
+  backGlow.addColorStop(0, `rgba(${aR}, ${aG}, ${aB}, 0.85)`);
+  backGlow.addColorStop(0.5, `rgba(${sR}, ${sG}, ${sB}, 0.4)`);
   backGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
   c.shadowBlur = 45 + be * 35;
-  c.shadowColor = '#FF3300';
+  c.shadowColor = theme.glowColor;
   c.fillStyle = backGlow;
   c.beginPath();
   c.arc(centerX, centerY, glowR, 0, Math.PI * 2);
   c.fill();
 
-  // Left Rim Red Lens Flare Spot
-  const flareLeftX = centerX - speakerR * 0.96;
-  const flareLeftGrad = c.createRadialGradient(flareLeftX, centerY, 0, flareLeftX, centerY, speakerR * 0.45);
-  flareLeftGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-  flareLeftGrad.addColorStop(0.2, 'rgba(255, 80, 0, 0.85)');
-  flareLeftGrad.addColorStop(0.6, 'rgba(255, 30, 0, 0.3)');
-  flareLeftGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  c.fillStyle = flareLeftGrad;
-  c.beginPath();
-  c.arc(flareLeftX, centerY, speakerR * 0.45, 0, Math.PI * 2);
-  c.fill();
-
-  // Right Rim Red Lens Flare Spot
-  const flareRightX = centerX + speakerR * 0.96;
-  const flareRightGrad = c.createRadialGradient(flareRightX, centerY, 0, flareRightX, centerY, speakerR * 0.45);
-  flareRightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-  flareRightGrad.addColorStop(0.2, 'rgba(255, 80, 0, 0.85)');
-  flareRightGrad.addColorStop(0.6, 'rgba(255, 30, 0, 0.3)');
-  flareRightGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  c.fillStyle = flareRightGrad;
-  c.beginPath();
-  c.arc(flareRightX, centerY, speakerR * 0.45, 0, Math.PI * 2);
-  c.fill();
+  const flareX = (dx: number) => {
+    const fx = centerX + dx;
+    const fg = c.createRadialGradient(fx, centerY, 0, fx, centerY, speakerR * 0.45);
+    fg.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+    fg.addColorStop(0.2, `rgba(${pR}, ${pG}, ${pB}, 0.85)`);
+    fg.addColorStop(0.6, `rgba(${sR}, ${sG}, ${sB}, 0.3)`);
+    fg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    c.fillStyle = fg;
+    c.beginPath();
+    c.arc(fx, centerY, speakerR * 0.45, 0, Math.PI * 2);
+    c.fill();
+  };
+  flareX(-speakerR * 0.96);
+  flareX(speakerR * 0.96);
 
   // --- PASS 3: OUTSIDE CHROME METALLIC RIM ---
   const outerRimR = speakerR;

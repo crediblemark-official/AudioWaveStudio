@@ -21,14 +21,15 @@ export function applyScreenEffects(
     case 'glitch':
       applyGlitch(canvas, ctx, settings, useBe, beatStrength);
       break;
-    case 'chromatic':
-      applyChromaticAberration(canvas, ctx, settings, useBe, beatStrength);
-      break;
+
     case 'vignette':
       applyVignette(ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
       break;
     case 'pulse':
       applyPulse(ctx, settings, useBe, beatStrength);
+      break;
+    case 'spotlight':
+      applySpotlight(ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
       break;
   }
 }
@@ -84,43 +85,6 @@ function applyGlitch(
   }
 }
 
-function applyChromaticAberration(
-  canvas: HTMLCanvasElement,
-  ctx: CanvasRenderingContext2D,
-  settings: ScreenEffectsSettings,
-  bassEnergy: number,
-  beatStrength: number,
-) {
-  const beatOff = beatStrength > 0.15 ? settings.chromaticIntensity * beatStrength * 50 : 0;
-  const offset = settings.chromaticIntensity * bassEnergy * 5 + beatOff;
-  if (offset < 1) return;
-
-  const w = canvas.width;
-  const h = canvas.height;
-
-  const imageData = ctx.getImageData(0, 0, w, h);
-  const data = imageData.data;
-  const output = ctx.createImageData(w, h);
-  const outData = output.data;
-
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const srcIdx = (y * w + x) * 4;
-
-      const rIdx = (y * w + Math.max(0, Math.min(w - 1, x + offset))) * 4;
-      const bIdx = (y * w + Math.max(0, Math.min(w - 1, x - offset))) * 4;
-
-      const outIdx = srcIdx;
-      outData[outIdx] = data[rIdx];
-      outData[outIdx + 1] = data[srcIdx + 1];
-      outData[outIdx + 2] = data[bIdx + 2];
-      outData[outIdx + 3] = 255;
-    }
-  }
-
-  ctx.putImageData(output, 0, 0);
-}
-
 function applyVignette(
   ctx: CanvasRenderingContext2D,
   w: number,
@@ -159,6 +123,49 @@ function applyPulse(
   ctx.save();
   ctx.fillStyle = `rgba(255,255,255,${alpha})`;
   ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
+}
+
+function hexToRgb(hex: string) {
+  const h = hex.replace('#', '');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+function applySpotlight(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  settings: ScreenEffectsSettings,
+  bassEnergy: number,
+  beatStrength: number,
+) {
+  const pulse = 0.5 + bassEnergy * 0.3 + (beatStrength > 0.15 ? beatStrength * 0.3 : 0);
+  const alpha = Math.min(1, 0.6 * pulse);
+  const mainRgb = hexToRgb(settings.spotlightColor || '#FFD700');
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  const [r0, g0, b0] = mainRgb;
+  const maxDim = Math.max(w, h);
+  const corners = [
+    { x: 0, y: 0, color: mainRgb },
+    { x: w, y: 0, color: [g0, b0, r0] },
+    { x: w, y: h, color: [b0, r0, g0] },
+    { x: 0, y: h, color: [Math.min(255, g0 + 40), Math.min(255, r0 + 20), Math.min(255, b0 + 30)] },
+  ];
+
+  for (const corner of corners) {
+    const grad = ctx.createRadialGradient(corner.x, corner.y, 0, corner.x, corner.y, maxDim * 1.1);
+    const [r, g, b] = corner.color;
+    grad.addColorStop(0, `rgba(${r},${g},${b},${alpha * 0.3})`);
+    grad.addColorStop(0.35, `rgba(${r},${g},${b},${alpha * 0.08})`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, w, h);
+  }
+
   ctx.restore();
 }
 
