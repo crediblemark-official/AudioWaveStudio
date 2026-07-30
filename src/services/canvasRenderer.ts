@@ -146,10 +146,10 @@ export class CanvasRenderer {
     if (this.exportFreqData) {
       this.freqData = this.exportFreqData;
       this.timeData = this.exportTimeData!;
-      this.bassEnergy = this.exportBassEnergy;
-      this.bassEnergyRaw = this.exportBassEnergy;
-      targetBass = this.exportBassEnergy;
-      rawBass = targetBass;
+      rawBass = this.exportBassEnergy;
+      targetBass = rawBass * (config.reactivity.sensitivity || 1.0);
+      this.bassEnergy += (targetBass - this.bassEnergy) * 0.2;
+      this.bassEnergyRaw += (rawBass - this.bassEnergyRaw) * 0.2;
     } else {
       const fftSize = config.reactivity.fftSize;
       if (this.freqData.length !== fftSize / 2) {
@@ -208,7 +208,7 @@ export class CanvasRenderer {
     r.radialCenterImgElement = this.radialCenterImgElement;
     r.rotationAngle = this.rotationAngle;
     r.exportFreqData = this.exportFreqData;
-    r.isPlaying = audioEngine.getIsPlaying();
+    r.isPlaying = this.exportFreqData ? true : audioEngine.getIsPlaying();
 
     const shakeOff = getShakeOffset(config.screenEffects, this.bassEnergy, this.beatStrength, aboveFloor);
     this.ctx.save();

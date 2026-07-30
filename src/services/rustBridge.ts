@@ -88,6 +88,22 @@ export class RustBridge {
     return new Uint8Array(bytes);
   }
 
+  public async readFileB64(path: string): Promise<string> {
+    return await invoke<string>('read_file_b64', { path });
+  }
+
+  public async getPcmFilePath(): Promise<string> {
+    return await invoke<string>('save_pcm_to_file');
+  }
+
+  public async readFileRangeB64(path: string, offset: number, length: number): Promise<string> {
+    return await invoke<string>('read_file_range_b64', { path, offset, length });
+  }
+
+  public async writeTextFile(path: string, content: string): Promise<void> {
+    await invoke('write_text_file', { path, content });
+  }
+
   public async copyFileToPath(source: string, destination: string): Promise<void> {
     await invoke('copy_file_to_path', { source, destination });
   }

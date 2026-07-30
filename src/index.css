@@ -298,6 +298,35 @@ html, body, #root {
   min-width: 175px;
 }
 
+.preset-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-muted);
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+  transform: translateY(-1px);
+}
+
 .preset-icon {
   color: var(--accent-gold);
   flex-shrink: 0;
@@ -1011,51 +1040,99 @@ html, body, #root {
 .export-mode-select {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
+  gap: 16px;
+  width: 100%;
+}
+
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.export-section-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--accent-cyan);
+  text-align: left;
 }
 
 .export-mode-options {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   width: 100%;
-  margin-top: 8px;
 }
 
 .export-mode-card {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 24px 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 2px solid var(--border-color);
+  text-align: center;
+  gap: 4px;
+  padding: 16px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   color: var(--text-primary);
 }
 
 .export-mode-card:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: var(--accent-cyan);
+  background: rgba(255, 255, 255, 0.06);
+  border-style: solid;
+  border-color: rgba(0, 240, 255, 0.5);
+  transform: translateY(-2px);
 }
 
 .export-mode-card.selected {
+  border-style: solid;
   border-color: var(--accent-cyan);
-  background: rgba(0, 240, 255, 0.08);
+  background: rgba(0, 240, 255, 0.1);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.18);
+}
+
+.recommended-badge {
+  position: absolute;
+  top: -10px;
+  background: linear-gradient(135deg, #00f0ff, #0077ff);
+  color: #000;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 240, 255, 0.4);
+}
+
+.card-header-icon {
+  margin-bottom: 2px;
 }
 
 .mode-label {
-  font-size: 1rem;
+  font-size: 0.92rem;
   font-weight: 700;
+  color: var(--text-primary);
+}
+
+.mode-tag {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  opacity: 0.85;
 }
 
 .mode-desc {
-  font-size: 0.78rem;
+  font-size: 0.73rem;
   color: var(--text-muted);
-  line-height: 1.4;
+  line-height: 1.35;
+  margin-top: 2px;
 }
 
 .video-preview-wrapper {

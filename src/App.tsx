@@ -6,7 +6,9 @@ import { ControlPanel } from './components/ControlPanel';
 import { ExportModal } from './components/ExportModal';
 import { DEFAULT_CONFIG, PRESETS } from './utils/presets';
 import { SongMetadata, VisualizerConfig } from './types/visualizer';
+import { rustBridge } from './services/rustBridge';
 import { audioEngine } from './services/audioEngine';
+import { save, open } from '@tauri-apps/plugin-dialog';
 import { RefreshCw, Headphones } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -156,6 +158,44 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSavePreset = async () => {
+    try {
+      const destPath = await save({
+        defaultPath: 'my-preset.awpreset',
+        filters: [{ name: 'AudioWave Preset', extensions: ['awpreset'] }],
+      });
+      if (!destPath) return;
+      const json = JSON.stringify(config, null, 2);
+      await rustBridge.writeTextFile(destPath, json);
+    } catch (e) {
+      console.error('[App] Failed to save preset:', e);
+    }
+  };
+
+  const handleLoadPreset = async () => {
+    try {
+      const selected = await open({
+        multiple: false,
+        filters: [{ name: 'AudioWave Preset', extensions: ['awpreset'] }],
+      });
+      if (!selected || typeof selected !== 'string') return;
+      const b64 = await rustBridge.readFileB64(selected);
+      const content = atob(b64);
+      const presetConfig = JSON.parse(content) as VisualizerConfig;
+      setConfig((prev) => ({
+        ...prev,
+        ...presetConfig,
+        background: { ...prev.background, ...presetConfig.background },
+        text: { ...prev.text, ...presetConfig.text },
+        reactivity: { ...prev.reactivity, ...presetConfig.reactivity },
+        export: { ...prev.export, ...presetConfig.export },
+        screenEffects: { ...prev.screenEffects, ...presetConfig.screenEffects },
+      }));
+    } catch (e) {
+      console.error('[App] Failed to load preset:', e);
+    }
+  };
+
   const toggleFullscreen = () => setIsFullscreen((v) => !v);
 
   return (
@@ -175,6 +215,8 @@ export const App: React.FC = () => {
         onLoadSong={handleLoadSong}
         onLoadSongPath={handleLoadSongPath}
         onApplyPreset={handleApplyPreset}
+        onSavePreset={handleSavePreset}
+        onLoadPreset={handleLoadPreset}
         onOpenExport={() => setIsExportModalOpen(true)}
         isListening={isListening}
         onStartListen={handleStartListen}

@@ -59,50 +59,125 @@ export class AudioEngine {
     }
   }
 
-  private async createAudioBufferFromChunks(sampleRate: number, totalFrames: number): Promise<AudioBuffer | null> {
-    if (!this.audioCtx || totalFrames === 0) return null;
-
-    const buffer = this.audioCtx.createBuffer(1, totalFrames, sampleRate);
-    const channelData = buffer.getChannelData(0);
-
-    // Fetch samples in 2-second chunks to avoid IPC size limits
-    const CHUNK_SEC = 2.0;
-    let offset = 0;
-    let failedChunks = 0;
-    for (let t = 0; offset < totalFrames; t += CHUNK_SEC) {
-      let b64: string;
-      try {
-        b64 = await rustBridge.getAudioChunkB64(t, CHUNK_SEC);
-      } catch (e) {
-        console.warn(`[AudioEngine] Chunk at ${t}s failed:`, e);
-        failedChunks++;
-        if (failedChunks >= 3) break;
-        continue;
-      }
-      if (!b64) {
-        console.warn(`[AudioEngine] Empty chunk at ${t}s — end of audio`);
-        break;
-      }
-
+  private async loadAudioBufferFromFile(filePath: string): Promise<AudioBuffer | null> {
+    if (!this.audioCtx) return null;
+    try {
+      const b64 = await rustBridge.readFileB64(filePath);
       const binaryStr = atob(b64);
       const bytes = new Uint8Array(binaryStr.length);
       for (let i = 0; i < binaryStr.length; i++) {
         bytes[i] = binaryStr.charCodeAt(i);
       }
-      const float32 = new Float32Array(bytes.buffer, 0, bytes.byteLength >> 2);
-      channelData.set(float32, offset);
-      offset += float32.length;
+      const arrayBuffer = bytes.buffer.slice(0, bytes.byteLength) as ArrayBuffer;
+      return await this.audioCtx.decodeAudioData(arrayBuffer);
+    } catch (e) {
+      console.warn('[AudioEngine] Failed to load audio from file, falling back to chunk loading:', e);
+      return null;
+    }
+  }
+
+  private async createAudioBufferFromChunks(sampleRate: number, totalFrames: number): Promise<AudioBuffer | null> {
+    if (!this.audioCtx || totalFrames === 0) return null;
+
+    try {
+      return await this.createAudioBufferFromPcmFile(sampleRate, totalFrames);
+    } catch (e) {
+      console.warn('[AudioEngine] PCM file approach failed, falling back to legacy chunk loading:', e);
     }
 
-    // Trim buffer if fewer frames were loaded
+    let buffer: AudioBuffer;
+    try {
+      buffer = this.audioCtx.createBuffer(1, totalFrames, sampleRate);
+    } catch (e) {
+      console.error(`[AudioEngine] Failed to create buffer (${totalFrames} frames, ${sampleRate}Hz):`, e);
+      return null;
+    }
+    const channelData = buffer.getChannelData(0);
+
+    const CHUNK_SEC = 0.5;
+    let offset = 0;
+    let failedChunks = 0;
+    const durationSec = totalFrames / sampleRate;
+    for (let t = 0; offset < totalFrames; t += CHUNK_SEC) {
+      let b64: string;
+      try {
+        b64 = await rustBridge.getAudioChunkB64(t, CHUNK_SEC);
+      } catch (e) {
+        console.warn(`[AudioEngine] Chunk at ${t.toFixed(1)}s failed:`, e);
+        failedChunks++;
+        if (failedChunks >= 3) break;
+        continue;
+      }
+      if (!b64) {
+        console.warn(`[AudioEngine] Empty chunk at ${t.toFixed(1)}s — end of audio (loaded ${(offset / sampleRate).toFixed(1)}s / ${durationSec.toFixed(1)}s)`);
+        break;
+      }
+
+      try {
+        const binaryStr = atob(b64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) {
+          bytes[i] = binaryStr.charCodeAt(i);
+        }
+        const float32 = new Float32Array(bytes.buffer, 0, bytes.byteLength >> 2);
+        channelData.set(float32, offset);
+        offset += float32.length;
+      } catch (e) {
+        console.warn(`[AudioEngine] Failed to decode chunk at ${t.toFixed(1)}s:`, e);
+        failedChunks++;
+        if (failedChunks >= 3) break;
+        continue;
+      }
+    }
+
     if (offset < totalFrames) {
-      console.warn(`[AudioEngine] Loaded ${offset}/${totalFrames} samples — audio truncated`);
-      const trimmed = this.audioCtx.createBuffer(1, offset, sampleRate);
-      trimmed.getChannelData(0).set(channelData.subarray(0, offset));
-      return trimmed;
+      console.warn(`[AudioEngine] Loaded ${offset}/${totalFrames} samples (${(offset / sampleRate).toFixed(1)}s / ${durationSec.toFixed(1)}s) — audio truncated`);
+      try {
+        const trimmed = this.audioCtx.createBuffer(1, offset, sampleRate);
+        trimmed.getChannelData(0).set(channelData.subarray(0, offset));
+        return trimmed;
+      } catch (e) {
+        console.error('[AudioEngine] Failed to create trimmed buffer:', e);
+        return null;
+      }
     }
 
     return buffer;
+  }
+
+  private async createAudioBufferFromPcmFile(sampleRate: number, totalFrames: number): Promise<AudioBuffer | null> {
+    if (!this.audioCtx || totalFrames === 0) return null;
+
+    const pcmPath = await rustBridge.getPcmFilePath();
+    let cleanupPath = pcmPath;
+
+    try {
+      const totalBytes = totalFrames * 4;
+      const CHUNK_BYTES = 4 * 1024 * 1024;
+      const allBytes = new Uint8Array(totalBytes);
+      let offset = 0;
+
+      while (offset < totalBytes) {
+        const length = Math.min(CHUNK_BYTES, totalBytes - offset);
+        const b64 = await rustBridge.readFileRangeB64(pcmPath, offset, length);
+        if (!b64) break;
+        const binaryStr = atob(b64);
+        for (let i = 0; i < binaryStr.length; i++) {
+          allBytes[offset + i] = binaryStr.charCodeAt(i);
+        }
+        offset += binaryStr.length;
+      }
+
+      if (offset === 0) return null;
+
+      const actualFrames = offset >> 2;
+      const float32 = new Float32Array(allBytes.buffer, 0, actualFrames);
+      const buffer = this.audioCtx.createBuffer(1, actualFrames, sampleRate);
+      buffer.getChannelData(0).set(float32);
+      return buffer;
+    } finally {
+      rustBridge.deleteFile(cleanupPath).catch(() => {});
+    }
   }
 
   public async startListening(_deviceId?: string): Promise<string> {
@@ -163,11 +238,26 @@ export class AudioEngine {
         fullDuration: result.full_duration,
       });
       fullDuration = result.full_duration;
-      this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
-      console.log('[AudioEngine] AudioBuffer created:', this.audioBuffer ? {
-        duration: this.audioBuffer.duration,
-        length: this.audioBuffer.length,
-      } : 'NULL');
+      this.audioBuffer = await this.loadAudioBufferFromFile(filePath);
+      if (!this.audioBuffer) {
+        this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
+      }
+      if (this.audioBuffer) {
+        const loadedSec = this.audioBuffer.duration;
+        console.log('[AudioEngine] AudioBuffer created:', {
+          duration: loadedSec,
+          length: this.audioBuffer.length,
+          fullDuration: fullDuration,
+        });
+        if (fullDuration > 0 && loadedSec < fullDuration - 0.5) {
+          console.warn(
+            `[AudioEngine] AudioBuffer truncated: ${loadedSec.toFixed(1)}s loaded vs ${fullDuration.toFixed(1)}s full. ` +
+            `Chunk loading failed after ~${loadedSec.toFixed(1)}s. Export methods needing JS AudioBuffer will be limited.`
+          );
+        }
+      } else {
+        console.log('[AudioEngine] AudioBuffer creation FAILED');
+      }
     } catch (e) {
       console.error('[AudioEngine] Rust audio decode FAILED:', e);
     }
@@ -231,7 +321,26 @@ export class AudioEngine {
           fullDuration: result.full_duration,
         });
         fullDuration = result.full_duration;
-        this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
+        this.audioBuffer = await this.loadAudioBufferFromFile(audioFilePath);
+        if (!this.audioBuffer) {
+          this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
+        }
+        if (this.audioBuffer) {
+          const loadedSec = this.audioBuffer.duration;
+          console.log('[AudioEngine] AudioBuffer created:', {
+            duration: loadedSec,
+            length: this.audioBuffer.length,
+            fullDuration: fullDuration,
+          });
+          if (fullDuration > 0 && loadedSec < fullDuration - 0.5) {
+            console.warn(
+              `[AudioEngine] AudioBuffer truncated: ${loadedSec.toFixed(1)}s loaded vs ${fullDuration.toFixed(1)}s full. ` +
+              `Chunk loading failed after ~${loadedSec.toFixed(1)}s.`
+            );
+          }
+        } else {
+          console.log('[AudioEngine] AudioBuffer creation FAILED');
+        }
       } catch (e) {
         console.error('[AudioEngine] Rust audio decode FAILED:', e);
       }
@@ -405,6 +514,10 @@ export class AudioEngine {
 
   public getDuration(): number {
     return this.audioBuffer ? this.audioBuffer.duration : 0;
+  }
+
+  public getFullDuration(): number {
+    return this.songMeta?.duration || this.getDuration();
   }
 
   public getIsPlaying(): boolean {

@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Minus, Square, X, Headphones, StopCircle } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -14,6 +14,8 @@ interface NavbarProps {
   onLoadSong: (file: File) => void;
   onLoadSongPath: (path: string) => void;
   onApplyPreset: (presetId: string) => void;
+  onSavePreset: () => void;
+  onLoadPreset: () => void;
   onOpenExport: () => void;
   isListening: boolean;
   onStartListen: (deviceId?: string) => void;
@@ -26,6 +28,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLoadSong,
   onLoadSongPath,
   onApplyPreset,
+  onSavePreset,
+  onLoadPreset,
   onOpenExport,
   isListening,
   onStartListen,
@@ -170,6 +174,16 @@ export const Navbar: React.FC<NavbarProps> = ({
               ...PRESETS.map((p) => ({ value: p.id, label: p.name })),
             ]}
           />
+        </div>
+
+        {/* Save / Load Preset Buttons */}
+        <div className="preset-actions">
+          <button className="btn btn-icon" onClick={onSavePreset} title="Save Preset">
+            <Save size={16} />
+          </button>
+          <button className="btn btn-icon" onClick={onLoadPreset} title="Load Preset">
+            <FolderOpen size={16} />
+          </button>
         </div>
 
         {/* Export MP4 Button */}

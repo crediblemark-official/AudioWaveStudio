@@ -388,6 +388,48 @@ async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
 }
 
 #[tauri::command]
+async fn read_file_b64(path: String) -> Result<String, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+    Ok(general_purpose::STANDARD.encode(&bytes))
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn save_pcm_to_file(state: tauri::State<'_, AppState>) -> Result<String, String> {
+  let audio = {
+    let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
+    guard.as_ref().ok_or_else(|| "No audio loaded".to_string())?.clone()
+  };
+
+  let dir = std::env::temp_dir().join("audiowave_pcm");
+  std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+  let path = dir.join("pcm.raw");
+
+  let bytes: Vec<u8> = audio.samples.iter().flat_map(|&s| s.to_le_bytes()).collect();
+  std::fs::write(&path, &bytes).map_err(|e| format!("Failed to write PCM file: {}", e))?;
+
+  Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+async fn read_file_range_b64(path: String, offset: usize, length: usize) -> Result<String, String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    use std::io::{Read, Seek};
+    let mut file = std::fs::File::open(&path).map_err(|e| format!("Failed to open file: {}", e))?;
+    file.seek(std::io::SeekFrom::Start(offset as u64)).map_err(|e| format!("Failed to seek: {}", e))?;
+    let mut buf = vec![0u8; length];
+    let n = file.read(&mut buf).map_err(|e| format!("Failed to read: {}", e))?;
+    buf.truncate(n);
+    Ok(general_purpose::STANDARD.encode(&buf))
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn copy_file_to_path(source: String, destination: String) -> Result<(), String> {
   tauri::async_runtime::spawn_blocking(move || {
     std::fs::copy(&source, &destination).map_err(|e| format!("Failed to copy file: {}", e))?;
@@ -472,6 +514,15 @@ async fn save_upload_to_temp(bytes: Vec<u8>, ext: String) -> Result<String, Stri
     let path = dir.join(format!("upload_{}", std::process::id())).with_extension(&ext);
     std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().to_string())
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn write_text_file(path: String, content: String) -> Result<(), String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    std::fs::write(&path, &content).map_err(|e| format!("Failed to write file: {}", e))
   })
   .await
   .map_err(|e| e.to_string())?
@@ -580,6 +631,7 @@ async fn stop_system_listen(state: tauri::State<'_, AppState>) -> Result<(), Str
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  let _ = std::fs::remove_dir_all(std::env::temp_dir().join("audiowave_pcm"));
   tauri::Builder::default()
     .plugin(tauri_plugin_opener::init())
     .plugin(tauri_plugin_dialog::init())
@@ -594,6 +646,10 @@ pub fn run() {
       decode_audio_playback,
       get_audio_chunk_b64,
       read_file_bytes,
+      read_file_b64,
+      save_pcm_to_file,
+      read_file_range_b64,
+      write_text_file,
       copy_file_to_path,
       delete_file,
       check_ffmpeg,
