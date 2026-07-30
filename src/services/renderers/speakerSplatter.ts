@@ -275,7 +275,7 @@ export function renderSpeakerSplatter(r: RenderContext) {
     // Ribbed Ring Grooves
     c.strokeStyle = 'rgba(255, 255, 255, 0.15)';
     c.lineWidth = 1.0;
-    for (let ring = coneInnerR + 4; ring < surroundInnerR - 2; ring += 5) {
+    for (let ring = coneInnerR + 4; ring < surroundInnerR - 2; ring += 8) {
       c.beginPath();
       c.arc(x, y, ring, 0, Math.PI * 2);
       c.stroke();

@@ -48,7 +48,8 @@ export class AudioEngine {
       // Create stream destination for MediaRecorder MP4 Export
       this.mediaDestination = this.audioCtx.createMediaStreamDestination();
 
-      // Connect nodes
+      // Connect nodes: sourceNode -> analyser -> gainNode -> destination
+      this.analyser.connect(this.gainNode);
       this.gainNode.connect(this.audioCtx.destination);
       this.gainNode.connect(this.mediaDestination);
     }
@@ -307,7 +308,6 @@ export class AudioEngine {
     this.sourceNode.buffer = this.audioBuffer;
 
     this.sourceNode.connect(this.analyser);
-    this.analyser.connect(this.gainNode);
 
     this.startTime = this.audioCtx.currentTime - startOffset;
     this.sourceNode.start(0, startOffset);

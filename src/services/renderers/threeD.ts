@@ -26,6 +26,9 @@ export function renderThreeD(r: RenderContext) {
   const centerX = width / 2;
   const floorY = height * 0.78;
   const persp = 0.3;
+  const maxBarW = 18;
+  const gap = 2;
+  const barStep = maxBarW + gap;
 
   const step = Math.floor(freqData.length / barCount);
 
@@ -52,7 +55,7 @@ export function renderThreeD(r: RenderContext) {
     for (let s = 0; s < sparkCount; s++) {
       const bi = Math.floor(Math.random() * barCount);
       const bh = barHs[bi] * height * 0.38;
-      const x = centerX - ((barCount * 22) / 2) + bi * 22 + (Math.random() - 0.5) * 12;
+      const x = centerX - ((barCount * barStep) / 2) + bi * barStep + (Math.random() - 0.5) * 12;
       const cd = (x - centerX) / (centerX);
       const ps = 1 - Math.abs(cd) * persp;
       const py = floorY - bh * ps - 5;
@@ -113,8 +116,6 @@ export function renderThreeD(r: RenderContext) {
     c.stroke();
   }
 
-  const maxBarW = 18;
-  const gap = 2;
   const totalW = (maxBarW + gap) * barCount;
   const startX = centerX - totalW / 2;
 

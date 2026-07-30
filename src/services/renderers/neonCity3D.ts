@@ -12,6 +12,9 @@ export function renderNeonCity3D(r: RenderContext) {
   const floorY = height * 0.58;
   const step = Math.floor(freqData.length / barCount);
 
+  if (frameHistory.length > 0 && frameHistory[0].length !== freqData.length) {
+    frameHistory = [];
+  }
   frameHistory.unshift(new Uint8Array(freqData));
   if (frameHistory.length > HISTORY_DEPTH) frameHistory.pop();
 

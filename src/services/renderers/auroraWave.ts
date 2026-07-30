@@ -16,6 +16,7 @@ export function renderAuroraWave(ctx: RenderContext) {
   const { ctx: c, width, height, config, freqData, bassEnergy: be } = ctx;
   const theme = config.theme;
   t += 0.008;
+  if (t > 10000) t -= 10000;
 
   const bassAmp = 0.1 + be * 0.4;
 

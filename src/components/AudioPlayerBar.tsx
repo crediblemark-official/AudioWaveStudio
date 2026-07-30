@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, Square, Volume2, VolumeX, Music } from 'lucide-react';
 import { SongMetadata } from '../types/visualizer';
 import { audioEngine } from '../services/audioEngine';
@@ -13,17 +13,28 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({ songMeta }) => {
   const [duration, setDuration] = useState<number>(0);
   const [volume, setVolumeState] = useState<number>(0.8);
   const [isMuted, setIsMuted] = useState<boolean>(false);
+  const [prevVolume, setPrevVolume] = useState<number>(0.8);
+
+  const setCurrentTimeRef = useRef(setCurrentTime);
+  const setIsPlayingRef = useRef(setIsPlaying);
+  setCurrentTimeRef.current = setCurrentTime;
+  setIsPlayingRef.current = setIsPlaying;
 
   useEffect(() => {
     audioEngine.setTimeUpdateCallback((time) => {
-      setCurrentTime(time);
-      setIsPlaying(audioEngine.getIsPlaying());
+      setCurrentTimeRef.current(time);
+      setIsPlayingRef.current(audioEngine.getIsPlaying());
     });
 
     audioEngine.setEndedCallback(() => {
-      setIsPlaying(false);
-      setCurrentTime(0);
+      setIsPlayingRef.current(false);
+      setCurrentTimeRef.current(0);
     });
+
+    return () => {
+      audioEngine.setTimeUpdateCallback(() => {});
+      audioEngine.setEndedCallback(() => {});
+    };
   }, []);
 
   useEffect(() => {
@@ -64,15 +75,21 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({ songMeta }) => {
     const val = parseFloat(e.target.value);
     setVolumeState(val);
     audioEngine.setVolume(val);
-    if (val > 0 && isMuted) setIsMuted(false);
+    if (val > 0 && isMuted) {
+      setIsMuted(false);
+      setPrevVolume(val);
+    }
   };
 
   const toggleMute = () => {
     if (isMuted) {
-      audioEngine.setVolume(volume);
+      audioEngine.setVolume(prevVolume);
+      setVolumeState(prevVolume);
       setIsMuted(false);
     } else {
+      setPrevVolume(volume);
       audioEngine.setVolume(0);
+      setVolumeState(0);
       setIsMuted(true);
     }
   };

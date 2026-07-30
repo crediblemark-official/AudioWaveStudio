@@ -49,7 +49,7 @@ export function renderVuMeter(ctx: RenderContext) {
     const y = chY;
     const { level, peakHold } = channels[ch];
 
-    const greenAngle = -0.75 + level * 2.5;
+    const greenAngle = Math.max(0, -0.75 + level * 2.5);
 
     c.save();
     c.translate(x, y);

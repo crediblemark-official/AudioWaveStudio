@@ -40,10 +40,11 @@ export function renderSpectrumBars(ctx: RenderContext) {
 
     const barH = val * maxBarHeight;
 
-    if (barH > peakData[i]) {
+    const prev = peakData[i] ?? 0;
+    if (barH > prev) {
       peakData[i] = barH;
     } else {
-      peakData[i] = Math.max(0, peakData[i] - 2);
+      peakData[i] = Math.max(0, prev - 2);
     }
 
     const x = startX + i * (barWidth + barGap);

@@ -3,6 +3,7 @@ import { audioEngine } from './audioEngine';
 import { rustBridge } from './rustBridge';
 import { CanvasRenderer } from './canvasRenderer';
 import { save } from '@tauri-apps/plugin-dialog';
+import { tempDir } from '@tauri-apps/api/path';
 
 export type ExportMethod = 'screen_recording' | 'frame_by_frame';
 
@@ -69,13 +70,17 @@ export class VideoExporter {
     const width = sourceCanvas.width;
     const height = sourceCanvas.height;
     const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
-    const outputPath = `/tmp/${outputFileName}`;
+    const tmpDir = await tempDir();
+    const outputPath = `${tmpDir}${outputFileName}`;
     const startTime = Date.now();
 
     try {
       // ── PHASE 1: Capture frames into memory ──
-      onProgress({ status: 'recording', progress: 0, currentFrame: 0, totalFrames: 0, elapsedTime: 0 });
+      const estimatedTotalFrames = Math.ceil(duration * 60);
+      onProgress({ status: 'recording', progress: 0, currentFrame: 0, totalFrames: estimatedTotalFrames, elapsedTime: 0 });
 
+      const prevVolume = audioEngine.getVolume();
+      audioEngine.setVolume(0);
       await audioEngine.play();
 
       const captureCtx = sourceCanvas.getContext('2d');
@@ -93,7 +98,9 @@ export class VideoExporter {
           const tmpCanvas = document.createElement('canvas');
           tmpCanvas.width = width;
           tmpCanvas.height = height;
-          tmpCanvas.getContext('2d')!.putImageData(imageData, 0, 0);
+          const tmpCtx = tmpCanvas.getContext('2d');
+          if (!tmpCtx) throw new Error('Cannot get temporary canvas context');
+          tmpCtx.putImageData(imageData, 0, 0);
           const jpegBlob = await new Promise<Blob>((resolve, reject) => {
             tmpCanvas.toBlob(
               (blob) => { if (blob) resolve(blob); else reject(new Error('JPEG encode failed')); },
@@ -113,13 +120,14 @@ export class VideoExporter {
             status: 'recording',
             progress: pct,
             currentFrame: capturedFrames.length,
-            totalFrames: 0,
+            totalFrames: estimatedTotalFrames,
             elapsedTime: elapsedSec,
           });
         }
       }
 
       audioEngine.stop();
+      audioEngine.setVolume(prevVolume);
       if (lastError) throw new Error(lastError);
       if (!this.isExporting) throw new Error('Export cancelled');
 
@@ -190,7 +198,8 @@ export class VideoExporter {
     else if (config.export.aspectRatio === '1:1') { height = width; }
 
     const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
-    const outputPath = `/tmp/${outputFileName}`;
+    const tmpDir = await tempDir();
+    const outputPath = `${tmpDir}${outputFileName}`;
     const fps = config.export.fps || 60;
     const totalFrames = Math.ceil(duration * fps);
     const startTime = Date.now();
@@ -198,7 +207,8 @@ export class VideoExporter {
     const offscreen = document.createElement('canvas');
     offscreen.width = width;
     offscreen.height = height;
-    const offCtx = offscreen.getContext('2d', { alpha: false })!;
+    const offCtx = offscreen.getContext('2d', { alpha: false });
+    if (!offCtx) throw new Error('Failed to get offscreen canvas 2D context');
 
     const exportRenderer = new CanvasRenderer();
     exportRenderer.init(offscreen);
@@ -212,11 +222,12 @@ export class VideoExporter {
       await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);
 
       const fftSize = config.reactivity.fftSize;
-      const barCount = fftSize / 2;
+      const barCount = Math.min(fftSize / 2, 128);
       const bassMultiplier = config.reactivity.bassMultiplier;
       const smoothing = config.reactivity.smoothing;
       let exportBassEnergy = 0;
 
+      let rotationAngle = 0;
       for (let frame = 0; frame < totalFrames; frame++) {
         if (!this.isExporting) throw new Error('Export cancelled');
 
@@ -230,8 +241,9 @@ export class VideoExporter {
         // Bass energy smoothing (kept in JS — single float, cheap)
         exportBassEnergy += (rustResult.bass_energy - exportBassEnergy) * 0.2;
 
+        rotationAngle += 0.003;
         exportRenderer.setExportData(freqData, timeData, exportBassEnergy);
-        exportRenderer.setRotationAngle(frame * 0.003);
+        exportRenderer.setRotationAngle(rotationAngle);
         exportRenderer.drawFrame(config);
 
         // Get raw pixels and send to Rust for JPEG encoding + pipe to FFmpeg

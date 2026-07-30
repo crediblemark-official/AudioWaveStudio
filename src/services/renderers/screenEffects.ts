@@ -1,6 +1,7 @@
 import { ScreenEffectsSettings } from '../../types/visualizer';
 
 let lastGlitchTime = 0;
+let _glitchCanvas: HTMLCanvasElement | null = null;
 
 export function applyScreenEffects(
   canvas: HTMLCanvasElement,
@@ -48,6 +49,15 @@ function applyGlitch(
   const w = canvas.width;
   const h = canvas.height;
 
+  if (!_glitchCanvas || _glitchCanvas.width !== w || _glitchCanvas.height !== h) {
+    _glitchCanvas = document.createElement('canvas');
+    _glitchCanvas.width = w;
+    _glitchCanvas.height = h;
+  }
+  const gc = _glitchCanvas.getContext('2d')!;
+  gc.clearRect(0, 0, w, h);
+  gc.drawImage(canvas, 0, 0);
+
   ctx.save();
   ctx.globalAlpha = 0.6;
 
@@ -56,7 +66,7 @@ function applyGlitch(
     const sliceY = Math.random() * h;
     const sliceH = 2 + Math.random() * 8 * intensity;
     const offsetX = (Math.random() - 0.5) * 40 * intensity;
-    ctx.drawImage(canvas, 0, sliceY, w, sliceH, offsetX, sliceY, w, sliceH);
+    ctx.drawImage(_glitchCanvas, 0, sliceY, w, sliceH, offsetX, sliceY, w, sliceH);
   }
   ctx.restore();
 

@@ -12,6 +12,8 @@ export function renderSmoothSpectrum(ctx: RenderContext) {
   const bottomY = height * 0.85;
   const maxH = height * 0.65;
 
+  if (barCount < 2) return;
+
   const points: { x: number; y: number }[] = [];
   const xStep = availableWidth / (barCount - 1);
 

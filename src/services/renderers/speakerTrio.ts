@@ -17,7 +17,7 @@ const NOTE_SYMBOLS = ['♪', '♫', '♬', '♩', '∮', '🎼'];
 
 function initNotes(width: number, height: number) {
   if (floatingNotes.length > 0) return;
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 18; i++) {
     floatingNotes.push({
       x: Math.random() * width,
       y: Math.random() * height,
@@ -73,9 +73,9 @@ export function renderSpeakerTrio(r: RenderContext) {
     if (val < 0.01) continue;
 
     const barH = val * height * 0.35;
-    const dotSize = 3.5;
-    const dotGap = 5;
-    const dotsCount = Math.min(Math.floor(barH / dotGap), 25);
+    const dotSize = 4;
+    const dotGap = 6;
+    const dotsCount = Math.min(Math.floor(barH / dotGap), 8);
 
     const xLeft = centerX - (i / (halfCount - 1)) * halfW;
     const xRight = centerX + (i / (halfCount - 1)) * halfW;
@@ -204,7 +204,7 @@ export function renderSpeakerTrio(r: RenderContext) {
     // Concentric Ridges / Ribbed Ring Lines on Cone
     c.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     c.lineWidth = 1.2;
-    for (let ring = coneInnerR + 6; ring < surroundInnerR - 4; ring += 7) {
+    for (let ring = coneInnerR + 6; ring < surroundInnerR - 4; ring += 10) {
       c.beginPath();
       c.arc(x, y, ring, 0, Math.PI * 2);
       c.stroke();

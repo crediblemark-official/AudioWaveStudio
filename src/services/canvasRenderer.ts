@@ -91,8 +91,10 @@ export class CanvasRenderer {
 
   public init(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d', { alpha: false });
-    this.rctx.ctx = this.ctx!;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    if (!ctx) throw new Error('Failed to get 2D context from canvas');
+    this.ctx = ctx;
+    this.rctx.ctx = ctx;
   }
 
   public setCustomBackgroundImage(uri?: string) {

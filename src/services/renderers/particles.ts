@@ -1,11 +1,19 @@
 import { RenderContext, Particle } from './types';
 
-function makeParticle(): Particle {
+function makeParticle(edgeSpawn = false): Particle {
   const angle = Math.random() * Math.PI * 2;
-  const speed = 0.0004 + Math.random() * 0.0004; // Smooth, slow ambient rolling speed
+  const speed = 0.0004 + Math.random() * 0.0004;
+  let x: number, y: number;
+  if (edgeSpawn) {
+    const side = Math.floor(Math.random() * 4);
+    x = side === 0 ? 0.05 : side === 1 ? 0.95 : 0.05 + Math.random() * 0.9;
+    y = side === 2 ? 0.05 : side === 3 ? 0.95 : 0.05 + Math.random() * 0.9;
+  } else {
+    x = 0.05 + Math.random() * 0.9;
+    y = 0.05 + Math.random() * 0.9;
+  }
   return {
-    x: 0.05 + Math.random() * 0.9,
-    y: 0.05 + Math.random() * 0.9,
+    x, y,
     radius: Math.random() * 3 + 1,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
@@ -29,7 +37,7 @@ export function renderParticles(ctx: RenderContext) {
   const targetCount = Math.max(5, bg.particleCount ?? 60);
 
   // Dynamically scale array size to particleCount setting
-  while (particles.length < targetCount) particles.push(makeParticle());
+  while (particles.length < targetCount) particles.push(makeParticle(true));
   while (particles.length > targetCount) particles.pop();
 
   const isPlaying = ctx.isPlaying;

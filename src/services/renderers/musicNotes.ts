@@ -115,6 +115,7 @@ export function renderMusicNotes(ctx: RenderContext) {
     const pulse = 1 + Math.sin(n.life * 0.1) * 0.1;
     const sz = n.size * pulse;
 
+    c.save();
     const cos = Math.cos(n.rotation);
     const sin = Math.sin(n.rotation);
     c.setTransform(cos, sin, -sin, cos, n.x, n.y);
@@ -127,6 +128,7 @@ export function renderMusicNotes(ctx: RenderContext) {
 
     c.fillStyle = `rgba(${cr},${cg},${cb},${alpha})`;
     c.fillText(n.symbol, 0, 0);
+    c.restore();
 
     if (alive !== i) musicNotes[alive] = n;
     alive++;

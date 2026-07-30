@@ -1,5 +1,8 @@
 import { RenderContext } from './types';
 
+let _cachedH = 0;
+let _barGrad: CanvasGradient | null = null;
+
 export function renderSpeaker3D(r: RenderContext) {
   const { ctx: c, width, height, config, freqData, bassEnergy: be, beatStrength: bs } = r;
   const sensitivity = config.reactivity.sensitivity;
@@ -8,11 +11,19 @@ export function renderSpeaker3D(r: RenderContext) {
   const centerX = width / 2;
   const centerY = height / 2;
 
-  // Base radius for speaker
   const baseRadius = Math.min(width, height) * 0.27;
-  // Dynamic 3D bass pulse scale
   const bassPulse = 1.0 + be * 0.12 + bs * 0.08;
   const speakerR = baseRadius * bassPulse;
+
+  if (!_barGrad || _cachedH !== height) {
+    _cachedH = height;
+    _barGrad = c.createLinearGradient(0, 0, 0, height);
+    _barGrad.addColorStop(0, 'rgba(255, 40, 0, 0.85)');
+    _barGrad.addColorStop(0.2, 'rgba(255, 120, 0, 0.95)');
+    _barGrad.addColorStop(0.5, 'rgba(255, 220, 80, 0.98)');
+    _barGrad.addColorStop(0.8, 'rgba(255, 100, 0, 0.95)');
+    _barGrad.addColorStop(1, 'rgba(200, 20, 0, 0.85)');
+  }
 
   c.save();
 
@@ -40,13 +51,6 @@ export function renderSpeaker3D(r: RenderContext) {
   c.lineTo(width, centerY);
   c.stroke();
 
-  const barGrad = c.createLinearGradient(0, 0, 0, height);
-  barGrad.addColorStop(0, 'rgba(255, 40, 0, 0.85)');
-  barGrad.addColorStop(0.2, 'rgba(255, 120, 0, 0.95)');
-  barGrad.addColorStop(0.5, 'rgba(255, 220, 80, 0.98)');
-  barGrad.addColorStop(0.8, 'rgba(255, 100, 0, 0.95)');
-  barGrad.addColorStop(1, 'rgba(200, 20, 0, 0.85)');
-
   c.shadowBlur = 15;
   c.shadowColor = theme.glowColor || '#FF5500';
 
@@ -65,7 +69,7 @@ export function renderSpeaker3D(r: RenderContext) {
     const xLeft = leftEnd - (i / (halfBars - 1)) * leftWidth - barW;
     const xRight = rightStart + (i / (halfBars - 1)) * rightWidth;
 
-    c.fillStyle = barGrad;
+    c.fillStyle = _barGrad;
     c.fillRect(xLeft, topY, barW, barH * 1.82);
     c.fillRect(xRight, topY, barW, barH * 1.82);
 
@@ -212,24 +216,27 @@ export function renderSpeaker3D(r: RenderContext) {
   c.arc(centerX, centerY, coneOuterR, 0, Math.PI * 2);
   c.fill();
 
-  // Polka Dot Mesh Texture
-  c.save();
-  c.clip();
   c.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  const gridSpacing = 9;
+  const gridSpacing = 12;
+  const dotR = 1.8;
+  const minD = coneInnerR * 0.9;
+  const maxD = coneOuterR * 0.98;
+  const minD2 = minD * minD;
+  const maxD2 = maxD * maxD;
   for (let gy = centerY - coneOuterR; gy <= centerY + coneOuterR; gy += gridSpacing) {
     const rowOffset = Math.floor((gy - centerY) / gridSpacing) % 2 === 0 ? 0 : gridSpacing * 0.5;
     for (let gx = centerX - coneOuterR; gx <= centerX + coneOuterR; gx += gridSpacing) {
       const xPos = gx + rowOffset;
-      const dist = Math.hypot(xPos - centerX, gy - centerY);
-      if (dist >= coneInnerR * 0.9 && dist <= coneOuterR * 0.98) {
+      const dx = xPos - centerX;
+      const dy = gy - centerY;
+      const dist2 = dx * dx + dy * dy;
+      if (dist2 >= minD2 && dist2 <= maxD2) {
         c.beginPath();
-        c.arc(xPos, gy, 2.0, 0, Math.PI * 2);
+        c.arc(xPos, gy, dotR, 0, Math.PI * 2);
         c.fill();
       }
     }
   }
-  c.restore();
 
   // --- PASS 6: 3D DUST CAP CONE WITH GLOSSY CRESCENT GLARE ---
   const dustCapR = coneInnerR * (1.0 + be * 0.06);

@@ -162,7 +162,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             icon={<Sparkles size={16} className="preset-icon" />}
             onChange={(v) => {
               if (!v) return;
-              setPresetValue(v);
+              setPresetValue('');
               onApplyPreset(v);
             }}
             options={[

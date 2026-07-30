@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Film, FilmIcon, CheckCircle, AlertTriangle, Download, X, RefreshCw, Zap, Layers } from 'lucide-react';
 import { VisualizerConfig } from '../types/visualizer';
 import { ExportProgress, ExportMethod, videoExporter } from '../services/videoExporter';
@@ -16,6 +16,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
   const [exportMethod, setExportMethod] = useState<ExportMethod>('screen_recording');
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const mountedRef = useRef(true);
   const [progressState, setProgressState] = useState<ExportProgress>({
     status: 'preparing',
     progress: 0,
@@ -41,7 +42,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
 
     videoExporter
       .exportToVideo(sourceCanvas, config, mode === 'with_audio', method, (progress) => {
-        setProgressState(progress);
+        if (mountedRef.current) setProgressState(progress);
       })
       .catch((err) => {
         console.error('Export error:', err);
@@ -49,11 +50,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
   };
 
   useEffect(() => {
+    mountedRef.current = true;
     if (!isOpen) {
       setHasStarted(false);
       setIsSaving(false);
     }
     return () => {
+      mountedRef.current = false;
       videoExporter.cancelExport();
     };
   }, [isOpen]);
