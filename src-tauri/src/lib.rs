@@ -20,7 +20,11 @@ use video_encoder::VideoEncoderRust;
 
 struct ExportSession {
   child: Child,
-  stderr_handle: std::process::ChildStderr,
+  stderr_buf: Arc<Mutex<String>>,
+}
+
+fn get_stderr_msg(session: &ExportSession) -> String {
+  session.stderr_buf.lock().map(|s| s.trim().to_string()).unwrap_or_default()
 }
 
 struct ListenSession {
@@ -266,7 +270,7 @@ async fn start_export_session(
 
   let mut cmd = Command::new(&ffmpeg_exe);
   cmd.arg("-y")
-    .arg("-loglevel").arg("error")
+    .arg("-loglevel").arg("warning")
     .arg("-f").arg("image2pipe")
     .arg("-c:v").arg("mjpeg")
     .arg("-r").arg(fps.to_string())
@@ -275,12 +279,15 @@ async fn start_export_session(
 
   if include_audio {
     cmd.arg("-i").arg(&audio_file_path)
+      .arg("-map").arg("0:v:0")
+      .arg("-map").arg("1:a:0?")
       .arg("-c:v").arg("libx264")
       .arg("-pix_fmt").arg("yuv420p")
       .arg("-c:a").arg("aac")
       .arg("-shortest");
   } else {
-    cmd.arg("-c:v").arg("libx264")
+    cmd.arg("-map").arg("0:v:0")
+      .arg("-c:v").arg("libx264")
       .arg("-pix_fmt").arg("yuv420p")
       .arg("-an");
   }
@@ -298,10 +305,20 @@ async fn start_export_session(
     }
   })?;
 
-  let stderr_handle = child.stderr.take().unwrap();
+  let stderr_buf = Arc::new(Mutex::new(String::new()));
+  let stderr_buf_clone = Arc::clone(&stderr_buf);
+  let mut stderr_handle = child.stderr.take().unwrap();
+
+  std::thread::spawn(move || {
+    let mut buf = String::new();
+    let _ = std::io::Read::read_to_string(&mut stderr_handle, &mut buf);
+    if let Ok(mut lock) = stderr_buf_clone.lock() {
+      *lock = buf;
+    }
+  });
 
   let mut guard = state.export_session.lock().map_err(|e| e.to_string())?;
-  *guard = Some(ExportSession { child, stderr_handle });
+  *guard = Some(ExportSession { child, stderr_buf });
 
   Ok(())
 }
@@ -315,11 +332,9 @@ fn write_frame(state: tauri::State<'_, AppState>, jpeg_bytes: Vec<u8>) -> Result
   match stdin.write_all(&jpeg_bytes) {
     Ok(()) => Ok(()),
     Err(e) => {
-      let mut stderr_out = std::io::Read::take(&mut session.stderr_handle, 4096);
-      let mut err_msg = String::new();
-      let _ = std::io::Read::read_to_string(&mut stderr_out, &mut err_msg);
+      let err_msg = get_stderr_msg(session);
       drop(guard);
-      Err(format!("FFmpeg write failed: {}. FFmpeg stderr: {}", e, err_msg.trim()))
+      Err(format!("FFmpeg write failed: {}. FFmpeg stderr: {}", e, err_msg))
     }
   }
 }
@@ -349,11 +364,9 @@ fn write_frame_rgba(state: tauri::State<'_, AppState>, width: u32, height: u32, 
   match stdin.write_all(&jpeg_bytes) {
     Ok(()) => Ok(()),
     Err(e) => {
-      let mut stderr_out = std::io::Read::take(&mut session.stderr_handle, 4096);
-      let mut err_msg = String::new();
-      let _ = std::io::Read::read_to_string(&mut stderr_out, &mut err_msg);
+      let err_msg = get_stderr_msg(session);
       drop(guard);
-      Err(format!("FFmpeg write failed: {}. FFmpeg stderr: {}", e, err_msg.trim()))
+      Err(format!("FFmpeg write failed: {}. FFmpeg stderr: {}", e, err_msg))
     }
   }
 }
@@ -378,9 +391,8 @@ async fn finish_export_session(
   if status.success() {
     Ok("Export completed successfully".to_string())
   } else {
-    let mut err_msg = String::new();
-    let _ = std::io::Read::read_to_string(&mut session.stderr_handle, &mut err_msg);
-    Err(format!("FFmpeg error (exit {}): {}", status.code().unwrap_or(-1), err_msg.trim()))
+    let err_msg = get_stderr_msg(&session);
+    Err(format!("FFmpeg error (exit {}): {}", status.code().unwrap_or(-1), err_msg))
   }
 }
 
@@ -430,12 +442,15 @@ async fn convert_webm_to_mp4(
 
   if include_audio {
     cmd.arg("-i").arg(&audio_path)
+      .arg("-map").arg("0:v:0")
+      .arg("-map").arg("1:a:0?")
       .arg("-c:v").arg("libx264")
       .arg("-pix_fmt").arg("yuv420p")
       .arg("-c:a").arg("aac")
       .arg("-shortest");
   } else {
-    cmd.arg("-c:v").arg("libx264")
+    cmd.arg("-map").arg("0:v:0")
+      .arg("-c:v").arg("libx264")
       .arg("-pix_fmt").arg("yuv420p")
       .arg("-an");
   }
