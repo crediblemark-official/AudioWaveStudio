@@ -40,5 +40,9 @@ pub fn download_url() -> &'static str {
 
 fn is_in_path(name: &str) -> bool {
   let cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
-  Command::new(cmd).arg(name).output().is_ok()
+  Command::new(cmd)
+    .arg(name)
+    .output()
+    .map(|o| o.status.success())
+    .unwrap_or(false)
 }

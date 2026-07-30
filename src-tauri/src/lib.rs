@@ -271,6 +271,7 @@ async fn start_export_session(
   let mut cmd = Command::new(&ffmpeg_exe);
   cmd.arg("-y")
     .arg("-loglevel").arg("warning")
+    .arg("-thread_queue_size").arg("2048")
     .arg("-f").arg("image2pipe")
     .arg("-c:v").arg("mjpeg")
     .arg("-r").arg(fps.to_string())
@@ -278,17 +279,18 @@ async fn start_export_session(
     .arg("-i").arg("pipe:0");
 
   if include_audio {
-    cmd.arg("-i").arg(&audio_file_path)
+    cmd.arg("-thread_queue_size").arg("2048")
+      .arg("-i").arg(&audio_file_path)
       .arg("-map").arg("0:v:0")
       .arg("-map").arg("1:a:0?")
       .arg("-c:v").arg("libx264")
-      .arg("-pix_fmt").arg("yuv420p")
+      .arg("-vf").arg("scale=out_color_matrix=bt709:out_range=limited,format=yuv420p")
       .arg("-c:a").arg("aac")
       .arg("-shortest");
   } else {
     cmd.arg("-map").arg("0:v:0")
       .arg("-c:v").arg("libx264")
-      .arg("-pix_fmt").arg("yuv420p")
+      .arg("-vf").arg("scale=out_color_matrix=bt709:out_range=limited,format=yuv420p")
       .arg("-an");
   }
 
@@ -437,21 +439,23 @@ async fn convert_webm_to_mp4(
 
   let mut cmd = Command::new(&ffmpeg_exe);
   cmd.arg("-y")
-    .arg("-loglevel").arg("error")
+    .arg("-loglevel").arg("warning")
+    .arg("-thread_queue_size").arg("2048")
     .arg("-i").arg(&webm_path);
 
   if include_audio {
-    cmd.arg("-i").arg(&audio_path)
+    cmd.arg("-thread_queue_size").arg("2048")
+      .arg("-i").arg(&audio_path)
       .arg("-map").arg("0:v:0")
       .arg("-map").arg("1:a:0?")
       .arg("-c:v").arg("libx264")
-      .arg("-pix_fmt").arg("yuv420p")
+      .arg("-vf").arg("scale=out_color_matrix=bt709:out_range=limited,format=yuv420p")
       .arg("-c:a").arg("aac")
       .arg("-shortest");
   } else {
     cmd.arg("-map").arg("0:v:0")
       .arg("-c:v").arg("libx264")
-      .arg("-pix_fmt").arg("yuv420p")
+      .arg("-vf").arg("scale=out_color_matrix=bt709:out_range=limited,format=yuv420p")
       .arg("-an");
   }
 

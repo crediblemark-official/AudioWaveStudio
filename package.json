@@ -1,7 +1,7 @@
 {
   "name": "audiowave-studio",
   "private": true,
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "High-performance cross-platform audio visualizer studio and video generator built with Tauri v2, React 19, and Rust.",
   "author": "CredibleMark <contact@crediblemark.com>",
   "type": "module",

@@ -144,7 +144,8 @@ export class VideoExporter {
         if (!this.isExporting) throw new Error('Export cancelled');
         await rustBridge.writeFrame(capturedFrames[i]);
 
-        if (i % 50 === 0) {
+        if (i % 10 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
           const pct = 55 + (i / capturedFrames.length) * 40;
           onProgress({
             status: 'muxing',
@@ -251,6 +252,10 @@ export class VideoExporter {
         // Get raw pixels and send to Rust for JPEG encoding + pipe to FFmpeg
         const imageData = offCtx.getImageData(0, 0, width, height);
         await rustBridge.writeFrameRgba(width, height, new Uint8Array(imageData.data.buffer));
+
+        if (frame % 10 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        }
 
         const pct = Math.min(100, ((frame + 1) * 100) / totalFrames);
         if (frame % 3 === 0 || frame === totalFrames - 1) {
