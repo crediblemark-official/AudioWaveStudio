@@ -71,7 +71,8 @@ export class VideoExporter {
     const height = sourceCanvas.height;
     const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
     const tmpDir = await tempDir();
-    const outputPath = `${tmpDir}${outputFileName}`;
+    const separator = tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/';
+    const outputPath = `${tmpDir}${separator}${outputFileName}`;
     const startTime = Date.now();
 
     try {
@@ -199,7 +200,8 @@ export class VideoExporter {
 
     const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
     const tmpDir = await tempDir();
-    const outputPath = `${tmpDir}${outputFileName}`;
+    const separator = tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/';
+    const outputPath = `${tmpDir}${separator}${outputFileName}`;
     const fps = config.export.fps || 60;
     const totalFrames = Math.ceil(duration * fps);
     const startTime = Date.now();

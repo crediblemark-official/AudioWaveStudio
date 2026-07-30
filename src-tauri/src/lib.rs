@@ -331,11 +331,18 @@ fn write_frame_rgba(state: tauri::State<'_, AppState>, width: u32, height: u32, 
 
   let stdin = session.child.stdin.as_mut().ok_or_else(|| "FFmpeg stdin not available".to_string())?;
 
-  // Encode RGBA pixels to JPEG in Rust
+  // Convert RGBA pixels to RGB (JPEG format doesn't support alpha channel / Rgba8)
+  let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
+  for chunk in rgba_data.chunks_exact(4) {
+    rgb_data.push(chunk[0]);
+    rgb_data.push(chunk[1]);
+    rgb_data.push(chunk[2]);
+  }
+
   let mut jpeg_bytes: Vec<u8> = Vec::new();
   {
     let mut encoder = JpegEncoder::new_with_quality(&mut jpeg_bytes, 95);
-    encoder.encode(&rgba_data, width, height, image::ExtendedColorType::Rgba8)
+    encoder.encode(&rgb_data, width, height, image::ExtendedColorType::Rgb8)
       .map_err(|e| format!("JPEG encode failed: {}", e))?;
   }
 
