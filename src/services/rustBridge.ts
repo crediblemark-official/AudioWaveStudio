@@ -40,7 +40,7 @@ export interface RenderConfigRust {
   position_y?: number;
 }
 
-function hexToRgba(hex: string): [number, number, number, number] {
+export function hexToRgba(hex: string): [number, number, number, number] {
   let c = hex.replace('#', '');
   if (c.length === 3) {
     c = c.split('').map((x) => x + x).join('');
@@ -92,6 +92,10 @@ export class RustBridge {
     await invoke('copy_file_to_path', { source, destination });
   }
 
+  public async deleteFile(path: string): Promise<void> {
+    await invoke('delete_file', { path });
+  }
+
   public async computeSpectrum(
     timeSec: number,
     barCount: number,
@@ -106,15 +110,6 @@ export class RustBridge {
       smoothing,
       bassMultiplier,
     });
-  }
-
-  public async renderFrame(config: VisualizerConfig, timeSec: number): Promise<Uint8Array> {
-    const rustConfig = convertToRustConfig(config);
-    const bytes = await invoke<number[]>('render_frame_rust', {
-      config: rustConfig,
-      timeSec,
-    });
-    return new Uint8Array(bytes);
   }
 
   public async checkFfmpeg(): Promise<boolean> {

@@ -6,8 +6,11 @@ use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use std::path::Path;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc;
+use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportProgressRust {
@@ -122,6 +125,8 @@ impl VideoEncoderRust {
         let config_clone = config.clone();
         let audio_clone = audio.clone();
         let (frame_tx, frame_rx) = mpsc::sync_channel::<Vec<u8>>(64);
+        let rendered = Arc::new(AtomicUsize::new(0));
+        let rendered_clone = rendered.clone();
 
         let writer_handle = thread::spawn(move || {
           let mut stdin = stdin;
@@ -144,22 +149,35 @@ impl VideoEncoderRust {
             if frame_tx.send(img.into_raw()).is_err() {
               break;
             }
+            rendered_clone.store(frame_idx + 1, Ordering::SeqCst);
           }
         });
 
         let mut last_pct = -1i32;
-        for frame_idx in 0..total_frames {
-          let pct = ((frame_idx + 1) * 100 / total_frames) as i32;
+        loop {
+          let done = rendered.load(Ordering::SeqCst);
+          if done >= total_frames {
+            break;
+          }
+          let pct = (done * 100 / total_frames) as i32;
           if pct != last_pct {
             last_pct = pct;
             on_progress(&ExportProgressRust {
               percent: pct as f32,
-              current_frame: frame_idx + 1,
+              current_frame: done,
               total_frames,
-              is_finished: frame_idx + 1 >= total_frames,
+              is_finished: false,
             });
           }
+          thread::sleep(Duration::from_millis(100));
         }
+
+        on_progress(&ExportProgressRust {
+          percent: 100.0,
+          current_frame: total_frames,
+          total_frames,
+          is_finished: true,
+        });
 
         let _ = render_handle.join();
         let _ = writer_handle.join();
@@ -182,5 +200,48 @@ impl VideoEncoderRust {
       };
       Err(msg)
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn export_progress_serialization() {
+    let p = ExportProgressRust {
+      percent: 50.0,
+      current_frame: 100,
+      total_frames: 200,
+      is_finished: false,
+    };
+    let json = serde_json::to_string(&p).unwrap();
+    assert!(json.contains("\"percent\":50.0"));
+    assert!(json.contains("\"current_frame\":100"));
+    assert!(json.contains("\"total_frames\":200"));
+    assert!(json.contains("\"is_finished\":false"));
+  }
+
+  #[test]
+  fn export_progress_finished() {
+    let p = ExportProgressRust {
+      percent: 100.0,
+      current_frame: 200,
+      total_frames: 200,
+      is_finished: true,
+    };
+    assert!(p.is_finished);
+    assert_eq!(p.percent, 100.0);
+    assert_eq!(p.current_frame, p.total_frames);
+  }
+
+  #[test]
+  fn export_progress_deserialization() {
+    let json = r#"{"percent":75.0,"current_frame":150,"total_frames":200,"is_finished":false}"#;
+    let p: ExportProgressRust = serde_json::from_str(json).unwrap();
+    assert_eq!(p.percent, 75.0);
+    assert_eq!(p.current_frame, 150);
+    assert_eq!(p.total_frames, 200);
+    assert!(!p.is_finished);
   }
 }

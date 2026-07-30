@@ -1,7 +1,7 @@
 {
   "name": "audiowave-studio",
   "private": true,
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "High-performance cross-platform audio visualizer studio and video generator built with Tauri v2, React 19, and Rust.",
   "author": "CredibleMark <contact@crediblemark.com>",
   "type": "module",
@@ -9,7 +9,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -25,6 +27,7 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "typescript": "~5.8.3",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.1.10"
   }
 }

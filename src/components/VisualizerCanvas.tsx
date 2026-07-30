@@ -10,10 +10,22 @@ interface VisualizerCanvasProps {
   isFullscreen: boolean;
 }
 
+function getCanvasSize(resolution: string, aspectRatio: string): { width: number; height: number } {
+  let width = 1920;
+  let height = 1080;
+  if (resolution === '720p') { width = 1280; height = 720; }
+  else if (resolution === '4K') { width = 3840; height = 2160; }
+  if (aspectRatio === '9:16') { const t = width; width = height; height = t; }
+  else if (aspectRatio === '1:1') { height = width; }
+  return { width, height };
+}
+
 export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({ config, onToggleFullscreen, isFullscreen }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const configRef = useRef<VisualizerConfig>(config);
   configRef.current = config;
+
+  const canvasSize = getCanvasSize(config.export.resolution, config.export.aspectRatio);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -72,8 +84,8 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({ config, onTo
       <div className={`canvas-container ${getAspectRatioClass()}`}>
         <canvas
           ref={canvasRef}
-          width={1280}
-          height={config.export.aspectRatio === '9:16' ? 2275 : config.export.aspectRatio === '1:1' ? 1280 : 720}
+          width={canvasSize.width}
+          height={canvasSize.height}
           className="visualizer-canvas"
         />
         <button

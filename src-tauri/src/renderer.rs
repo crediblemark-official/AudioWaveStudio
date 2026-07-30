@@ -300,3 +300,150 @@ fn interpolate_color(c1: [u8; 4], c2: [u8; 4], t: f32) -> [u8; 4] {
     255,
   ]
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  // ─── boost_spectrum ───
+
+  #[test]
+  fn boost_spectrum_all_zero() {
+    let result = boost_spectrum(&[0.0; 32], 1.0, 1.0);
+    assert_eq!(result.len(), 32);
+    assert!(result.iter().all(|&v| v == 0.0));
+  }
+
+  #[test]
+  fn boost_spectrum_positive_sensitivity_increases_values() {
+    let input = vec![0.5; 32];
+    let low = boost_spectrum(&input, 0.5, 1.0);
+    let high = boost_spectrum(&input, 2.0, 1.0);
+    for i in 0..32 {
+      assert!(high[i] >= low[i], "high[{}]={} < low[{}]={}", i, high[i], i, low[i]);
+    }
+  }
+
+  #[test]
+  fn boost_spectrum_bass_bins_get_extra_boost() {
+    let input = vec![0.5; 64];
+    let result = boost_spectrum(&input, 1.0, 1.0);
+    // First 8 bins (bass) should be >= mid bins
+    for i in 0..8 {
+      assert!(result[i] >= result[16], "bass bin {}: {} < mid {}", i, result[i], result[16]);
+    }
+  }
+
+  #[test]
+  fn boost_spectrum_values_clamped_to_1() {
+    let input = vec![1.0; 16];
+    let result = boost_spectrum(&input, 10.0, 10.0);
+    assert!(result.iter().all(|&v| v <= 1.0));
+  }
+
+  #[test]
+  fn boost_spectrum_empty_input() {
+    let result = boost_spectrum(&[], 1.0, 1.0);
+    assert_eq!(result.len(), 0);
+  }
+
+  // ─── interpolate_color ───
+
+  #[test]
+  fn interpolate_color_at_zero_returns_c1() {
+    let c1 = [10, 20, 30, 255];
+    let c2 = [100, 200, 250, 255];
+    let result = interpolate_color(c1, c2, 0.0);
+    assert_eq!(result[0], 10);
+    assert_eq!(result[1], 20);
+    assert_eq!(result[2], 30);
+    assert_eq!(result[3], 255);
+  }
+
+  #[test]
+  fn interpolate_color_at_one_returns_c2() {
+    let c1 = [10, 20, 30, 255];
+    let c2 = [100, 200, 250, 255];
+    let result = interpolate_color(c1, c2, 1.0);
+    assert_eq!(result[0], 100);
+    assert_eq!(result[1], 200);
+    assert_eq!(result[2], 250);
+    assert_eq!(result[3], 255);
+  }
+
+  #[test]
+  fn interpolate_color_midpoint() {
+    let c1 = [0, 0, 0, 255];
+    let c2 = [100, 200, 250, 255];
+    let result = interpolate_color(c1, c2, 0.5);
+    assert_eq!(result[0], 50);
+    assert_eq!(result[1], 100);
+    assert_eq!(result[2], 125);
+    assert_eq!(result[3], 255);
+  }
+
+  #[test]
+  fn interpolate_color_same_colors() {
+    let c = [50, 100, 150, 255];
+    let result = interpolate_color(c, c, 0.5);
+    assert_eq!(result, c);
+  }
+
+  // ─── RustRenderer::render_frame ───
+
+  fn make_config() -> RenderConfig {
+    RenderConfig {
+      style: "spectrum".into(),
+      width: 200,
+      height: 100,
+      primary_color: [0, 240, 255, 255],
+      secondary_color: [255, 0, 170, 255],
+      accent_color: [255, 170, 0, 255],
+      bg_color: [0, 0, 0, 255],
+      bar_count: 16,
+      sensitivity: 1.0,
+      bass_multiplier: 1.0,
+      show_particles: false,
+      title_text: None,
+      artist_text: None,
+    }
+  }
+
+  #[test]
+  fn render_frame_returns_correct_size() {
+    let config = make_config();
+    let mut renderer = RustRenderer::new();
+    let spectrum = vec![0.5; 16];
+    let waveform = vec![0.0; 256];
+    let img = renderer.render_frame(&config, &spectrum, &waveform, 0.5);
+    assert_eq!(img.width(), 200);
+    assert_eq!(img.height(), 100);
+  }
+
+  #[test]
+  fn render_frame_all_styles_succeed() {
+    let styles = ["spectrum", "radial", "oscilloscope", "equalizer", "minimal"];
+    for &style in &styles {
+      let mut config = make_config();
+      config.style = style.to_string();
+      let mut renderer = RustRenderer::new();
+      let spectrum = vec![0.3; config.bar_count];
+      let waveform = vec![0.0; 256];
+      let img = renderer.render_frame(&config, &spectrum, &waveform, 0.3);
+      assert_eq!(img.width(), 200, "Style '{}' failed", style);
+      assert_eq!(img.height(), 100, "Style '{}' failed", style);
+    }
+  }
+
+  // ─── render_particles ───
+
+  #[test]
+  fn render_particles_does_not_panic() {
+    let mut img = RgbaImage::new(100, 100);
+    // Just verify it doesn't panic
+    render_particles(&mut img, 100, 100, 0.5, [255, 0, 0, 255]);
+    render_particles(&mut img, 100, 100, 0.0, [0, 255, 0, 255]);
+    render_particles(&mut img, 100, 100, 1.0, [0, 0, 255, 255]);
+  }
+}
+

@@ -10,7 +10,7 @@ use base64::{Engine as _, engine::general_purpose};
 use fft_analyzer::FftAnalyzer;
 use ffmpeg::resolve_ffmpeg;
 use image::codecs::jpeg::JpegEncoder;
-use renderer::{RenderConfig, RustRenderer};
+use renderer::RenderConfig;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::process::{Child, Command, Stdio};
@@ -79,6 +79,11 @@ async fn decode_audio(state: tauri::State<'_, AppState>, file_path: String) -> R
     sample_rate: audio.sample_rate,
     channels: audio.channels,
   };
+
+  // Reset smoothing state for fresh playback
+  if let Ok(mut prev) = state.prev_smoothed.lock() {
+    *prev = None;
+  }
 
   let mut guard = state.audio_data.lock().map_err(|e| e.to_string())?;
   *guard = Some(Arc::new(audio));
@@ -204,31 +209,6 @@ fn compute_spectrum_rust(
 }
 
 #[tauri::command]
-fn render_frame_rust(
-  state: tauri::State<'_, AppState>,
-  config: RenderConfig,
-  time_sec: f64,
-) -> Result<Vec<u8>, String> {
-  let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
-  let audio = guard.as_ref().ok_or_else(|| "No audio loaded".to_string())?;
-
-  let window = audio.get_sample_window(time_sec, 1024);
-  let analyzer = FftAnalyzer::new(1024);
-  let (spectrum, bass_energy) = analyzer.compute_spectrum(&window, config.bar_count)?;
-
-  let mut renderer = RustRenderer::new();
-  let img = renderer.render_frame(&config, &spectrum, &window, bass_energy);
-
-  let mut png_bytes: Vec<u8> = Vec::new();
-  let mut cursor = std::io::Cursor::new(&mut png_bytes);
-  img
-    .write_to(&mut cursor, image::ImageFormat::Png)
-    .map_err(|e| e.to_string())?;
-
-  Ok(png_bytes)
-}
-
-#[tauri::command]
 async fn export_mp4_native(
   app_handle: tauri::AppHandle,
   state: tauri::State<'_, AppState>,
@@ -319,6 +299,11 @@ async fn start_export_session(
     }
   });
 
+  // Reset smoothing state so the export starts with a clean slate
+  if let Ok(mut prev) = state.prev_smoothed.lock() {
+    *prev = None;
+  }
+
   let mut guard = state.export_session.lock().map_err(|e| e.to_string())?;
   *guard = Some(ExportSession { child, stderr_buf });
 
@@ -335,7 +320,6 @@ fn write_frame(state: tauri::State<'_, AppState>, jpeg_bytes: Vec<u8>) -> Result
     Ok(()) => Ok(()),
     Err(e) => {
       let err_msg = get_stderr_msg(session);
-      drop(guard);
       Err(format!("FFmpeg write failed: {}. FFmpeg stderr: {}", e, err_msg))
     }
   }
@@ -348,7 +332,6 @@ fn write_frame_rgba(state: tauri::State<'_, AppState>, width: u32, height: u32, 
 
   let stdin = session.child.stdin.as_mut().ok_or_else(|| "FFmpeg stdin not available".to_string())?;
 
-  // Convert RGBA pixels to RGB (JPEG format doesn't support alpha channel / Rgba8)
   let mut rgb_data = Vec::with_capacity((width * height * 3) as usize);
   for chunk in rgba_data.chunks_exact(4) {
     rgb_data.push(chunk[0]);
@@ -357,17 +340,14 @@ fn write_frame_rgba(state: tauri::State<'_, AppState>, width: u32, height: u32, 
   }
 
   let mut jpeg_bytes: Vec<u8> = Vec::new();
-  {
-    let mut encoder = JpegEncoder::new_with_quality(&mut jpeg_bytes, 95);
-    encoder.encode(&rgb_data, width, height, image::ExtendedColorType::Rgb8)
-      .map_err(|e| format!("JPEG encode failed: {}", e))?;
-  }
+  JpegEncoder::new_with_quality(&mut jpeg_bytes, 95)
+    .encode(&rgb_data, width, height, image::ExtendedColorType::Rgb8)
+    .map_err(|e| format!("JPEG encode failed: {}", e))?;
 
   match stdin.write_all(&jpeg_bytes) {
     Ok(()) => Ok(()),
     Err(e) => {
       let err_msg = get_stderr_msg(session);
-      drop(guard);
       Err(format!("FFmpeg write failed: {}. FFmpeg stderr: {}", e, err_msg))
     }
   }
@@ -411,6 +391,18 @@ async fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
 async fn copy_file_to_path(source: String, destination: String) -> Result<(), String> {
   tauri::async_runtime::spawn_blocking(move || {
     std::fs::copy(&source, &destination).map_err(|e| format!("Failed to copy file: {}", e))?;
+    Ok(())
+  })
+  .await
+  .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn delete_file(path: String) -> Result<(), String> {
+  tauri::async_runtime::spawn_blocking(move || {
+    if std::path::Path::new(&path).exists() {
+      std::fs::remove_file(&path).map_err(|e| format!("Failed to delete file: {}", e))?;
+    }
     Ok(())
   })
   .await
@@ -603,11 +595,11 @@ pub fn run() {
       get_audio_chunk_b64,
       read_file_bytes,
       copy_file_to_path,
+      delete_file,
       check_ffmpeg,
       ffmpeg_download_url,
       save_upload_to_temp,
       compute_spectrum_rust,
-      render_frame_rust,
       export_mp4_native,
       start_export_session,
       write_frame,

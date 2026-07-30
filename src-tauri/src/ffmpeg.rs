@@ -46,3 +46,26 @@ fn is_in_path(name: &str) -> bool {
     .map(|o| o.status.success())
     .unwrap_or(false)
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn download_url_returns_non_empty() {
+    let url = download_url();
+    assert!(!url.is_empty());
+    assert!(url.starts_with("http"));
+  }
+
+  #[test]
+  fn is_in_path_returns_true_for_existing_commands() {
+    // "echo" should exist on all platforms
+    assert!(is_in_path("echo"));
+  }
+
+  #[test]
+  fn is_in_path_returns_false_for_nonexistent_commands() {
+    assert!(!is_in_path("this_command_does_not_exist_xyz123"));
+  }
+}

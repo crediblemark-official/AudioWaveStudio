@@ -17,6 +17,16 @@ export interface ExportProgress {
   outputPath?: string;
 }
 
+export function getExportDimensions(config: VisualizerConfig): { width: number; height: number } {
+  let width = 1920;
+  let height = 1080;
+  if (config.export.resolution === '720p') { width = 1280; height = 720; }
+  else if (config.export.resolution === '4K') { width = 3840; height = 2160; }
+  if (config.export.aspectRatio === '9:16') { const t = width; width = height; height = t; }
+  else if (config.export.aspectRatio === '1:1') { height = width; }
+  return { width, height };
+}
+
 export class VideoExporter {
   private isExporting: boolean = false;
   private animFrameId: number | null = null;
@@ -48,8 +58,7 @@ export class VideoExporter {
   }
 
   // ─── METHOD 1: Screen Recording (real-time capture from live canvas) ──
-  // Phase 1: Capture all frames into memory as fast as possible
-  // Phase 2: Start FFmpeg with ACTUAL fps, pipe frames, mux audio
+  // Streams frames directly to FFmpeg without buffering in memory
   private async exportViaScreenRecording(
     sourceCanvas: HTMLCanvasElement,
     config: VisualizerConfig,
@@ -67,8 +76,9 @@ export class VideoExporter {
     await audioEngine.ensureRustDecode();
     this.isExporting = true;
 
-    const width = sourceCanvas.width;
-    const height = sourceCanvas.height;
+    const { width, height } = getExportDimensions(config);
+    const fps = config.export.fps || 60;
+    const totalFrames = Math.ceil(duration * fps);
     const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
     const tmpDir = await tempDir();
     const separator = tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/';
@@ -76,94 +86,79 @@ export class VideoExporter {
     const startTime = Date.now();
 
     try {
-      // ── PHASE 1: Capture frames into memory ──
-      const estimatedTotalFrames = Math.ceil(duration * 60);
-      onProgress({ status: 'recording', progress: 0, currentFrame: 0, totalFrames: estimatedTotalFrames, elapsedTime: 0 });
+      onProgress({ status: 'recording', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
       const prevVolume = audioEngine.getVolume();
       audioEngine.setVolume(0);
       await audioEngine.play();
 
+      const origWidth = sourceCanvas.width;
+      const origHeight = sourceCanvas.height;
+      sourceCanvas.width = width;
+      sourceCanvas.height = height;
+
       const captureCtx = sourceCanvas.getContext('2d');
       if (!captureCtx) throw new Error('Cannot get canvas 2D context');
 
-      const capturedFrames: Uint8Array[] = [];
-      let lastError: string | null = null;
+      const frameInterval = 1000 / fps;
+      let frameCount = 0;
 
-      while (this.isExporting && !lastError) {
+      // Start FFmpeg session FIRST, then stream frames as they're captured
+      await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);
+
+      while (this.isExporting) {
         const elapsedSec = (Date.now() - startTime) / 1000;
-        if (elapsedSec >= duration) break;
+        if (elapsedSec >= duration || frameCount >= totalFrames) break;
 
-        try {
-          const imageData = captureCtx.getImageData(0, 0, width, height);
-          const tmpCanvas = document.createElement('canvas');
-          tmpCanvas.width = width;
-          tmpCanvas.height = height;
-          const tmpCtx = tmpCanvas.getContext('2d');
-          if (!tmpCtx) throw new Error('Cannot get temporary canvas context');
-          tmpCtx.putImageData(imageData, 0, 0);
-          const jpegBlob = await new Promise<Blob>((resolve, reject) => {
-            tmpCanvas.toBlob(
-              (blob) => { if (blob) resolve(blob); else reject(new Error('JPEG encode failed')); },
-              'image/jpeg', 0.95
-            );
-          });
-          const bytes = new Uint8Array(await jpegBlob.arrayBuffer());
-          capturedFrames.push(bytes);
-        } catch {
-          lastError = 'Failed to capture frame';
-          break;
-        }
+        const frameStart = Date.now();
 
-        if (capturedFrames.length % 10 === 0) {
-          const pct = Math.min(50, (elapsedSec / duration) * 50);
+        const imageData = captureCtx.getImageData(0, 0, width, height);
+        const tmpCanvas = document.createElement('canvas');
+        tmpCanvas.width = width;
+        tmpCanvas.height = height;
+        const tmpCtx = tmpCanvas.getContext('2d');
+        if (!tmpCtx) throw new Error('Cannot get temporary canvas context');
+        tmpCtx.putImageData(imageData, 0, 0);
+        const jpegBlob = await new Promise<Blob>((resolve, reject) => {
+          tmpCanvas.toBlob(
+            (blob) => { if (blob) resolve(blob); else reject(new Error('JPEG encode failed')); },
+            'image/jpeg', 0.95
+          );
+        });
+        const bytes = new Uint8Array(await jpegBlob.arrayBuffer());
+
+        // Stream to FFmpeg immediately
+        await rustBridge.writeFrame(bytes);
+        frameCount++;
+
+        const pct = Math.min(100, ((frameCount) * 100) / totalFrames);
+        if (frameCount % 3 === 0 || frameCount >= totalFrames) {
           onProgress({
             status: 'recording',
             progress: pct,
-            currentFrame: capturedFrames.length,
-            totalFrames: estimatedTotalFrames,
-            elapsedTime: elapsedSec,
-          });
-        }
-      }
-
-      audioEngine.stop();
-      audioEngine.setVolume(prevVolume);
-      if (lastError) throw new Error(lastError);
-      if (!this.isExporting) throw new Error('Export cancelled');
-
-      const captureTimeSec = (Date.now() - startTime) / 1000;
-      const actualFps = Math.max(1, Math.round(capturedFrames.length / Math.max(0.1, captureTimeSec)));
-
-      // ── PHASE 2: Pipe to FFmpeg with actual fps ──
-      onProgress({ status: 'muxing', progress: 55, currentFrame: capturedFrames.length, totalFrames: capturedFrames.length, elapsedTime: captureTimeSec });
-
-      await rustBridge.startExportSession(actualFps, width, height, outputPath, audioFilePath, includeAudio);
-
-      for (let i = 0; i < capturedFrames.length; i++) {
-        if (!this.isExporting) throw new Error('Export cancelled');
-        await rustBridge.writeFrame(capturedFrames[i]);
-
-        if (i % 10 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0));
-          const pct = 55 + (i / capturedFrames.length) * 40;
-          onProgress({
-            status: 'muxing',
-            progress: pct,
-            currentFrame: i,
-            totalFrames: capturedFrames.length,
+            currentFrame: frameCount,
+            totalFrames,
             elapsedTime: (Date.now() - startTime) / 1000,
           });
         }
+
+        // Frame limiter: wait to match target FPS
+        const frameDuration = Date.now() - frameStart;
+        const waitTime = Math.max(0, frameInterval - frameDuration);
+        if (waitTime > 0) await new Promise((r) => setTimeout(r, waitTime));
       }
 
-      // Free memory
-      capturedFrames.length = 0;
+      sourceCanvas.width = origWidth;
+      sourceCanvas.height = origHeight;
+
+      audioEngine.stop();
+      audioEngine.setVolume(prevVolume);
+      if (!this.isExporting) throw new Error('Export cancelled');
 
       await rustBridge.finishExportSession();
 
       this.isExporting = false;
-      onProgress({ status: 'completed', progress: 100, currentFrame: capturedFrames.length, totalFrames: capturedFrames.length, elapsedTime: (Date.now() - startTime) / 1000, outputPath });
+      onProgress({ status: 'completed', progress: 100, currentFrame: frameCount, totalFrames, elapsedTime: (Date.now() - startTime) / 1000, outputPath });
       return new Blob([]);
     } catch (err: unknown) {
       this.isExporting = false;
@@ -192,12 +187,7 @@ export class VideoExporter {
     await audioEngine.ensureRustDecode();
     this.isExporting = true;
 
-    let width = 1920;
-    let height = 1080;
-    if (config.export.resolution === '720p') { width = 1280; height = 720; }
-    else if (config.export.resolution === '4K') { width = 3840; height = 2160; }
-    if (config.export.aspectRatio === '9:16') { const t = width; width = height; height = t; }
-    else if (config.export.aspectRatio === '1:1') { height = width; }
+    const { width, height } = getExportDimensions(config);
 
     const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
     const tmpDir = await tempDir();
@@ -284,6 +274,11 @@ export class VideoExporter {
     });
     if (!destPath) return false;
     await rustBridge.copyFileToPath(sourcePath, destPath);
+    try {
+      await rustBridge.deleteFile(sourcePath);
+    } catch {
+      // Temp file cleanup is best-effort
+    }
     return true;
   }
 }
