@@ -17,7 +17,8 @@ function drawCoverImage(
   width: number,
   height: number,
   blur = 0,
-  alpha = 1.0
+  alpha = 1.0,
+  margin = 0
 ): boolean {
   if (!img || !img.complete || img.naturalWidth === 0) return false;
   const imgRatio = img.naturalWidth / img.naturalHeight;
@@ -38,12 +39,12 @@ function drawCoverImage(
   c.save();
   if (alpha < 1) c.globalAlpha = Math.max(0, Math.min(1, alpha));
   if (blur > 0) c.filter = `blur(${blur}px)`;
-  c.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+  c.drawImage(img, offsetX - margin, offsetY - margin, renderWidth + margin * 2, renderHeight + margin * 2);
   c.restore();
   return true;
 }
 
-export function renderBackground(ctx: RenderContext) {
+export function renderBackground(ctx: RenderContext, shakeMargin = 0) {
   const { ctx: c, width, height, config, customImgElement } = ctx;
   const bg = config.background;
   const blur = bg.blurAmount || 0;
@@ -67,17 +68,17 @@ export function renderBackground(ctx: RenderContext) {
     grad.addColorStop(0, bg.gradientStart || '#0f0c20');
     grad.addColorStop(1, bg.gradientEnd || '#06101e');
     c.fillStyle = grad;
-    c.fillRect(0, 0, width, height);
+    c.fillRect(-shakeMargin, -shakeMargin, width + shakeMargin * 2, height + shakeMargin * 2);
   } else {
     c.fillStyle = bg.solidColor || '#0b0c10';
-    c.fillRect(0, 0, width, height);
+    c.fillRect(-shakeMargin, -shakeMargin, width + shakeMargin * 2, height + shakeMargin * 2);
   }
 
   // 2. Render Custom Background Image Layer (if present)
   if (customImgElement) {
     const defaultOpacity = bg.mode === 'customImage' ? 1.0 : 0.7;
     const imageOpacity = bg.imageOpacity ?? defaultOpacity;
-    drawCoverImage(c, customImgElement, width, height, blur, imageOpacity);
+    drawCoverImage(c, customImgElement, width, height, blur, imageOpacity, shakeMargin);
   }
 
   // 3. Render Overlay Visual Effect Layers (Multi-Select Stacking Support)

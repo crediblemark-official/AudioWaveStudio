@@ -71,6 +71,7 @@ export async function exportOffscreen(
 
       rotationAngle += 0.003;
       renderer.setExportData(freqData, timeData, rustResult.bass_energy);
+      renderer.setFrameTime(timeSec);
       renderer.setRotationAngle(rotationAngle);
       renderer.drawFrame(config);
 

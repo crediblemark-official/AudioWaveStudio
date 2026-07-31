@@ -45,4 +45,5 @@ export interface RenderContext {
   rotationAngle: number;
   exportFreqData: Uint8Array | null;
   isPlaying: boolean;
+  frameTime: number; // seconds (frame-accurate during export, playback time live)
 }

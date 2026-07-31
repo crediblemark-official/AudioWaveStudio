@@ -1,4 +1,118 @@
-import { ColorTheme, ThemePreset, VisualizerConfig } from '../types/visualizer';
+import { ColorTheme, TextBlock, TextSettings, ThemePreset, VisualizerConfig } from '../types/visualizer';
+
+export function createTextBlock(overrides: Partial<TextBlock> = {}): TextBlock {
+  return {
+    id:
+      typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+        ? crypto.randomUUID()
+        : `block-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    text: '',
+    enabled: true,
+    fontFamily: '',
+    fontSize: 24,
+    fontWeight: 700,
+    italic: false,
+    color: '#ffffff',
+    useGradient: false,
+    gradientStart: '#ffffff',
+    gradientEnd: '#00f0ff',
+    gradientAngle: 0,
+    opacity: 1,
+    letterSpacing: 0,
+    transform: 'none',
+    positionX: 50,
+    positionY: 78,
+    align: 'center',
+    lineHeight: 1.3,
+    maxWidth: 0,
+    shadow: false,
+    shadowBlur: 12,
+    shadowOffsetX: 0,
+    shadowOffsetY: 0,
+    glowIntensity: 0,
+    outline: false,
+    outlineColor: '#000000',
+    outlineWidth: 2,
+    reactiveScale: 0,
+    waveEffect: false,
+    fadeIn: false,
+    ...overrides,
+  };
+}
+
+function legacyValue(t: Record<string, unknown>, key: string, fallback: number | string | boolean): number | string | boolean {
+  const v = t[key];
+  return typeof v === 'number' || typeof v === 'string' || typeof v === 'boolean' ? v : fallback;
+}
+
+export function normalizeTextBlock(block?: Partial<TextBlock>, legacy?: Partial<TextBlock>): TextBlock {
+  return createTextBlock({ ...(legacy || {}), ...(block || {}) });
+}
+
+export function migrateTextSettings(text?: Partial<TextSettings>): TextSettings {
+  const fallback = DEFAULT_CONFIG.text;
+  const t = (text || {}) as Partial<TextSettings> & Record<string, unknown>;
+  const titleX = legacyValue(t, 'textPositionX', fallback.title.positionX) as number;
+  const titleY = legacyValue(t, 'textPositionY', fallback.title.positionY) as number;
+
+  return {
+    ...fallback,
+    ...t,
+    songTitle: typeof t.songTitle === 'string' ? t.songTitle : fallback.songTitle,
+    artistName: typeof t.artistName === 'string' ? t.artistName : fallback.artistName,
+    showTitle: typeof t.showTitle === 'boolean' ? t.showTitle : fallback.showTitle,
+    showArtist: typeof t.showArtist === 'boolean' ? t.showArtist : fallback.showArtist,
+    fontFamily: typeof t.fontFamily === 'string' ? t.fontFamily : fallback.fontFamily,
+    title: normalizeTextBlock(t.title as Partial<TextBlock> | undefined, {
+      id: 'title',
+      text: (typeof t.songTitle === 'string' ? t.songTitle : fallback.songTitle) || fallback.songTitle,
+      fontSize: legacyValue(t, 'titleFontSize', fallback.title.fontSize) as number,
+      color: legacyValue(t, 'titleColor', fallback.title.color) as string,
+      positionX: titleX,
+      positionY: titleY,
+      shadow: legacyValue(t, 'textShadow', fallback.title.shadow) as boolean,
+    }),
+    artist: normalizeTextBlock(t.artist as Partial<TextBlock> | undefined, {
+      id: 'artist',
+      text: (typeof t.artistName === 'string' ? t.artistName : fallback.artistName) || fallback.artistName,
+      fontSize: legacyValue(t, 'artistFontSize', fallback.artist.fontSize) as number,
+      color: legacyValue(t, 'artistColor', fallback.artist.color) as string,
+      positionX: titleX,
+      positionY: Math.min(100, titleY + 6),
+    }),
+    blocks: Array.isArray(t.blocks) ? (t.blocks as Partial<TextBlock>[]).map((b) => normalizeTextBlock(b)) : [],
+  };
+}
+
+const STORAGE_KEY = 'audiowave-config';
+
+export function loadSavedConfig(): VisualizerConfig {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_CONFIG;
+    const saved = JSON.parse(raw) as Partial<VisualizerConfig>;
+    return {
+      ...DEFAULT_CONFIG,
+      ...saved,
+      background: { ...DEFAULT_CONFIG.background, ...(saved.background || {}) },
+      text: migrateTextSettings(saved.text),
+      reactivity: { ...DEFAULT_CONFIG.reactivity, ...(saved.reactivity || {}) },
+      export: { ...DEFAULT_CONFIG.export, ...(saved.export || {}) },
+      screenEffects: { ...DEFAULT_CONFIG.screenEffects, ...(saved.screenEffects || {}) },
+    };
+  } catch (e) {
+    console.error('Failed to load saved config:', e);
+    return DEFAULT_CONFIG;
+  }
+}
+
+export function saveConfig(config: VisualizerConfig): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+  } catch (e) {
+    console.error('Failed to save config:', e);
+  }
+}
 
 export const COLOR_THEMES: Record<string, ColorTheme> = {
   cyberpunk: {
@@ -75,15 +189,29 @@ export const DEFAULT_CONFIG: VisualizerConfig = {
     artistName: 'Synthwave Producer',
     showTitle: true,
     showArtist: true,
-    titleColor: '#ffffff',
-    artistColor: '#00f0ff',
-    titleFontSize: 28,
-    artistFontSize: 16,
     fontFamily: '"Outfit", "Inter", sans-serif',
-    position: 'bottom-center',
-    textPositionX: 50,
-    textPositionY: 82,
-    textShadow: true
+    title: createTextBlock({
+      id: 'title',
+      text: 'Electrifying Night',
+      fontSize: 28,
+      fontWeight: 700,
+      color: '#ffffff',
+      positionX: 50,
+      positionY: 78,
+      align: 'center',
+      shadow: true,
+    }),
+    artist: createTextBlock({
+      id: 'artist',
+      text: 'Synthwave Producer',
+      fontSize: 16,
+      fontWeight: 500,
+      color: '#00f0ff',
+      positionX: 50,
+      positionY: 86,
+      align: 'center',
+    }),
+    blocks: [],
   },
   reactivity: {
     fftSize: 1024,
@@ -110,10 +238,24 @@ export const DEFAULT_CONFIG: VisualizerConfig = {
     enabled: false,
     mainEffect: 'shake',
     shakeIntensity: 0.3,
+    shakeFrequency: 0.5,
+    shakeMaxOffset: 40,
+    shakeOnBeat: false,
     glitchIntensity: 0.4,
 
     pulseIntensity: 0.5,
     spotlightColor: '#FFD700',
+    strobeIntensity: 0.5,
+    scanlineOpacity: 0.12,
+    chromaticIntensity: 0.3,
+    zoomIntensity: 0.15,
+    invertIntensity: 0.3,
+    barsAmount: 0.5,
+    shockwaveIntensity: 0.6,
+    pixelateIntensity: 0.4,
+    tiltIntensity: 0.3,
+    heatHazeIntensity: 0.4,
+    hueShiftIntensity: 0.3,
   },
   positionX: 0,
   positionY: 0,

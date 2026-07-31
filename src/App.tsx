@@ -4,7 +4,7 @@ import { VisualizerCanvas } from './components/VisualizerCanvas';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { ControlPanel } from './components/ControlPanel';
 import { ExportModal } from './components/ExportModal';
-import { DEFAULT_CONFIG, PRESETS } from './utils/presets';
+import { PRESETS, migrateTextSettings, loadSavedConfig, saveConfig } from './utils/presets';
 import { SongMetadata, VisualizerConfig } from './types/visualizer';
 import { rustBridge } from './services/rustBridge';
 import { audioEngine } from './services/audioEngine';
@@ -12,13 +12,18 @@ import { save, open } from '@tauri-apps/plugin-dialog';
 import { RefreshCw, Headphones } from 'lucide-react';
 
 export const App: React.FC = () => {
-  const [config, setConfig] = useState<VisualizerConfig>(DEFAULT_CONFIG);
+  const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
   const [songMeta, setSongMeta] = useState<SongMetadata | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
   const [listenError, setListenError] = useState<string>('');
+
+  useEffect(() => {
+    const t = setTimeout(() => saveConfig(config), 400);
+    return () => clearTimeout(t);
+  }, [config]);
 
   const handleStartListen = async (deviceId?: string) => {
     setIsLoading(true);
@@ -51,7 +56,9 @@ export const App: React.FC = () => {
         text: {
           ...prev.text,
           songTitle: meta.title,
-          artistName: meta.artist
+          artistName: meta.artist,
+          title: { ...prev.text.title, text: meta.title },
+          artist: { ...prev.text.artist, text: meta.artist },
         },
       }));
     } catch (err) {
@@ -71,7 +78,9 @@ export const App: React.FC = () => {
         text: {
           ...prev.text,
           songTitle: meta.title,
-          artistName: meta.artist
+          artistName: meta.artist,
+          title: { ...prev.text.title, text: meta.title },
+          artist: { ...prev.text.artist, text: meta.artist },
         },
       }));
     } catch (err) {
@@ -186,7 +195,7 @@ export const App: React.FC = () => {
         ...prev,
         ...presetConfig,
         background: { ...prev.background, ...presetConfig.background },
-        text: { ...prev.text, ...presetConfig.text },
+        text: migrateTextSettings(presetConfig.text),
         reactivity: { ...prev.reactivity, ...presetConfig.reactivity },
         export: { ...prev.export, ...presetConfig.export },
         screenEffects: { ...prev.screenEffects, ...presetConfig.screenEffects },

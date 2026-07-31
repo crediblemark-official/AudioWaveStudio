@@ -174,12 +174,12 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
       </div>
       <div className="control-group">
         <label className="label-row"><span>Horizontal X ({config.positionX > 0 ? '+' : ''}{config.positionX})</span></label>
-        <input type="range" min={-500} max={500} step={1} value={config.positionX}
+        <input type="range" min={-1200} max={1200} step={1} value={config.positionX}
           onChange={(e) => updateConfig((prev) => ({ ...prev, positionX: parseInt(e.target.value) }))} className="input-range" />
       </div>
       <div className="control-group">
         <label className="label-row"><span>Vertical Y ({config.positionY > 0 ? '+' : ''}{config.positionY})</span></label>
-        <input type="range" min={-500} max={500} step={1} value={config.positionY}
+        <input type="range" min={-1200} max={1200} step={1} value={config.positionY}
           onChange={(e) => updateConfig((prev) => ({ ...prev, positionY: parseInt(e.target.value) }))} className="input-range" />
       </div>
 

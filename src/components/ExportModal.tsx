@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Film, CheckCircle, AlertTriangle, Download, X, RefreshCw, Zap, Layers, Camera, Volume2, VolumeX, Sparkles } from 'lucide-react';
+import { Film, CheckCircle, AlertTriangle, Download, X, RefreshCw, Zap, Layers, Camera, Volume2, VolumeX, Sparkles, Wrench } from 'lucide-react';
 import { VisualizerConfig } from '../types/visualizer';
 import { ExportProgress, ExportMethod, videoExporter } from '../services/videoExporter';
+import { rustBridge } from '../services/rustBridge';
 
 export type ExportMode = 'with_audio' | 'visualizer_only';
 
@@ -16,6 +17,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
   const [exportMethod, setExportMethod] = useState<ExportMethod>('hybrid');
   const [hasStarted, setHasStarted] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [ffmpegAvailable, setFfmpegAvailable] = useState<boolean>(true);
+  const [ffmpegAutoInstall, setFfmpegAutoInstall] = useState<boolean>(false);
+  const [ffmpegInstalling, setFfmpegInstalling] = useState<boolean>(false);
+  const [ffmpegPhase, setFfmpegPhase] = useState<string>('');
+  const [ffmpegError, setFfmpegError] = useState<string>('');
   const mountedRef = useRef(true);
   const [progressState, setProgressState] = useState<ExportProgress>({
     status: 'preparing',
@@ -24,6 +30,48 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
     totalFrames: 0,
     elapsedTime: 0
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      setFfmpegInstalling(false);
+      setFfmpegPhase('');
+      setFfmpegError('');
+      setFfmpegAutoInstall(false);
+      rustBridge
+        .checkFfmpeg()
+        .then((ok) => {
+          if (!mountedRef.current) return;
+          setFfmpegAvailable(ok);
+          if (!ok) {
+            rustBridge.ffmpegAutoInstallSupported().then((s) => {
+              if (mountedRef.current) setFfmpegAutoInstall(s);
+            });
+          }
+        })
+        .catch(() => {
+          if (mountedRef.current) setFfmpegAvailable(true);
+        });
+    }
+  }, [isOpen]);
+
+  const handleInstallFfmpeg = async () => {
+    setFfmpegInstalling(true);
+    setFfmpegError('');
+    setFfmpegPhase('downloading');
+    try {
+      await rustBridge.installFfmpeg((phase) => {
+        if (mountedRef.current) setFfmpegPhase(phase);
+      });
+      setFfmpegAvailable(true);
+    } catch (err) {
+      if (mountedRef.current) {
+        setFfmpegError(err instanceof Error ? err.message : String(err));
+        setFfmpegPhase('');
+      }
+    } finally {
+      if (mountedRef.current) setFfmpegInstalling(false);
+    }
+  };
 
   const startExport = (mode: ExportMode, method: ExportMethod) => {
     const sourceCanvas = document.querySelector('.visualizer-canvas') as HTMLCanvasElement;
@@ -121,6 +169,41 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
         </div>
 
         <div className="modal-body">
+          {!ffmpegAvailable && !hasStarted && (
+            <div className="export-ffmpeg-warning">
+              <div className="warning-icon">
+                <AlertTriangle size={20} />
+              </div>
+              <div className="warning-content">
+                <span className="warning-title">FFmpeg is not installed</span>
+                <span className="warning-desc">
+                  Export requires FFmpeg to encode the MP4 video.
+                  {ffmpegAutoInstall && !ffmpegInstalling && ' Install it now with one click.'}
+                </span>
+                {ffmpegPhase === 'done' && <span className="warning-success">FFmpeg installed successfully. You can now export.</span>}
+                {ffmpegError && <span className="warning-error">{ffmpegError}</span>}
+              </div>
+              {ffmpegAutoInstall && !ffmpegInstalling && ffmpegPhase !== 'done' && (
+                <button type="button" className="btn btn-export btn-sm" onClick={handleInstallFfmpeg}>
+                  <Wrench size={16} />
+                  <span>Install FFmpeg</span>
+                </button>
+              )}
+              {ffmpegInstalling && (
+                <div className="warning-progress">
+                  <RefreshCw size={16} className="spin-icon" />
+                  <span>
+                    {ffmpegPhase === 'downloading'
+                      ? 'Downloading FFmpeg (~100 MB)...'
+                      : ffmpegPhase === 'extracting'
+                      ? 'Extracting...'
+                      : 'Installing...'}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           {!hasStarted && (
             <div className="export-mode-select">
               <div className="export-section">

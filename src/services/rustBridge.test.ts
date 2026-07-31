@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { hexToRgba, convertToRustConfig } from './rustBridge';
+import { createTextBlock } from '../utils/presets';
 import type { VisualizerConfig } from '../types/visualizer';
 
 describe('hexToRgba', () => {
@@ -55,15 +56,10 @@ describe('convertToRustConfig', () => {
         artistName: 'My Artist',
         showTitle: true,
         showArtist: false,
-        titleColor: '#fff',
-        artistColor: '#aaa',
-        titleFontSize: 24,
-        artistFontSize: 18,
         fontFamily: 'Arial',
-        position: 'center',
-        textPositionX: 0,
-        textPositionY: 0,
-        textShadow: false,
+        title: createTextBlock({ id: 'title', text: 'My Song', fontSize: 24, color: '#fff' }),
+        artist: createTextBlock({ id: 'artist', text: 'My Artist', fontSize: 18, color: '#aaa' }),
+        blocks: [],
       },
       reactivity: {
         fftSize: 1024,
@@ -88,9 +84,23 @@ describe('convertToRustConfig', () => {
         enabled: false,
         mainEffect: 'none',
         shakeIntensity: 0,
+        shakeFrequency: 0.5,
+        shakeMaxOffset: 40,
+        shakeOnBeat: false,
         glitchIntensity: 0,
         pulseIntensity: 0,
         spotlightColor: '#fff',
+        strobeIntensity: 0,
+        scanlineOpacity: 0,
+        chromaticIntensity: 0,
+        zoomIntensity: 0,
+        invertIntensity: 0,
+        barsAmount: 0,
+        shockwaveIntensity: 0,
+        pixelateIntensity: 0,
+        tiltIntensity: 0,
+        heatHazeIntensity: 0,
+        hueShiftIntensity: 0,
       },
       positionX: 10,
       positionY: 20,

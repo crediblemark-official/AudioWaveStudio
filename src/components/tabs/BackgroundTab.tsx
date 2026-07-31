@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { VisualizerConfig, MusicNoteStyle, ParticleStyle, BackgroundEffect, BackgroundFillType } from '../../types/visualizer';
 import { CustomSelect } from '../CustomSelect';
-import { fileToDataUrl } from '../../utils/imageUtils';
+import { fileToBackgroundDataUrl } from '../../utils/imageUtils';
 import { Sparkles, Music, Upload, Square, Layers, Grid3x3, Wind, GripHorizontal, CircleDot, Stars, Cloud, Compass, Trash2, CheckCircle2, Sliders } from 'lucide-react';
 
 interface Props {
@@ -86,7 +86,7 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
     const file = e.target.files && e.target.files[0];
     if (file) {
       try {
-        const dataUrl = await fileToDataUrl(file);
+        const dataUrl = await fileToBackgroundDataUrl(file);
         updateConfig((prev) => ({
           ...prev,
           background: { ...prev.background, customImageUri: dataUrl }

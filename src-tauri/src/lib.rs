@@ -539,6 +539,23 @@ fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
+fn ffmpeg_auto_install_supported() -> bool {
+  ffmpeg::auto_install_supported()
+}
+
+#[tauri::command]
+async fn install_ffmpeg(app_handle: tauri::AppHandle) -> Result<String, String> {
+  let handle = app_handle.clone();
+  tauri::async_runtime::spawn_blocking(move || {
+    ffmpeg::install_ffmpeg(&handle, |phase| {
+      let _ = handle.emit("ffmpeg-install-progress", phase);
+    })
+  })
+  .await
+  .map_err(|e| format!("FFmpeg install task panicked: {}", e))?
+}
+
+#[tauri::command]
 fn ffmpeg_download_url() -> String {
   ffmpeg::download_url().to_string()
 }
@@ -735,6 +752,8 @@ pub fn run() {
       copy_file_to_path,
       delete_file,
       check_ffmpeg,
+      ffmpeg_auto_install_supported,
+      install_ffmpeg,
       ffmpeg_download_url,
       save_upload_to_temp,
       compute_spectrum_rust,

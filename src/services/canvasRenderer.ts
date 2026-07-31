@@ -25,6 +25,8 @@ import { renderTextOverlay } from './renderers/textOverlay';
 import { applyScreenEffects, getShakeOffset } from './renderers/screenEffects';
 import type { RenderContext, MusicNote } from './renderers/types';
 
+const BACKGROUND_SHAKE_MULT = 1.8;
+
 export class CanvasRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
@@ -51,6 +53,8 @@ export class CanvasRenderer {
   private exportTimeData: Uint8Array | null = null;
   private exportBassEnergy: number = 0;
 
+  private frameTime: number | null = null;
+
   private rctx: RenderContext = {
     ctx: null as unknown as CanvasRenderingContext2D,
     width: 0,
@@ -70,10 +74,15 @@ export class CanvasRenderer {
     rotationAngle: 0,
     exportFreqData: null,
     isPlaying: false,
+    frameTime: 0,
   };
 
   public setRotationAngle(angle: number) {
     this.rotationAngle = angle;
+  }
+
+  public setFrameTime(timeSec: number) {
+    this.frameTime = timeSec;
   }
 
   public setExportData(freqData: Uint8Array, timeData: Uint8Array, bassEnergy: number) {
@@ -86,6 +95,7 @@ export class CanvasRenderer {
     this.exportFreqData = null;
     this.exportTimeData = null;
     this.exportBassEnergy = 0;
+    this.frameTime = null;
   }
 
   public init(canvas: HTMLCanvasElement) {
@@ -232,26 +242,40 @@ export class CanvasRenderer {
     r.rotationAngle = this.rotationAngle;
     r.exportFreqData = this.exportFreqData;
     r.isPlaying = this.exportFreqData ? true : audioEngine.getIsPlaying();
+    r.frameTime = this.frameTime ?? audioEngine.getCurrentTime();
 
     const shakeOff = getShakeOffset(config.screenEffects, this.bassEnergy, this.beatStrength, aboveFloor);
-    this.ctx.save();
-    this.ctx.translate(shakeOff.x, shakeOff.y);
+    const bgShakeOff = {
+      x: Math.round(shakeOff.x * BACKGROUND_SHAKE_MULT),
+      y: Math.round(shakeOff.y * BACKGROUND_SHAKE_MULT),
+    };
+    const shakeMargin = Math.ceil(Math.hypot(bgShakeOff.x, bgShakeOff.y));
 
-    renderBackground(r);
+    this.ctx.save();
+    this.ctx.translate(bgShakeOff.x, bgShakeOff.y);
+    renderBackground(r, shakeMargin);
+    this.ctx.restore();
 
     const overlay = config.background.overlayOpacity || 0;
     if (overlay > 0) {
+      this.ctx.save();
+      this.ctx.translate(shakeOff.x, shakeOff.y);
       this.ctx.fillStyle = `rgba(10, 10, 15, ${overlay})`;
-      this.ctx.fillRect(0, 0, width, height);
+      this.ctx.fillRect(-shakeMargin, -shakeMargin, width + shakeMargin * 2, height + shakeMargin * 2);
+      this.ctx.restore();
     }
 
     this.ctx.save();
+    this.ctx.translate(shakeOff.x, shakeOff.y);
     const sx = config.scale ?? 1;
+    const posX = config.positionX || 0;
+    const posY = config.positionY || 0;
+
+    this.ctx.translate(width / 2 + posX, height / 2 + posY);
     if (sx !== 1) {
-      this.ctx.translate(width * (1 - sx) / 2, height * (1 - sx) / 2);
       this.ctx.scale(sx, sx);
     }
-    this.ctx.translate(config.positionX || 0, config.positionY || 0);
+    this.ctx.translate(-width / 2, -height / 2);
     switch (config.style) {
       case 'radial': renderRadialVisualizer(r); break;
       case 'oscilloscope': renderOscilloscopeVisualizer(r); break;

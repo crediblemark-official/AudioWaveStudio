@@ -7,7 +7,7 @@ export type ColorThemeName = 'cyberpunk' | 'synthwave' | 'emerald' | 'violet' | 
 export type MusicNoteStyle = 'float' | 'bounce' | 'spiral' | 'wave' | 'burst' | 'confined';
 export type ParticleStyle = 'float' | 'bounce' | 'wave' | 'static' | 'confined';
 
-export type ScreenEffect = 'none' | 'shake' | 'glitch' | 'vignette' | 'pulse' | 'spotlight';
+export type ScreenEffect = 'none' | 'shake' | 'glitch' | 'vignette' | 'pulse' | 'spotlight' | 'strobe' | 'scanline' | 'chromatic' | 'zoom' | 'invert' | 'bars' | 'shockwave' | 'pixelate' | 'tilt' | 'heatHaze' | 'hueShift';
 
 export interface ColorTheme {
   name: ColorThemeName;
@@ -73,20 +73,52 @@ export interface BackgroundSettings {
   psychedelicLineWidth?: number;
 }
 
+export type TextTransform = 'none' | 'uppercase' | 'lowercase' | 'capitalize';
+export type TextAlign = 'left' | 'center' | 'right';
+
+export interface TextBlock {
+  id: string;
+  text: string;
+  enabled: boolean;
+  fontFamily: string; // CSS font stack; '' = inherit global font
+  fontSize: number;
+  fontWeight: number;
+  italic: boolean;
+  color: string;
+  useGradient: boolean;
+  gradientStart: string;
+  gradientEnd: string;
+  gradientAngle: number; // degrees, 0 = left→right
+  opacity: number; // 0 to 1
+  letterSpacing: number; // px
+  transform: TextTransform;
+  positionX: number; // % of canvas width (anchor: left edge / center / right edge per align)
+  positionY: number; // % of canvas height (baseline of first line)
+  align: TextAlign;
+  lineHeight: number; // multiplier of font size
+  maxWidth: number; // % of canvas width for wrapping; 0 = no wrap
+  shadow: boolean;
+  shadowBlur: number; // px
+  shadowOffsetX: number; // px
+  shadowOffsetY: number; // px
+  glowIntensity: number; // extra glow blur in px (0 = off)
+  outline: boolean;
+  outlineColor: string;
+  outlineWidth: number; // px
+  reactiveScale: number; // 0 to 1, how much text scales with bass
+  waveEffect: boolean; // per-character wave animation
+  fadeIn: boolean; // fade in on play
+}
+
 export interface TextSettings {
   songTitle: string;
   artistName: string;
   showTitle: boolean;
   showArtist: boolean;
-  titleColor: string;
-  artistColor: string;
-  titleFontSize: number;
-  artistFontSize: number;
   fontFamily: string;
-  position: 'center' | 'bottom-left' | 'bottom-center' | 'top-center';
-  textPositionX: number;
-  textPositionY: number;
-  textShadow: boolean;
+  title: TextBlock;
+  artist: TextBlock;
+  blocks: TextBlock[]; // additional custom text blocks
 }
 
 export interface AudioReactivitySettings {
@@ -116,9 +148,23 @@ export interface ScreenEffectsSettings {
   enabled: boolean;
   mainEffect: ScreenEffect;
   shakeIntensity: number;
+  shakeFrequency: number;
+  shakeMaxOffset: number;
+  shakeOnBeat: boolean;
   glitchIntensity: number;
   pulseIntensity: number;
   spotlightColor: string;
+  strobeIntensity: number;
+  scanlineOpacity: number;
+  chromaticIntensity: number;
+  zoomIntensity: number;
+  invertIntensity: number;
+  barsAmount: number;
+  shockwaveIntensity: number;
+  pixelateIntensity: number;
+  tiltIntensity: number;
+  heatHazeIntensity: number;
+  hueShiftIntensity: number;
 }
 
 export interface SongMetadata {

@@ -53,10 +53,21 @@ export async function exportHybrid(
 
   onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
-  const spectra = await rustBridge.precomputeSpectra(fps, totalFrames, barCount, fftSize, smoothing, bassMultiplier);
-  const freqAll = new Uint8Array(spectra.freq_data_all);
-  const timeAll = new Uint8Array(spectra.time_data_all);
-  const bassEnergies = spectra.bass_energies;
+  if (isCancelled()) throw new Error('Export cancelled');
+
+  const estimatedPayload = totalFrames * (barCount * 7 + 7);
+  const useBatchSpectra = estimatedPayload < 7_000_000;
+
+  let freqAll: Uint8Array | null = null;
+  let timeAll: Uint8Array | null = null;
+  let bassEnergies: number[] = [];
+
+  if (useBatchSpectra) {
+    const spectra = await rustBridge.precomputeSpectra(fps, totalFrames, barCount, fftSize, smoothing, bassMultiplier);
+    freqAll = new Uint8Array(spectra.freq_data_all);
+    timeAll = new Uint8Array(spectra.time_data_all);
+    bassEnergies = spectra.bass_energies;
+  }
 
   let rotationAngle = 0;
   let sessionStarted = false;
@@ -71,13 +82,25 @@ export async function exportHybrid(
     for (let frame = 0; frame < totalFrames; frame++) {
       if (isCancelled()) throw new Error('Export cancelled');
 
-      const offset = frame * barCount;
-      const freqData = freqAll.subarray(offset, offset + barCount);
-      const timeData = timeAll.subarray(offset, offset + barCount);
-      const bassEnergy = bassEnergies[frame];
+      let freqData: Uint8Array;
+      let timeData: Uint8Array;
+      let bassEnergy: number;
 
-      rotationAngle += 0.003;
+      if (freqAll) {
+        const offset = frame * barCount;
+        freqData = freqAll.subarray(offset, offset + barCount);
+        timeData = timeAll!.subarray(offset, offset + barCount);
+        bassEnergy = bassEnergies[frame] ?? 0;
+      } else {
+        const rustResult = await rustBridge.computeSpectrum(frame / fps, barCount, fftSize, smoothing, bassMultiplier);
+        freqData = new Uint8Array(rustResult.freq_data);
+        timeData = new Uint8Array(rustResult.time_data);
+        bassEnergy = rustResult.bass_energy;
+      }
+
       renderer.setExportData(freqData, timeData, bassEnergy);
+      renderer.setFrameTime(frame / fps);
+      rotationAngle += 0.003;
       renderer.setRotationAngle(rotationAngle);
       renderer.drawFrame(config);
 

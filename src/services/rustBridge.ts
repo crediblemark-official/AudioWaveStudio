@@ -157,6 +157,24 @@ export class RustBridge {
     return await invoke<boolean>('check_ffmpeg');
   }
 
+  public async ffmpegAutoInstallSupported(): Promise<boolean> {
+    return await invoke<boolean>('ffmpeg_auto_install_supported');
+  }
+
+  public async installFfmpeg(onProgress?: (phase: string) => void): Promise<string> {
+    let unlisten: (() => void) | null = null;
+    if (onProgress) {
+      unlisten = await listen<string>('ffmpeg-install-progress', (event) => {
+        onProgress(event.payload);
+      });
+    }
+    try {
+      return await invoke<string>('install_ffmpeg');
+    } finally {
+      if (unlisten) unlisten();
+    }
+  }
+
   public async ffmpegDownloadUrl(): Promise<string> {
     return await invoke<string>('ffmpeg_download_url');
   }
