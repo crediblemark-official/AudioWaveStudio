@@ -17,6 +17,9 @@ export async function exportOffscreen(
   const audioFilePath = audioEngine.getSongFilePath();
   if (!audioFilePath) throw new Error('No audio file path available');
 
+  onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames: 0, elapsedTime: 0 });
+
+  if (isCancelled()) throw new Error('Export cancelled');
   await audioEngine.ensureRustDecode();
 
   const { width, height } = getExportDimensions(config);
@@ -39,6 +42,8 @@ export async function exportOffscreen(
 
   if (config.background.customImageUri) renderer.setCustomBackgroundImage(config.background.customImageUri);
   if (config.background.radialCenterImageUri) renderer.setRadialCenterImage(config.background.radialCenterImageUri);
+  
+  if (isCancelled()) throw new Error('Export cancelled');
   await renderer.preloadImages();
 
   const barCount = config.reactivity.barCount;
@@ -49,6 +54,7 @@ export async function exportOffscreen(
   let sessionStarted = false;
 
   try {
+    if (isCancelled()) throw new Error('Export cancelled');
     onProgress({ status: 'rendering', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
     await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);

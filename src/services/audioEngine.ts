@@ -238,6 +238,7 @@ export class AudioEngine {
         fullDuration: result.full_duration,
       });
       fullDuration = result.full_duration;
+      this.rustDecoded = true;
       this.audioBuffer = await this.loadAudioBufferFromFile(filePath);
       if (!this.audioBuffer) {
         this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
@@ -321,6 +322,7 @@ export class AudioEngine {
           fullDuration: result.full_duration,
         });
         fullDuration = result.full_duration;
+        this.rustDecoded = true;
         this.audioBuffer = await this.loadAudioBufferFromFile(audioFilePath);
         if (!this.audioBuffer) {
           this.audioBuffer = await this.createAudioBufferFromChunks(result.sample_rate, result.samples_count);
@@ -388,8 +390,14 @@ export class AudioEngine {
       this.pendingFileExt = '';
     }
 
-    await rustBridge.decodeAudio(rustPath);
-    this.rustDecoded = true;
+    if (rustPath) {
+      try {
+        await rustBridge.decodeAudio(rustPath);
+        this.rustDecoded = true;
+      } catch (e) {
+        console.warn('[AudioEngine] ensureRustDecode warning:', e);
+      }
+    }
   }
 
   public setFftSize(fftSize: number) {

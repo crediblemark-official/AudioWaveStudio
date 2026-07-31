@@ -17,6 +17,9 @@ export async function exportScreenRecord(
   const audioFilePath = audioEngine.getSongFilePath();
   if (!audioFilePath) throw new Error('No audio file path available');
 
+  onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames: 0, elapsedTime: 0 });
+
+  if (isCancelled()) throw new Error('Export cancelled');
   await audioEngine.ensureRustDecode();
 
   const { width, height } = getExportDimensions(config);
@@ -53,6 +56,7 @@ export async function exportScreenRecord(
   let sessionStarted = false;
 
   try {
+    if (isCancelled()) throw new Error('Export cancelled');
     onProgress({ status: 'recording', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
     audioEngine.setVolume(0);

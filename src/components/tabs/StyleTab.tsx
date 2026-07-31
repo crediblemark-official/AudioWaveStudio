@@ -3,6 +3,7 @@ import {
   Layers, Circle, Radio, Grid, Minus, AudioWaveform, CircleDot, LineChart, Disc, Image as ImageIcon,
 } from 'lucide-react';
 import { VisualizerConfig, VisualizerStyle } from '../../types/visualizer';
+import { fileToDataUrl } from '../../utils/imageUtils';
 
 interface Props {
   config: VisualizerConfig;
@@ -28,17 +29,19 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
   };
 
   const radialImgInputRef = useRef<HTMLInputElement>(null);
-  const prevRadialUrlRef = useRef<string>('');
 
-  const handleRadialImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      if (prevRadialUrlRef.current) URL.revokeObjectURL(prevRadialUrlRef.current);
-      const url = URL.createObjectURL(e.target.files[0]);
-      prevRadialUrlRef.current = url;
-      updateConfig((prev) => ({
-        ...prev,
-        background: { ...prev.background, radialCenterImageUri: url }
-      }));
+  const handleRadialImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        updateConfig((prev) => ({
+          ...prev,
+          background: { ...prev.background, radialCenterImageUri: dataUrl }
+        }));
+      } catch (err) {
+        console.error('Failed to read radial center image:', err);
+      }
     }
   };
 
@@ -188,7 +191,6 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
         <input type="file" ref={radialImgInputRef} onChange={handleRadialImageUpload} accept="image/*" className="hidden-input" />
         {config.background.radialCenterImageUri && (
           <button className="w-full mt-1" style={{ background: 'none', border: 'none', color: '#ff5555', cursor: 'pointer', fontSize: '0.8rem', padding: '4px 0' }} onClick={() => {
-            if (prevRadialUrlRef.current) URL.revokeObjectURL(prevRadialUrlRef.current);
             updateConfig((prev) => ({ ...prev, background: { ...prev.background, radialCenterImageUri: undefined } }));
           }}>
             Remove Image

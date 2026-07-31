@@ -16,6 +16,13 @@ export interface AudioDecodeResult {
   samples_count: number;
 }
 
+export interface PrecomputedSpectra {
+  freq_data_all: number[];
+  time_data_all: number[];
+  bass_energies: number[];
+  bar_count: number;
+}
+
 export interface SpectrumResultRust {
   freq_data: number[];
   time_data: number[];
@@ -110,6 +117,24 @@ export class RustBridge {
 
   public async deleteFile(path: string): Promise<void> {
     await invoke('delete_file', { path });
+  }
+
+  public async precomputeSpectra(
+    fps: number,
+    totalFrames: number,
+    barCount: number,
+    fftSize: number,
+    smoothing: number,
+    bassMultiplier: number,
+  ): Promise<PrecomputedSpectra> {
+    return await invoke<PrecomputedSpectra>('precompute_spectra', {
+      fps,
+      totalFrames,
+      barCount,
+      fftSize,
+      smoothing,
+      bassMultiplier,
+    });
   }
 
   public async computeSpectrum(

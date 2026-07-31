@@ -101,8 +101,15 @@ export class CanvasRenderer {
       this.customImgElement = null;
       return;
     }
+    if (this.customImgElement && this.customImgElement.src === uri) {
+      return;
+    }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => { /* loaded ok */ };
+    img.onerror = (e) => { console.warn('[CanvasRenderer] Custom background image load error:', e); };
     img.src = uri;
     this.customImgElement = img;
   }
@@ -112,8 +119,15 @@ export class CanvasRenderer {
       this.radialCenterImgElement = null;
       return;
     }
+    if (this.radialCenterImgElement && this.radialCenterImgElement.src === uri) {
+      return;
+    }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (uri.startsWith('http://') || uri.startsWith('https://')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => { /* loaded ok */ };
+    img.onerror = (e) => { console.warn('[CanvasRenderer] Radial center image load error:', e); };
     img.src = uri;
     this.radialCenterImgElement = img;
   }
@@ -121,16 +135,26 @@ export class CanvasRenderer {
   public async preloadImages(): Promise<void> {
     const promises: Promise<void>[] = [];
     if (this.customImgElement && !this.customImgElement.complete) {
-      promises.push(new Promise((resolve) => {
-        this.customImgElement!.onload = () => resolve();
-      }));
+      promises.push(
+        new Promise((resolve) => {
+          if (!this.customImgElement) return resolve();
+          this.customImgElement.onload = () => resolve();
+          this.customImgElement.onerror = () => resolve();
+        })
+      );
     }
     if (this.radialCenterImgElement && !this.radialCenterImgElement.complete) {
-      promises.push(new Promise((resolve) => {
-        this.radialCenterImgElement!.onload = () => resolve();
-      }));
+      promises.push(
+        new Promise((resolve) => {
+          if (!this.radialCenterImgElement) return resolve();
+          this.radialCenterImgElement.onload = () => resolve();
+          this.radialCenterImgElement.onerror = () => resolve();
+        })
+      );
     }
-    await Promise.all(promises);
+    if (promises.length === 0) return;
+    const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+    await Promise.race([Promise.all(promises), timeout]);
   }
 
   public drawFrame(config: VisualizerConfig) {

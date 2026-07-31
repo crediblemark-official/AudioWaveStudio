@@ -208,6 +208,88 @@ fn compute_spectrum_rust(
   })
 }
 
+#[derive(Serialize, Deserialize)]
+struct PrecomputedSpectra {
+  freq_data_all: Vec<u8>,
+  time_data_all: Vec<u8>,
+  bass_energies: Vec<f32>,
+  bar_count: usize,
+}
+
+#[tauri::command]
+async fn precompute_spectra(
+  state: tauri::State<'_, AppState>,
+  fps: u32,
+  total_frames: usize,
+  bar_count: usize,
+  fft_size: usize,
+  smoothing: f32,
+  bass_multiplier: f32,
+) -> Result<PrecomputedSpectra, String> {
+  let audio = {
+    let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
+    guard.as_ref().ok_or_else(|| "No audio loaded".to_string())?.clone()
+  };
+
+  tauri::async_runtime::spawn_blocking(move || {
+    let analyzer = FftAnalyzer::new(fft_size);
+    let mut freq_data_all = Vec::with_capacity(total_frames * bar_count);
+    let mut time_data_all = Vec::with_capacity(total_frames * bar_count);
+    let mut bass_energies = Vec::with_capacity(total_frames);
+    let mut prev_smoothed: Option<Vec<f32>> = None;
+
+    for frame in 0..total_frames {
+      let time_sec = frame as f64 / fps as f64;
+      let window = audio.get_sample_window(time_sec, fft_size);
+      let (spectrum_linear, _bass_raw) = analyzer.compute_spectrum(&window, bar_count)
+        .map_err(|e| e.to_string())?;
+
+      for i in 0..bar_count.min(spectrum_linear.len()) {
+        let mag = spectrum_linear[i].max(1e-10);
+        let db = 20.0 * mag.log10();
+        let mut byte_val = ((db + 100.0) / 70.0) * 255.0;
+        byte_val = byte_val.clamp(0.0, 255.0);
+        if let Some(ref prev_vec) = prev_smoothed {
+          if i < prev_vec.len() {
+            byte_val = prev_vec[i] * smoothing + byte_val * (1.0 - smoothing);
+          }
+        }
+        freq_data_all.push(byte_val.round() as u8);
+      }
+
+      let frame_start = freq_data_all.len() - bar_count.min(spectrum_linear.len());
+      let mut smoothed = Vec::with_capacity(bar_count);
+      for i in 0..bar_count.min(spectrum_linear.len()) {
+        smoothed.push(freq_data_all[frame_start + i] as f32);
+      }
+      prev_smoothed = Some(smoothed);
+
+      for &s in window.iter().take(bar_count) {
+        time_data_all.push(((s + 1.0) * 127.5).clamp(0.0, 255.0).round() as u8);
+      }
+
+      let bass_bins = 16.min(bar_count);
+      let bass_energy = if bass_bins > 0 && freq_data_all.len() >= bar_count {
+        let start = freq_data_all.len() - bar_count;
+        let sum: usize = freq_data_all[start..start + bass_bins].iter().map(|&v| v as usize).sum();
+        (sum as f32 / (bass_bins as f32 * 255.0)) * bass_multiplier
+      } else {
+        0.0
+      };
+      bass_energies.push(bass_energy);
+    }
+
+    Ok(PrecomputedSpectra {
+      freq_data_all,
+      time_data_all,
+      bass_energies,
+      bar_count,
+    })
+  })
+  .await
+  .map_err(|e| format!("Precompute panicked: {}", e))?
+}
+
 #[tauri::command]
 async fn export_mp4_native(
   app_handle: tauri::AppHandle,
@@ -656,6 +738,7 @@ pub fn run() {
       ffmpeg_download_url,
       save_upload_to_temp,
       compute_spectrum_rust,
+      precompute_spectra,
       export_mp4_native,
       start_export_session,
       write_frame,

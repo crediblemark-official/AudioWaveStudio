@@ -17,6 +17,9 @@ export async function exportHybrid(
   const audioFilePath = audioEngine.getSongFilePath();
   if (!audioFilePath) throw new Error('No audio file path available');
 
+  onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames: 0, elapsedTime: 0 });
+
+  if (isCancelled()) throw new Error('Export cancelled');
   await audioEngine.ensureRustDecode();
 
   const { width, height } = getExportDimensions(config);
@@ -39,16 +42,27 @@ export async function exportHybrid(
 
   if (config.background.customImageUri) renderer.setCustomBackgroundImage(config.background.customImageUri);
   if (config.background.radialCenterImageUri) renderer.setRadialCenterImage(config.background.radialCenterImageUri);
+  
+  if (isCancelled()) throw new Error('Export cancelled');
   await renderer.preloadImages();
 
   const barCount = config.reactivity.barCount;
   const fftSize = config.reactivity.fftSize;
   const bassMultiplier = config.reactivity.bassMultiplier;
   const smoothing = config.reactivity.smoothing;
+
+  onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
+
+  const spectra = await rustBridge.precomputeSpectra(fps, totalFrames, barCount, fftSize, smoothing, bassMultiplier);
+  const freqAll = new Uint8Array(spectra.freq_data_all);
+  const timeAll = new Uint8Array(spectra.time_data_all);
+  const bassEnergies = spectra.bass_energies;
+
   let rotationAngle = 0;
   let sessionStarted = false;
 
   try {
+    if (isCancelled()) throw new Error('Export cancelled');
     onProgress({ status: 'recording', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
     await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);
@@ -57,14 +71,13 @@ export async function exportHybrid(
     for (let frame = 0; frame < totalFrames; frame++) {
       if (isCancelled()) throw new Error('Export cancelled');
 
-      const timeSec = frame / fps;
-      const rustResult = await rustBridge.computeSpectrum(timeSec, barCount, fftSize, smoothing, bassMultiplier);
-
-      const freqData = new Uint8Array(rustResult.freq_data);
-      const timeData = new Uint8Array(rustResult.time_data);
+      const offset = frame * barCount;
+      const freqData = freqAll.subarray(offset, offset + barCount);
+      const timeData = timeAll.subarray(offset, offset + barCount);
+      const bassEnergy = bassEnergies[frame];
 
       rotationAngle += 0.003;
-      renderer.setExportData(freqData, timeData, rustResult.bass_energy);
+      renderer.setExportData(freqData, timeData, bassEnergy);
       renderer.setRotationAngle(rotationAngle);
       renderer.drawFrame(config);
 

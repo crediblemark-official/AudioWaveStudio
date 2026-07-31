@@ -1,6 +1,7 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { VisualizerConfig, MusicNoteStyle, ParticleStyle, BackgroundEffect, BackgroundFillType } from '../../types/visualizer';
 import { CustomSelect } from '../CustomSelect';
+import { fileToDataUrl } from '../../utils/imageUtils';
 import { Sparkles, Music, Upload, Square, Layers, Grid3x3, Wind, GripHorizontal, CircleDot, Stars, Cloud, Compass, Trash2, CheckCircle2, Sliders } from 'lucide-react';
 
 interface Props {
@@ -10,16 +11,7 @@ interface Props {
 
 export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
   const bgImageInputRef = useRef<HTMLInputElement>(null);
-  const prevBgUrlRef = useRef<string>('');
   const [selectedSettingsTab, setSelectedSettingsTab] = useState<BackgroundEffect | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (prevBgUrlRef.current) {
-        URL.revokeObjectURL(prevBgUrlRef.current);
-      }
-    };
-  }, []);
 
   const fillType: BackgroundFillType = config.background.fillType ?? (config.background.mode === 'gradient' ? 'gradient' : 'solid');
   
@@ -90,24 +82,23 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
     }));
   };
 
-  const handleBgImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      if (prevBgUrlRef.current) URL.revokeObjectURL(prevBgUrlRef.current);
-      const url = URL.createObjectURL(e.target.files[0]);
-      prevBgUrlRef.current = url;
-      updateConfig((prev) => ({
-        ...prev,
-        background: { ...prev.background, customImageUri: url }
-      }));
+  const handleBgImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        updateConfig((prev) => ({
+          ...prev,
+          background: { ...prev.background, customImageUri: dataUrl }
+        }));
+      } catch (err) {
+        console.error('Failed to read background image:', err);
+      }
       e.target.value = '';
     }
   };
 
   const handleRemoveBgImage = () => {
-    if (prevBgUrlRef.current) {
-      URL.revokeObjectURL(prevBgUrlRef.current);
-      prevBgUrlRef.current = '';
-    }
     updateConfig((prev) => ({
       ...prev,
       background: { ...prev.background, customImageUri: undefined }
