@@ -121,7 +121,8 @@ export class RustBridge {
 
   public async precomputeSpectra(
     fps: number,
-    totalFrames: number,
+    startFrame: number,
+    numFrames: number,
     barCount: number,
     fftSize: number,
     smoothing: number,
@@ -129,7 +130,8 @@ export class RustBridge {
   ): Promise<PrecomputedSpectra> {
     return await invoke<PrecomputedSpectra>('precompute_spectra', {
       fps,
-      totalFrames,
+      startFrame,
+      numFrames,
       barCount,
       fftSize,
       smoothing,
@@ -201,16 +203,30 @@ export class RustBridge {
     });
   }
 
-  public async writeFrame(jpegBytes: Uint8Array): Promise<void> {
-    await invoke('write_frame', { jpegBytes });
-  }
-
   public async writeFrameRgba(width: number, height: number, rgbaData: Uint8Array): Promise<void> {
     await invoke('write_frame_rgba', { width, height, rgbaData });
   }
 
   public async finishExportSession(): Promise<string> {
     return await invoke<string>('finish_export_session');
+  }
+
+  public async exportGpu(
+    config: VisualizerConfig,
+    audioFilePath: string,
+    outputPath: string,
+    includeAudio: boolean,
+  ): Promise<string> {
+    return await invoke<string>('export_gpu', {
+      config,
+      audioFilePath,
+      outputPath,
+      includeAudio,
+    });
+  }
+
+  public async cancelGpuExport(): Promise<void> {
+    await invoke('cancel_gpu_export');
   }
 
   public async convertWebmToMp4(
@@ -233,43 +249,6 @@ export class RustBridge {
 
   public async stopSystemListen(): Promise<void> {
     await invoke('stop_system_listen');
-  }
-
-  public async exportMp4Native(
-    audioFilePath: string,
-    outputMp4Path: string,
-    config: VisualizerConfig,
-    fps: number,
-    width: number,
-    height: number,
-    includeAudio: boolean,
-    onProgress?: (progress: { percent: number; current_frame: number; total_frames: number; is_finished: boolean }) => void,
-  ): Promise<string> {
-    const rustConfig = convertToRustConfig(config, width, height);
-
-    let unlisten: (() => void) | null = null;
-    if (onProgress) {
-      unlisten = await listen<{
-        percent: number;
-        current_frame: number;
-        total_frames: number;
-        is_finished: boolean;
-      }>('export-progress', (event) => {
-        onProgress(event.payload);
-      });
-    }
-
-    try {
-      return await invoke<string>('export_mp4_native', {
-        audioFilePath,
-        outputMp4Path,
-        config: rustConfig,
-        fps,
-        includeAudio,
-      });
-    } finally {
-      if (unlisten) unlisten();
-    }
   }
 }
 

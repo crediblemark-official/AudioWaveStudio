@@ -15,6 +15,10 @@ interface FloatingNote {
 let floatingNotes: FloatingNote[] = [];
 const NOTE_SYMBOLS = ['♪', '♫', '♬', '♩', '∮', '🎼'];
 
+export function resetSpeakerTrioState() {
+  floatingNotes = [];
+}
+
 function initNotes(width: number, height: number) {
   if (floatingNotes.length > 0) return;
   for (let i = 0; i < 18; i++) {

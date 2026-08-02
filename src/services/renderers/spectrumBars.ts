@@ -27,7 +27,7 @@ export function renderSpectrumBars(ctx: RenderContext) {
   c.shadowColor = theme.glowColor;
   c.fillStyle = barGradient;
 
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
   const doRound = barRounding > 0 && typeof c.roundRect === 'function';
 
   for (let i = 0; i < barCount; i++) {

@@ -2,6 +2,7 @@ import { VisualizerConfig } from '../../types/visualizer';
 import { audioEngine } from '../audioEngine';
 import { rustBridge } from '../rustBridge';
 import { tempDir } from '@tauri-apps/api/path';
+import { resetVisualizerState } from '../renderers/resetState';
 import { ExportProgress, getExportDimensions } from './types';
 
 export async function exportScreenRecord(
@@ -42,11 +43,6 @@ export async function exportScreenRecord(
   const prevVolume = audioEngine.getVolume();
   const origWidth = sourceCanvas.width;
   const origHeight = sourceCanvas.height;
-  const tmpCanvas = document.createElement('canvas');
-  tmpCanvas.width = width;
-  tmpCanvas.height = height;
-  const tmpCtx = tmpCanvas.getContext('2d');
-  if (!tmpCtx) throw new Error('Cannot get temporary canvas 2D context');
 
   const captureCtx = sourceCanvas.getContext('2d');
   if (!captureCtx) throw new Error('Cannot get canvas 2D context');
@@ -61,6 +57,7 @@ export async function exportScreenRecord(
 
     audioEngine.setVolume(0);
     audioEngine.stop();
+    resetVisualizerState();
     await audioEngine.play();
 
     sourceCanvas.width = width;
@@ -70,23 +67,12 @@ export async function exportScreenRecord(
     sessionStarted = true;
 
     while (!isCancelled() && frameCount < totalFrames) {
-      const wallElapsed = (Date.now() - startTime) / 1000;
-      if (wallElapsed > duration + 2.0) break;
-
       const frameStart = Date.now();
 
       const imageData = captureCtx.getImageData(0, 0, width, height);
-      tmpCtx.putImageData(imageData, 0, 0);
-      const jpegBlob = await new Promise<Blob>((resolve, reject) => {
-        tmpCanvas.toBlob(
-          (blob) => { if (blob) resolve(blob); else reject(new Error('JPEG encode failed')); },
-          'image/jpeg', 0.95,
-        );
-      });
-      const bytes = new Uint8Array(await jpegBlob.arrayBuffer());
 
       if (isCancelled()) break;
-      await rustBridge.writeFrame(bytes);
+      await rustBridge.writeFrameRgba(width, height, new Uint8Array(imageData.data.buffer));
       frameCount++;
 
       const pct = Math.min(100, (frameCount * 100) / totalFrames);
@@ -118,6 +104,7 @@ export async function exportScreenRecord(
       try { await rustBridge.finishExportSession(); } catch { /* FFmpeg already gone */ }
       sessionStarted = false;
     }
+    try { await rustBridge.deleteFile(outputPath); } catch { /* Temp cleanup is best-effort */ }
     throw err;
   } finally {
     sourceCanvas.width = origWidth;

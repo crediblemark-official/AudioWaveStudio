@@ -68,6 +68,40 @@ impl FftAnalyzer {
 
     Ok((binned, bass_energy))
   }
+
+  pub fn compute_full_spectrum(&self, samples: &[f32]) -> Result<(Vec<f32>, f32), String> {
+    let n = self.fft_size;
+    let mut input = vec![0.0f32; n];
+
+    for i in 0..n.min(samples.len()) {
+      input[i] = samples[i] * self.hann_window[i];
+    }
+
+    let mut planner = self.planner.lock().map_err(|_| "Mutex poisoned".to_string())?;
+    let fft = planner.plan_fft_forward(n);
+    drop(planner);
+
+    let mut output = fft.make_output_vec();
+    if fft.process(&mut input, &mut output).is_err() {
+      return Ok((vec![0.0; n / 2], 0.0));
+    }
+
+    // frequencyBinCount = fft_size / 2 (skip the Nyquist bin), matching AnalyserNode
+    let magnitudes: Vec<f32> = output
+      .iter()
+      .take(n / 2)
+      .map(|c| (c.norm() / (n as f32 / 2.0)).min(1.0))
+      .collect();
+
+    let bass_bins = 8.min(magnitudes.len());
+    let bass_energy: f32 = if bass_bins > 0 {
+      magnitudes[0..bass_bins].iter().sum::<f32>() / bass_bins as f32
+    } else {
+      0.0
+    };
+
+    Ok((magnitudes, bass_energy))
+  }
 }
 
 #[cfg(test)]

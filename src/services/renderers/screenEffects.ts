@@ -1,5 +1,16 @@
 import { ScreenEffectsSettings } from '../../types/visualizer';
 
+function mulberry32(seed: number) {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 let lastGlitchTime = 0;
 let _glitchCanvas: HTMLCanvasElement | null = null;
 let _snapshotCanvas: HTMLCanvasElement | null = null;
@@ -10,12 +21,22 @@ let _shakeY = 0;
 let _prevBeatHigh = false;
 let _shockStart = -1e9;
 
+export function resetScreenEffectsState() {
+  lastGlitchTime = 0;
+  _shakeBucket = -1;
+  _shakeX = 0;
+  _shakeY = 0;
+  _prevBeatHigh = false;
+  _shockStart = -1e9;
+}
+
 export function applyScreenEffects(
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
   settings: ScreenEffectsSettings,
   beatStrength: number,
   aboveFloor: number,
+  frameTime: number,
 ) {
   if (!settings.enabled) return;
 
@@ -26,7 +47,7 @@ export function applyScreenEffects(
 
   switch (effect) {
     case 'glitch':
-      applyGlitch(canvas, ctx, settings, useBe, beatStrength);
+      applyGlitch(canvas, ctx, settings, useBe, beatStrength, frameTime);
       break;
 
     case 'vignette':
@@ -39,7 +60,7 @@ export function applyScreenEffects(
       applySpotlight(ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
       break;
     case 'strobe':
-      applyStrobe(ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
+      applyStrobe(ctx, canvas.width, canvas.height, settings, useBe, beatStrength, frameTime);
       break;
     case 'scanline':
       applyScanline(ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
@@ -57,19 +78,19 @@ export function applyScreenEffects(
       applyBars(canvas, ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
       break;
     case 'shockwave':
-      applyShockwave(canvas, ctx, canvas.width, canvas.height, settings, beatStrength);
+      applyShockwave(canvas, ctx, canvas.width, canvas.height, settings, beatStrength, frameTime);
       break;
     case 'pixelate':
       applyPixelate(canvas, ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
       break;
     case 'tilt':
-      applyTilt(canvas, ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
+      applyTilt(canvas, ctx, canvas.width, canvas.height, settings, useBe, beatStrength, frameTime);
       break;
     case 'heatHaze':
-      applyHeatHaze(canvas, ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
+      applyHeatHaze(canvas, ctx, canvas.width, canvas.height, settings, useBe, beatStrength, frameTime);
       break;
     case 'hueShift':
-      applyHueShift(ctx, canvas.width, canvas.height, settings, useBe, beatStrength);
+      applyHueShift(ctx, canvas.width, canvas.height, settings, useBe, beatStrength, frameTime);
       break;
   }
 }
@@ -98,8 +119,10 @@ function applyGlitch(
   settings: ScreenEffectsSettings,
   bassEnergy: number,
   beatStrength: number,
+  frameTime: number,
 ) {
-  const now = performance.now();
+  const now = frameTime * 1000;
+  const rand = mulberry32(Math.floor(now));
   const beat = beatStrength > 0.15 ? settings.glitchIntensity * beatStrength * 8 : 0;
   const smooth = settings.glitchIntensity * bassEnergy * 0.8;
   const intensity = smooth + beat;
@@ -126,22 +149,22 @@ function applyGlitch(
 
   const sliceCount = Math.floor(3 + intensity * 12);
   for (let i = 0; i < sliceCount; i++) {
-    const sliceY = Math.random() * h;
-    const sliceH = 2 + Math.random() * 8 * intensity;
-    const offsetX = (Math.random() - 0.5) * 40 * intensity;
+    const sliceY = rand() * h;
+    const sliceH = 2 + rand() * 8 * intensity;
+    const offsetX = (rand() - 0.5) * 40 * intensity;
     ctx.drawImage(_glitchCanvas, 0, sliceY, w, sliceH, offsetX, sliceY, w, sliceH);
   }
   ctx.restore();
 
   if (intensity > 0.3 && now - lastGlitchTime > 200) {
     lastGlitchTime = now;
-    const gH = 1 + Math.random() * 4 * intensity;
-    const gY = Math.random() * h;
-    const gX = Math.random() * w * 0.3;
-    const gW = w * (0.3 + Math.random() * 0.7);
+    const gH = 1 + rand() * 4 * intensity;
+    const gY = rand() * h;
+    const gX = rand() * w * 0.3;
+    const gW = w * (0.3 + rand() * 0.7);
 
-    ctx.fillStyle = `rgb(${Math.random() > 0.5 ? 0 : 255}, ${Math.random() > 0.5 ? 0 : 255}, ${Math.random() > 0.5 ? 0 : 255})`;
-    ctx.globalAlpha = 0.3 + Math.random() * 0.4;
+    ctx.fillStyle = `rgb(${rand() > 0.5 ? 0 : 255}, ${rand() > 0.5 ? 0 : 255}, ${rand() > 0.5 ? 0 : 255})`;
+    ctx.globalAlpha = 0.3 + rand() * 0.4;
     ctx.fillRect(gX, gY, gW, gH);
     ctx.globalAlpha = 1;
   }
@@ -238,13 +261,14 @@ function applyStrobe(
   settings: ScreenEffectsSettings,
   bassEnergy: number,
   beatStrength: number,
+  frameTime: number,
 ) {
   const beat = beatStrength > 0.15 ? settings.strobeIntensity * 0.9 : 0;
   const smooth = settings.strobeIntensity * bassEnergy * 0.12;
   const alpha = smooth + beat;
   if (alpha < 0.02) return;
 
-  const on = Math.floor(performance.now() / 100) % 2 === 0;
+  const on = Math.floor(frameTime * 10) % 2 === 0;
   if (!on) return;
 
   ctx.save();
@@ -383,14 +407,15 @@ function applyShockwave(
   h: number,
   settings: ScreenEffectsSettings,
   beatStrength: number,
+  frameTime: number,
 ) {
   const beatHigh = beatStrength > 0.15;
   if (beatHigh && !_prevBeatHigh) {
-    _shockStart = performance.now();
+    _shockStart = frameTime * 1000;
   }
   _prevBeatHigh = beatHigh;
 
-  const elapsed = (performance.now() - _shockStart) / 650;
+  const elapsed = (frameTime * 1000 - _shockStart) / 650;
   if (elapsed < 0 || elapsed >= 1) return;
 
   const progress = Math.min(1, elapsed);
@@ -419,7 +444,7 @@ function applyShockwave(
   const cy = sh / 2;
   const maxDist = Math.sqrt(cx * cx + cy * cy) || 1;
   const freq = 0.13;
-  const time = performance.now() / 1000;
+  const time = frameTime;
 
   for (let y = 0; y < sh; y++) {
     for (let x = 0; x < sw; x++) {
@@ -488,6 +513,7 @@ function applyTilt(
   settings: ScreenEffectsSettings,
   bassEnergy: number,
   beatStrength: number,
+  frameTime: number,
 ) {
   const beat = beatStrength > 0.15 ? settings.tiltIntensity * beatStrength : 0;
   const smooth = settings.tiltIntensity * bassEnergy * 0.4;
@@ -495,7 +521,8 @@ function applyTilt(
   if (amount < 0.02) return;
 
   const snap = getSnapshot(canvas);
-  const angle = (Math.random() - 0.5) * amount * 0.08;
+  const rand = mulberry32(Math.floor(frameTime * 1000));
+  const angle = (rand() - 0.5) * amount * 0.08;
 
   ctx.save();
   ctx.clearRect(0, 0, w, h);
@@ -514,6 +541,7 @@ function applyHeatHaze(
   settings: ScreenEffectsSettings,
   bassEnergy: number,
   beatStrength: number,
+  frameTime: number,
 ) {
   const beat = beatStrength > 0.15 ? settings.heatHazeIntensity * beatStrength : 0;
   const smooth = settings.heatHazeIntensity * bassEnergy * 0.3;
@@ -526,7 +554,7 @@ function applyHeatHaze(
 
   const stripH = 4;
   for (let y = 0; y < h; y += stripH) {
-    const xOff = Math.sin((y + performance.now() / 28) * 0.05) * amount * 18;
+    const xOff = Math.sin((y + (frameTime * 1000) / 28) * 0.05) * amount * 18;
     ctx.drawImage(snap, 0, y, w, stripH, xOff, y, w, stripH);
   }
   ctx.restore();
@@ -539,13 +567,14 @@ function applyHueShift(
   settings: ScreenEffectsSettings,
   bassEnergy: number,
   beatStrength: number,
+  frameTime: number,
 ) {
   const beat = beatStrength > 0.15 ? settings.hueShiftIntensity * beatStrength : 0;
   const smooth = settings.hueShiftIntensity * bassEnergy * 0.3;
   const amount = Math.min(0.9, smooth + beat);
   if (amount < 0.02) return;
 
-  const hue = (performance.now() / 40) % 360;
+  const hue = (frameTime * 25) % 360;
   const grad = ctx.createLinearGradient(0, 0, w, h);
   grad.addColorStop(0, `hsla(${hue}, 85%, 50%, ${amount})`);
   grad.addColorStop(1, `hsla(${(hue + 180) % 360}, 85%, 50%, ${amount})`);
@@ -562,6 +591,7 @@ export function getShakeOffset(
   bassEnergy: number,
   beatStrength: number,
   aboveFloor: number = 0,
+  frameTime: number,
 ): { x: number; y: number } {
   if (!settings.enabled || settings.mainEffect !== 'shake') return { x: 0, y: 0 };
 
@@ -575,12 +605,13 @@ export function getShakeOffset(
 
   const maxOffset = Math.max(1, settings.shakeMaxOffset || 40);
   const framesPerHold = Math.round((1 - (settings.shakeFrequency ?? 0.5)) * 8) + 1;
-  const bucket = Math.floor(performance.now() / (framesPerHold * 16.67));
+  const bucket = Math.floor((frameTime * 1000) / (framesPerHold * 16.67));
 
   if (bucket !== _shakeBucket) {
     _shakeBucket = bucket;
-    const angle = doesBeat && beatStrength > 0.3 ? -Math.PI / 2 : Math.random() * Math.PI * 2;
-    const dist = Math.min(intensity * (0.5 + Math.random() * 0.5), maxOffset);
+    const rand = mulberry32(bucket);
+    const angle = doesBeat && beatStrength > 0.3 ? -Math.PI / 2 : rand() * Math.PI * 2;
+    const dist = Math.min(intensity * (0.5 + rand() * 0.5), maxOffset);
     _shakeX = Math.cos(angle) * dist;
     _shakeY = Math.sin(angle) * dist;
   }

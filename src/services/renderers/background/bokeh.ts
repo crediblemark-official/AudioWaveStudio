@@ -6,7 +6,7 @@ export function renderBokeh(ctx: RenderContext) {
   const count = bg.bokehCount ?? 18;
   const baseSize = bg.bokehSize ?? 30;
   const baseOpacity = bg.bokehOpacity ?? 0.3;
-  const t = Date.now() / 5000;
+  const t = ctx.frameTime / 5;
 
   c.save();
   c.globalCompositeOperation = 'screen';

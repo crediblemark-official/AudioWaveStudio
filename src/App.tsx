@@ -4,6 +4,7 @@ import { VisualizerCanvas } from './components/VisualizerCanvas';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { ControlPanel } from './components/ControlPanel';
 import { ExportModal } from './components/ExportModal';
+import { HardwareModal } from './components/HardwareModal';
 import { PRESETS, migrateTextSettings, loadSavedConfig, saveConfig } from './utils/presets';
 import { SongMetadata, VisualizerConfig } from './types/visualizer';
 import { rustBridge } from './services/rustBridge';
@@ -15,6 +16,7 @@ export const App: React.FC = () => {
   const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
   const [songMeta, setSongMeta] = useState<SongMetadata | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
+  const [isHardwareModalOpen, setIsHardwareModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
@@ -227,6 +229,7 @@ export const App: React.FC = () => {
         onSavePreset={handleSavePreset}
         onLoadPreset={handleLoadPreset}
         onOpenExport={() => setIsExportModalOpen(true)}
+        onOpenHardware={() => setIsHardwareModalOpen(true)}
         isListening={isListening}
         onStartListen={handleStartListen}
         onStopListen={handleStopListen}
@@ -260,6 +263,11 @@ export const App: React.FC = () => {
         isOpen={isExportModalOpen}
         config={config}
         onClose={() => setIsExportModalOpen(false)}
+      />
+
+      <HardwareModal
+        isOpen={isHardwareModalOpen}
+        onClose={() => setIsHardwareModalOpen(false)}
       />
     </div>
   );

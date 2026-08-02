@@ -44,7 +44,7 @@ export function renderRadialVisualizer(ctx: RenderContext) {
   c.restore();
 
   const maxSpike = Math.min(width, height) * 0.25;
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
 
   c.save();
   c.shadowBlur = 12;

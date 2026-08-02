@@ -8,7 +8,7 @@ export function renderSmoothSpectrum(ctx: RenderContext) {
 
   const availableWidth = width * 0.92;
   const startX = (width - availableWidth) / 2;
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
   const bottomY = height * 0.85;
   const maxH = height * 0.65;
 

@@ -9,7 +9,7 @@ export function renderMinimalWaveVisualizer(ctx: RenderContext) {
   const centerY = height * 0.55;
   const theme = config.theme;
 
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
 
   c.save();
   c.fillStyle = theme.primaryColor;

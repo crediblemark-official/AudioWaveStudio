@@ -9,7 +9,7 @@ export function renderPsychedelic(ctx: RenderContext) {
   const targetBands = Math.max(1, bg.psychedelicBands ?? 24);
   const baseLineWidth = Math.max(0.5, bg.psychedelicLineWidth ?? 4);
 
-  const t = (Date.now() / 2000) * speedMult;
+  const t = (ctx.frameTime / 2) * speedMult;
   const cx = width / 2;
   const cy = height / 2;
   const maxR = Math.sqrt(width * width + height * height) / 2;

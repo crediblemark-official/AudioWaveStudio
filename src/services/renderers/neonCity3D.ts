@@ -3,6 +3,10 @@ import { RenderContext } from './types';
 let frameHistory: Uint8Array[] = [];
 const HISTORY_DEPTH = 12;
 
+export function resetNeonCity3DState() {
+  frameHistory = [];
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace('#', '');
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
@@ -18,7 +22,7 @@ export function renderNeonCity3D(r: RenderContext) {
 
   const centerX = width / 2;
   const floorY = height * 0.58;
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
 
   if (frameHistory.length > 0 && frameHistory[0].length !== freqData.length) {
     frameHistory = [];

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Film, CheckCircle, AlertTriangle, Download, X, RefreshCw, Zap, Layers, Camera, Volume2, VolumeX, Sparkles, Wrench } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
+import { Film, CheckCircle, AlertTriangle, Download, RefreshCw, Zap, Layers, Camera, Volume2, VolumeX, Sparkles, Wrench, Cpu } from 'lucide-react';
 import { VisualizerConfig } from '../types/visualizer';
 import { ExportProgress, ExportMethod, videoExporter } from '../services/videoExporter';
 import { rustBridge } from '../services/rustBridge';
@@ -22,6 +23,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
   const [ffmpegInstalling, setFfmpegInstalling] = useState<boolean>(false);
   const [ffmpegPhase, setFfmpegPhase] = useState<string>('');
   const [ffmpegError, setFfmpegError] = useState<string>('');
+  const [hwInfo, setHwInfo] = useState<any>(null);
+  const [memoryInfo, setMemoryInfo] = useState<{ used_mb: number; total_mb: number; used_percent: number } | null>(null);
   const mountedRef = useRef(true);
   const [progressState, setProgressState] = useState<ExportProgress>({
     status: 'preparing',
@@ -30,6 +33,28 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
     totalFrames: 0,
     elapsedTime: 0
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      invoke('check_hardware').then((info) => {
+        if (mountedRef.current) setHwInfo(info);
+      }).catch(() => {});
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    let timer: any;
+    if (isOpen) {
+      const fetchMem = () => {
+        invoke('get_system_memory_cmd').then((mem: any) => {
+          if (mountedRef.current && mem) setMemoryInfo(mem);
+        }).catch(() => {});
+      };
+      fetchMem();
+      timer = setInterval(fetchMem, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [isOpen, hasStarted]);
 
   useEffect(() => {
     if (isOpen) {
@@ -111,9 +136,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
 
   if (!isOpen) return null;
 
-  const handleCancel = () => {
+  const handleCancelExport = () => {
     videoExporter.cancelExport();
-    onClose();
+    setHasStarted(false);
   };
 
   const handleDownload = async () => {
@@ -156,16 +181,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
   };
 
   return (
-    <div className="modal-backdrop" onClick={(e) => { if (e.target === e.currentTarget) handleCancel(); }}>
+    <div className="modal-backdrop">
       <div className="modal-card">
         <div className="modal-header">
           <div className="modal-title">
             <Film size={20} className="text-secondary" />
             <span>Export MP4 Video</span>
           </div>
-          <button className="btn-icon" onClick={handleCancel} title="Close">
-            <X size={18} />
-          </button>
         </div>
 
         <div className="modal-body">
@@ -279,7 +301,48 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
                 {methodLabel(exportMethod)} · {config.export.fps} FPS · {config.export.aspectRatio} ({config.export.resolution})
               </p>
 
-              <div className="progress-track">
+              {/* Hardware GPU/CPU Indicator Badge */}
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '10px' }}>
+                {hwInfo && hwInfo.recommended_encoder !== 'libx264' ? (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      padding: '4px 14px',
+                      borderRadius: '20px',
+                      background: 'rgba(34, 197, 94, 0.15)',
+                      color: '#4ade80',
+                      border: '1px solid rgba(34, 197, 94, 0.3)',
+                    }}
+                  >
+                    <Zap size={14} />
+                    <span>⚡ Mode GPU Hardware: {hwInfo.recommended_label.replace('⚡ GPU Accelerated (', '').replace(')', '')}</span>
+                  </span>
+                ) : (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      fontSize: '0.78rem',
+                      fontWeight: 600,
+                      padding: '4px 14px',
+                      borderRadius: '20px',
+                      background: 'rgba(234, 179, 8, 0.15)',
+                      color: '#facc15',
+                      border: '1px solid rgba(234, 179, 8, 0.3)',
+                    }}
+                  >
+                    <Cpu size={14} />
+                    <span>💻 Mode CPU Software: x264</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="progress-track" style={{ marginTop: '14px' }}>
                 <div
                   className="progress-fill"
                   style={{ width: `${Math.min(100, Math.max(0, progressState.progress))}%` }}
@@ -295,6 +358,32 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
                   {Math.floor(progressState.elapsedTime / 60)}:{String(Math.floor(progressState.elapsedTime % 60)).padStart(2, '0')}
                 </span>
               </div>
+
+              {/* Live RAM Usage Metric */}
+              {memoryInfo && (
+                <div
+                  style={{
+                    marginTop: '12px',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    background: 'rgba(15, 23, 42, 0.6)',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    fontSize: '0.78rem',
+                    color: '#94a3b8',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Cpu size={14} style={{ color: '#38bdf8' }} />
+                    <span>Penggunaan RAM Sistem:</span>
+                  </div>
+                  <span style={{ fontWeight: 600, color: memoryInfo.used_percent > 85 ? '#f87171' : '#38bdf8' }}>
+                    {(memoryInfo.used_mb / 1024).toFixed(1)} GB / {(memoryInfo.total_mb / 1024).toFixed(1)} GB ({memoryInfo.used_percent.toFixed(1)}%)
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -352,11 +441,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({ isOpen, config, onClos
               </button>
             </>
           ) : progressState.status === 'error' ? (
-            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+            <button type="button" className="btn btn-secondary" onClick={handleCancelExport}>
               Close
             </button>
           ) : (
-            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+            <button type="button" className="btn btn-secondary" onClick={handleCancelExport}>
               Cancel Export
             </button>
           )}

@@ -6,7 +6,7 @@ export function renderNebula(ctx: RenderContext) {
   const speedMult = bg.nebulaSpeed ?? 1.0;
   const intensityMult = bg.nebulaIntensity ?? 0.6;
 
-  const t = (Date.now() / 7000) * speedMult;
+  const t = (ctx.frameTime / 7) * speedMult;
   const intensity = (0.5 + bassEnergy * 0.5) * intensityMult;
 
   c.save();

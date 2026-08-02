@@ -8,7 +8,7 @@ export function renderCircularBars(ctx: RenderContext) {
   const sensitivity = config.reactivity.sensitivity;
   const theme = config.theme;
 
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
   const maxLen = Math.min(width, height) * 0.42;
   const minRadius = 20;
 

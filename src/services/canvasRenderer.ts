@@ -243,8 +243,9 @@ export class CanvasRenderer {
     r.exportFreqData = this.exportFreqData;
     r.isPlaying = this.exportFreqData ? true : audioEngine.getIsPlaying();
     r.frameTime = this.frameTime ?? audioEngine.getCurrentTime();
+    const frameTime = r.frameTime;
 
-    const shakeOff = getShakeOffset(config.screenEffects, this.bassEnergy, this.beatStrength, aboveFloor);
+    const shakeOff = getShakeOffset(config.screenEffects, this.bassEnergy, this.beatStrength, aboveFloor, frameTime);
     const bgShakeOff = {
       x: Math.round(shakeOff.x * BACKGROUND_SHAKE_MULT),
       y: Math.round(shakeOff.y * BACKGROUND_SHAKE_MULT),
@@ -309,9 +310,7 @@ export class CanvasRenderer {
 
     renderTextOverlay(r);
 
-    this.ctx.restore();
-
-    applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor);
+    applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor, frameTime);
 
     this.rotationAngle = r.rotationAngle;
   }

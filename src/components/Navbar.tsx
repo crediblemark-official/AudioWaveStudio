@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -17,6 +17,7 @@ interface NavbarProps {
   onSavePreset: () => void;
   onLoadPreset: () => void;
   onOpenExport: () => void;
+  onOpenHardware?: () => void;
   isListening: boolean;
   onStartListen: (deviceId?: string) => void;
   onStopListen: () => void;
@@ -31,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSavePreset,
   onLoadPreset,
   onOpenExport,
+  onOpenHardware,
   isListening,
   onStartListen,
   onStopListen,
@@ -176,8 +178,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
         </div>
 
-        {/* Save / Load Preset Buttons */}
+        {/* Save / Load Preset / Hardware Check Buttons */}
         <div className="preset-actions">
+          <button className="btn btn-icon" onClick={onOpenHardware} title="Cek Kesiapan Hardware & GPU">
+            <Cpu size={16} />
+          </button>
           <button className="btn btn-icon" onClick={onSavePreset} title="Save Preset">
             <Save size={16} />
           </button>

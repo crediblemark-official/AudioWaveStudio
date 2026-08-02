@@ -3,6 +3,11 @@ import { RenderContext } from './types';
 let staticSplatterDots: { x: number; y: number; r: number }[] = [];
 let arcRotation = 0;
 
+export function resetSpeakerSplatterState() {
+  staticSplatterDots = [];
+  arcRotation = 0;
+}
+
 function initSplatterElements(centerX: number, centerY: number, baseR: number) {
   if (staticSplatterDots.length > 0) return;
 

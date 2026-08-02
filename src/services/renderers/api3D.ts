@@ -14,6 +14,11 @@ interface EmberParticle {
 let embers: EmberParticle[] = [];
 let time = 0;
 
+export function resetApi3DState() {
+  embers = [];
+  time = 0;
+}
+
 export function renderApi3D(r: RenderContext) {
   const { ctx: c, width, height, config, freqData, bassEnergy: be, beatStrength: bs } = r;
   const sensitivity = config.reactivity.sensitivity;
@@ -34,8 +39,8 @@ export function renderApi3D(r: RenderContext) {
   const subDisplacements1 = new Float32Array(pointCount);
   const subDisplacements2 = new Float32Array(pointCount);
 
-  const binCount = Math.min(48, Math.floor(freqData.length / 4));
-  const step = Math.floor(freqData.length / binCount);
+  const binCount = Math.max(1, Math.min(48, Math.floor(freqData.length / 4)));
+  const step = Math.max(1, Math.floor(freqData.length / binCount));
 
   for (let b = 0; b < binCount; b++) {
     let sum = 0;

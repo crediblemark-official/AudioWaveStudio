@@ -7,7 +7,7 @@ export function renderAurora(ctx: RenderContext) {
   const baseAmp = bg.auroraAmplitude ?? 50;
   const baseOpacity = bg.auroraOpacity ?? 0.25;
 
-  const t = (Date.now() / 1000) * speedMult;
+  const t = ctx.frameTime * speedMult;
   const speed = (0.3 + bassEnergy * 0.6) * speedMult;
   const amp = baseAmp + beatStrength * 60;
 

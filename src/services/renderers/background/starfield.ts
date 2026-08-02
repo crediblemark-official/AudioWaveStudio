@@ -21,7 +21,7 @@ export function renderStarfield(ctx: RenderContext) {
   const speedMult = bg.starSpeed ?? 1.0;
   const brightnessMult = bg.starBrightness ?? 1.0;
 
-  const t = (Date.now() / 1000) * speedMult;
+  const t = ctx.frameTime * speedMult;
   const pulse = 0.7 + bassEnergy * 0.4;
 
   c.save();

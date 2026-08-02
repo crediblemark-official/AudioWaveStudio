@@ -1,6 +1,7 @@
 use std::fs::File;
 use std::path::Path;
-use symphonia::core::audio::{AudioBufferRef, Signal};
+use symphonia::core::audio::{AudioBuffer, AudioBufferRef, Signal};
+use symphonia::core::sample::Sample;
 use symphonia::core::codecs::DecoderOptions;
 use symphonia::core::errors::Error;
 use symphonia::core::formats::FormatOptions;
@@ -118,64 +119,36 @@ impl AudioData {
 
 
 
+fn push_mixdown<T: Sample + Copy>(
+  buf: &AudioBuffer<T>,
+  samples: &mut Vec<f32>,
+  convert: impl Fn(T) -> f32,
+) {
+  let num_frames = buf.frames();
+  let chan_count = buf.spec().channels.count();
+  for f in 0..num_frames {
+    let mut sum = 0.0;
+    for c in 0..chan_count {
+      sum += convert(buf.chan(c)[f]);
+    }
+    samples.push(sum / chan_count as f32);
+  }
+}
+
 fn append_audio_samples(buf: &AudioBufferRef, samples: &mut Vec<f32>, _channels: usize) {
   match buf {
-    AudioBufferRef::F32(b) => {
-      let num_frames = b.frames();
-      let chan_count = b.spec().channels.count();
-      for f in 0..num_frames {
-        let mut sum = 0.0;
-        for c in 0..chan_count {
-          sum += b.chan(c)[f];
-        }
-        samples.push(sum / chan_count as f32);
-      }
+    AudioBufferRef::F32(b) => push_mixdown(b, samples, |s| s),
+    AudioBufferRef::F64(b) => push_mixdown(b, samples, |s| s as f32),
+    AudioBufferRef::U8(b) => push_mixdown(b, samples, |s| (s as f32 - 128.0) / 128.0),
+    AudioBufferRef::U16(b) => push_mixdown(b, samples, |s| (s as f32 - 32768.0) / 32768.0),
+    AudioBufferRef::U24(b) => push_mixdown(b, samples, |s| (s.0 as f32 - 8388608.0) / 8388608.0),
+    AudioBufferRef::U32(b) => {
+      push_mixdown(b, samples, |s| (s as f32 - 2147483648.0) / 2147483648.0)
     }
-    AudioBufferRef::U8(b) => {
-      let num_frames = b.frames();
-      let chan_count = b.spec().channels.count();
-      for f in 0..num_frames {
-        let mut sum = 0.0;
-        for c in 0..chan_count {
-          sum += (b.chan(c)[f] as f32 - 128.0) / 128.0;
-        }
-        samples.push(sum / chan_count as f32);
-      }
-    }
-    AudioBufferRef::U16(b) => {
-      let num_frames = b.frames();
-      let chan_count = b.spec().channels.count();
-      for f in 0..num_frames {
-        let mut sum = 0.0;
-        for c in 0..chan_count {
-          sum += (b.chan(c)[f] as f32 - 32768.0) / 32768.0;
-        }
-        samples.push(sum / chan_count as f32);
-      }
-    }
-    AudioBufferRef::S16(b) => {
-      let num_frames = b.frames();
-      let chan_count = b.spec().channels.count();
-      for f in 0..num_frames {
-        let mut sum = 0.0;
-        for c in 0..chan_count {
-          sum += b.chan(c)[f] as f32 / 32768.0;
-        }
-        samples.push(sum / chan_count as f32);
-      }
-    }
-    AudioBufferRef::S32(b) => {
-      let num_frames = b.frames();
-      let chan_count = b.spec().channels.count();
-      for f in 0..num_frames {
-        let mut sum = 0.0;
-        for c in 0..chan_count {
-          sum += b.chan(c)[f] as f32 / 2147483648.0;
-        }
-        samples.push(sum / chan_count as f32);
-      }
-    }
-    _ => {}
+    AudioBufferRef::S8(b) => push_mixdown(b, samples, |s| s as f32 / 128.0),
+    AudioBufferRef::S16(b) => push_mixdown(b, samples, |s| s as f32 / 32768.0),
+    AudioBufferRef::S24(b) => push_mixdown(b, samples, |s| s.0 as f32 / 8388608.0),
+    AudioBufferRef::S32(b) => push_mixdown(b, samples, |s| s as f32 / 2147483648.0),
   }
 }
 

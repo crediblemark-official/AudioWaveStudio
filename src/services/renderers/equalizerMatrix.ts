@@ -11,7 +11,7 @@ export function renderEqualizerMatrix(ctx: RenderContext) {
   const startY = height * 0.6;
 
   const theme = config.theme;
-  const step = Math.floor(freqData.length / cols);
+  const step = Math.max(1, Math.floor(freqData.length / cols));
 
   for (let col = 0; col < cols; col++) {
     let val = 0;

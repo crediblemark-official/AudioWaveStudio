@@ -12,6 +12,11 @@ interface GalaxyParticle {
 let galaxy: GalaxyParticle[] = [];
 let galaxyInit = false;
 
+export function resetSpiralGalaxyState() {
+  galaxy = [];
+  galaxyInit = false;
+}
+
 function initGalaxy() {
   if (galaxyInit) return;
   galaxyInit = true;

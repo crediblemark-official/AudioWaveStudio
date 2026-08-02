@@ -17,6 +17,13 @@ let motes: LightMote[] = [];
 let prevBeat = 0;
 let peaks: { x: number; y: number; alpha: number }[] = [];
 
+export function resetThreeDState() {
+  sparks = [];
+  motes = [];
+  prevBeat = 0;
+  peaks = [];
+}
+
 export function renderThreeD(r: RenderContext) {
   const { ctx: c, width, height, config, freqData, bassEnergy: be, beatStrength: bs } = r;
   const barCount = Math.min(48, config.reactivity.barCount);
@@ -39,7 +46,7 @@ export function renderThreeD(r: RenderContext) {
   const gap = 2;
   const barStep = maxBarW + gap;
 
-  const step = Math.floor(freqData.length / barCount);
+  const step = Math.max(1, Math.floor(freqData.length / barCount));
 
   if (motes.length === 0) {
     for (let i = 0; i < 50; i++) {

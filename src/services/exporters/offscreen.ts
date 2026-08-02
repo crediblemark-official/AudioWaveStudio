@@ -2,6 +2,7 @@ import { VisualizerConfig } from '../../types/visualizer';
 import { audioEngine } from '../audioEngine';
 import { rustBridge } from '../rustBridge';
 import { CanvasRenderer } from '../canvasRenderer';
+import { resetVisualizerState } from '../renderers/resetState';
 import { tempDir } from '@tauri-apps/api/path';
 import { ExportProgress, getExportDimensions } from './types';
 
@@ -17,14 +18,15 @@ export async function exportOffscreen(
   const audioFilePath = audioEngine.getSongFilePath();
   if (!audioFilePath) throw new Error('No audio file path available');
 
-  onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames: 0, elapsedTime: 0 });
+  const fps = config.export.fps || 60;
+  const totalFrames = Math.ceil(duration * fps);
+
+  onProgress({ status: 'preparing', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
   if (isCancelled()) throw new Error('Export cancelled');
   await audioEngine.ensureRustDecode();
 
   const { width, height } = getExportDimensions(config);
-  const fps = config.export.fps || 60;
-  const totalFrames = Math.ceil(duration * fps);
   const outputFileName = `${(config.text.songTitle || 'visualizer').replace(/[^a-zA-Z0-9]/g, '_')}_wave.mp4`;
   const tmpDir = await tempDir();
   const separator = tmpDir.endsWith('/') || tmpDir.endsWith('\\') ? '' : '/';
@@ -39,6 +41,7 @@ export async function exportOffscreen(
 
   const renderer = new CanvasRenderer();
   renderer.init(offscreen);
+  resetVisualizerState();
 
   if (config.background.customImageUri) renderer.setCustomBackgroundImage(config.background.customImageUri);
   if (config.background.radialCenterImageUri) renderer.setRadialCenterImage(config.background.radialCenterImageUri);
@@ -101,6 +104,7 @@ export async function exportOffscreen(
       sessionStarted = false;
     }
     renderer.clearExportData();
+    try { await rustBridge.deleteFile(outputPath); } catch { /* Temp cleanup is best-effort */ }
     throw err;
   }
 }
