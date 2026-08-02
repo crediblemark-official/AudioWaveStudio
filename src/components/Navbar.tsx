@@ -139,20 +139,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isListening ? <StopCircle size={16} /> : <Headphones size={16} />}
             <span>{isListening ? 'Stop Listen' : 'Listen'}</span>
           </button>
-          <div
-            className="crediblemark-ticker-container"
-            onClick={onOpenAbout}
-            title="Klik untuk info pengembang & layanan CredibleMark (crediblemark.com)"
-          >
-            <div className="crediblemark-ticker-wrapper">
-              <span className="crediblemark-ticker-item">
-                🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
-              </span>
-              <span className="crediblemark-ticker-item">
-                🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
-              </span>
-            </div>
-          </div>
         </div>
 
         {showDevicePicker && (
@@ -179,6 +165,22 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Listen failed: {listenError}</span>
           </div>
         )}
+      </div>
+
+      {/* CENTER PROMO TICKER */}
+      <div
+        className="crediblemark-ticker-container"
+        onClick={onOpenAbout}
+        title="Klik untuk info pengembang & layanan CredibleMark (crediblemark.com)"
+      >
+        <div className="crediblemark-ticker-wrapper">
+          <span className="crediblemark-ticker-item">
+            🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
+          </span>
+          <span className="crediblemark-ticker-item">
+            🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
+          </span>
+        </div>
       </div>
 
       <div className="navbar-right">
