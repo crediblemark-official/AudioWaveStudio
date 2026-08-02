@@ -1,5 +1,6 @@
 import { VisualizerConfig } from '../types/visualizer';
 import { audioEngine } from './audioEngine';
+import { rustBridge } from './rustBridge';
 import { renderBackground } from './renderers/background';
 import { renderSpectrumBars } from './renderers/spectrumBars';
 import { renderRadialVisualizer } from './renderers/radial';
@@ -30,6 +31,8 @@ const BACKGROUND_SHAKE_MULT = 1.8;
 export class CanvasRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
+  private useRustGpuPreview: boolean = true;
+  private isRenderingRustFrame: boolean = false;
 
   private freqData: Uint8Array = new Uint8Array(512);
   private timeData: Uint8Array = new Uint8Array(512);
@@ -172,6 +175,36 @@ export class CanvasRenderer {
 
     const width = this.canvas.width;
     const height = this.canvas.height;
+
+    if (this.useRustGpuPreview && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window && !this.exportFreqData) {
+      if (!this.isRenderingRustFrame) {
+        this.isRenderingRustFrame = true;
+        const currentFrameTime = this.frameTime ?? audioEngine.getCurrentTime();
+        const fftSize = config.reactivity.fftSize || 1024;
+        if (this.freqData.length !== fftSize / 2) {
+          this.freqData = new Uint8Array(fftSize / 2);
+          this.timeData = new Uint8Array(fftSize / 2);
+        }
+        audioEngine.getFrequencyData(this.freqData);
+        audioEngine.getTimeDomainData(this.timeData);
+
+        rustBridge
+          .renderRustPreviewFrame(config, this.freqData, this.timeData, currentFrameTime, width, height)
+          .then((rgbaBytes) => {
+            if (this.ctx && rgbaBytes && rgbaBytes.length === width * height * 4) {
+              const imgData = new ImageData(new Uint8ClampedArray(rgbaBytes.buffer, rgbaBytes.byteOffset, rgbaBytes.byteLength), width, height);
+              this.ctx.putImageData(imgData, 0, 0);
+            }
+          })
+          .catch(() => {
+            // Fallback to TS canvas 2D if GPU readback is temporarily busy
+          })
+          .finally(() => {
+            this.isRenderingRustFrame = false;
+          });
+      }
+      return;
+    }
 
     let targetBass: number;
     let rawBass: number;
