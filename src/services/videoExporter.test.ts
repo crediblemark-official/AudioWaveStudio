@@ -126,12 +126,12 @@ describe('canUseGpuExport', () => {
     expect(canUseGpuExport(config)).toBe(true);
   });
 
-  it('returns true when radialCenterImageUri is set', () => {
+  it('returns false when radialCenterImageUri is set to ensure image overlay renders via canvas exporter', () => {
     const config = makeConfig({
       style: 'radial',
       background: { ...makeConfig().background, radialCenterImageUri: 'data:image/png;base64,iVBORw0KGgo=' },
     });
-    expect(canUseGpuExport(config)).toBe(true);
+    expect(canUseGpuExport(config)).toBe(false);
   });
 
   it('returns true for ported screen effects like glitch, heatHaze, chromatic', () => {
