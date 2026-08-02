@@ -16,6 +16,7 @@ function BarChartIcon({ size }: { size: number }) {
 
 const barStyles: VisualizerStyle[] = ['spectrum', 'radial', 'equalizer', 'minimal', 'smoothSpectrum', 'circularBars', 'threeD', 'api3D', 'neonCity3D', 'speaker3D', 'speakerTrio', 'speakerSplatter'];
 const sensitivityStyles: VisualizerStyle[] = ['spectrum', 'radial', 'equalizer', 'minimal', 'smoothSpectrum', 'circularBars', 'oscilloscope', 'waveformFill', 'vuMeter', 'flameFire', 'threeD', 'api3D', 'neonCity3D', 'speaker3D', 'speakerTrio', 'speakerSplatter'];
+const mirrorStyles: VisualizerStyle[] = ['spectrum', 'smoothSpectrum', 'equalizer', 'waveformFill'];
 
 export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
   const handleStyleChange = (style: VisualizerStyle) => {
@@ -123,6 +124,17 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
           <label className="label-row"><span>Sensitivity ({config.reactivity.sensitivity.toFixed(1)}x)</span></label>
           <input type="range" min={0.5} max={2.5} step={0.1} value={config.reactivity.sensitivity}
             onChange={(e) => handleReactivityChange('sensitivity', parseFloat(e.target.value))} className="input-range" />
+        </div>
+      )}
+
+      {mirrorStyles.includes(config.style) && (
+        <div className="control-group mt-2">
+          <label className="checkbox-label">
+            <input type="checkbox" checked={config.reactivity.mirrorBars}
+              onChange={(e) => handleReactivityChange('mirrorBars', e.target.checked)} />
+            <span>Mirror Waves Downwards</span>
+          </label>
+          <span className="hint-text">Reflects the visualization symmetrically below the center line</span>
         </div>
       )}
 
