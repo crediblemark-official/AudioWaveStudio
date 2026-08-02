@@ -55,13 +55,6 @@ const GPU_SCREEN_EFFECTS = new Set([
 ]);
 
 export function canUseGpuExport(config: VisualizerConfig): boolean {
-  // Fall back to Canvas 2D exporter when custom background images, radial center images,
-  // custom text blocks (including RTL fonts & image overlays), or music note particles are active,
-  // to guarantee 100% pixel-perfect visual parity with live preview.
-  if (config.background.customImageUri || config.background.radialCenterImageUri) return false;
-  if (config.background.showMusicNotes) return false;
-  if (config.text.blocks && config.text.blocks.length > 0) return false;
-
   if (!GPU_STYLES.has(config.style)) return false;
   if (config.screenEffects.enabled && !GPU_SCREEN_EFFECTS.has(config.screenEffects.mainEffect)) return false;
   return true;

@@ -64,7 +64,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let spike_h = val * max_spike;
 
     let angle = (i as f32 / bar_count as f32) * TAU + ctx.rotation_angle;
-    let (cos, sin) = angle.sin_cos();
+    let (sin, cos) = angle.sin_cos();
 
     let x1 = center_x + cos * base_radius;
     let y1 = center_y + sin * base_radius;
