@@ -3,8 +3,6 @@ import { VisualizerConfig } from '../../types/visualizer';
 import { CustomSelect } from '../CustomSelect';
 import { TextBlockEditor } from './TextBlockEditor';
 import { createTextBlock } from '../../utils/presets';
-import { renderTextOverlay } from '../../services/renderers/textOverlay';
-import { RenderContext } from '../../services/renderers/types';
 import { Plus } from 'lucide-react';
 
 interface Props {
@@ -22,27 +20,17 @@ function TextPreview({ config }: { config: VisualizerConfig }) {
     if (!c) return;
     c.fillStyle = '#0b0c10';
     c.fillRect(0, 0, canvas.width, canvas.height);
-    renderTextOverlay({
-      ctx: c,
-      width: canvas.width,
-      height: canvas.height,
-      config,
-      freqData: new Uint8Array(0),
-      timeData: new Uint8Array(0),
-      bassEnergy: 0,
-      bassEnergyRaw: 0,
-      beatStrength: 0,
-      beatStrengthRaw: 0,
-      peakData: [],
-      particles: [],
-      musicNotes: [],
-      customImgElement: null,
-      radialCenterImgElement: null,
-      rotationAngle: 0,
-      exportFreqData: null,
-      isPlaying: false,
-      frameTime: 1.5,
-    } as unknown as RenderContext);
+
+    c.textAlign = 'center';
+    c.fillStyle = '#ffffff';
+    c.font = `600 ${config.text.title.fontSize || 24}px ${config.text.fontFamily || 'sans-serif'}`;
+    if (config.text.showTitle && config.text.songTitle) {
+      c.fillText(config.text.songTitle, canvas.width / 2, canvas.height / 2);
+    }
+    if (config.text.showArtist && config.text.artistName) {
+      c.font = `400 ${config.text.artist.fontSize || 16}px ${config.text.fontFamily || 'sans-serif'}`;
+      c.fillText(config.text.artistName, canvas.width / 2, canvas.height / 2 + 30);
+    }
   }, [config]);
 
   return (
