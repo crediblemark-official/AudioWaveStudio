@@ -11,16 +11,69 @@ import { rustBridge } from './services/rustBridge';
 import { audioEngine } from './services/audioEngine';
 import { canvasRenderer } from './services/canvasRenderer';
 import { detachedPreviewService } from './services/detachedPreviewService';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { RefreshCw, Headphones } from 'lucide-react';
+import { RefreshCw, Headphones, Pin, PinOff, Maximize2, Minimize2, X } from 'lucide-react';
 
 const isDetachedWindow = typeof window !== 'undefined' && window.location.search.includes('detached=true');
 
 const DetachedPreviewView: React.FC = () => {
   const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
+  const [isPinned, setIsPinned] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const configRef = useRef<VisualizerConfig>(config);
   configRef.current = config;
+
+  const togglePin = async () => {
+    const nextState = !isPinned;
+    try {
+      await invoke('set_always_on_top_cmd', { alwaysOnTop: nextState });
+      setIsPinned(nextState);
+    } catch {
+      try {
+        const win = getCurrentWindow();
+        await win.setAlwaysOnTop(nextState);
+        setIsPinned(nextState);
+      } catch (err) {
+        console.error('[DetachedPreview] Failed to toggle pin:', err);
+      }
+    }
+  };
+
+  const toggleFullscreen = async () => {
+    try {
+      const win = getCurrentWindow();
+      const next = !isFullscreen;
+      await win.setFullscreen(next);
+      setIsFullscreen(next);
+    } catch {
+      setIsFullscreen((prev) => !prev);
+    }
+  };
+
+  const closeWindow = async () => {
+    try {
+      const win = getCurrentWindow();
+      await win.close();
+    } catch {
+      window.close();
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'F11') {
+        e.preventDefault();
+        toggleFullscreen();
+      } else if (e.code === 'Escape' && isFullscreen) {
+        toggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -63,13 +116,50 @@ const DetachedPreviewView: React.FC = () => {
   }, []);
 
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div
+      style={{
+        position: 'relative',
+        width: '100vw',
+        height: '100vh',
+        background: '#000',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      onDoubleClick={toggleFullscreen}
+    >
       <canvas
         ref={canvasRef}
         width={1920}
         height={1080}
         style={{ width: '100%', height: '100%', objectFit: 'contain' }}
       />
+      <div className="canvas-overlay-controls" style={{ position: 'absolute', top: 12, right: 16, left: 'auto', display: 'flex', gap: 8, zIndex: 99 }}>
+        <button
+          className={`btn-fullscreen ${isPinned ? 'active' : ''}`}
+          onClick={(e) => { e.stopPropagation(); togglePin(); }}
+          title={isPinned ? 'Unpin Always on Top' : 'Stay on Top (Sticky)'}
+          style={{ background: isPinned ? 'rgba(0, 229, 255, 0.25)' : undefined, color: isPinned ? '#00e5ff' : undefined, borderColor: isPinned ? '#00e5ff' : undefined }}
+        >
+          {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
+        </button>
+        <button
+          className="btn-fullscreen"
+          onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
+          title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'}
+        >
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
+        <button
+          className="btn-fullscreen"
+          onClick={(e) => { e.stopPropagation(); closeWindow(); }}
+          title="Tutup Preview"
+          style={{ background: 'rgba(255, 50, 50, 0.3)', borderColor: 'rgba(255, 50, 50, 0.5)' }}
+        >
+          <X size={16} />
+        </button>
+      </div>
     </div>
   );
 };
