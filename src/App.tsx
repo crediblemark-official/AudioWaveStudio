@@ -14,25 +14,20 @@ import { detachedPreviewService } from './services/detachedPreviewService';
 import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { save, open } from '@tauri-apps/plugin-dialog';
-import { RefreshCw, Headphones, Pin, PinOff, Maximize2, Minimize2, X } from 'lucide-react';
+import { RefreshCw, Headphones, Maximize2, Minimize2, X } from 'lucide-react';
 
 const isDetachedWindow = typeof window !== 'undefined' && window.location.search.includes('detached=true');
 
 const DetachedPreviewView: React.FC = () => {
   const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
-  const [isPinned, setIsPinned] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const configRef = useRef<VisualizerConfig>(config);
   configRef.current = config;
 
   useEffect(() => {
-    invoke<boolean>('is_always_on_top_cmd')
-      .then((pinned) => setIsPinned(pinned))
-      .catch(() => {});
     try {
       const win = getCurrentWindow();
-      win.isAlwaysOnTop().then((pinned) => setIsPinned(pinned)).catch(() => {});
       win.isFullscreen().then((fs) => setIsFullscreen(fs)).catch(() => {});
     } catch {}
   }, []);
@@ -43,22 +38,6 @@ const DetachedPreviewView: React.FC = () => {
         getCurrentWindow().startDragging();
       } catch (err) {
         console.warn('[DetachedPreview] startDragging error:', err);
-      }
-    }
-  };
-
-  const togglePin = async () => {
-    try {
-      const res = await invoke<boolean>('toggle_detached_always_on_top');
-      setIsPinned(res);
-    } catch {
-      try {
-        const win = getCurrentWindow();
-        const nextState = !isPinned;
-        await win.setAlwaysOnTop(nextState);
-        setIsPinned(nextState);
-      } catch (err) {
-        console.error('[DetachedPreview] Failed to toggle pin:', err);
       }
     }
   };
@@ -166,14 +145,6 @@ const DetachedPreviewView: React.FC = () => {
         style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
       />
       <div className="canvas-overlay-controls" style={{ position: 'absolute', top: 12, right: 16, left: 'auto', display: 'flex', gap: 8, zIndex: 99 }} onMouseDown={(e) => e.stopPropagation()}>
-        <button
-          className={`btn-fullscreen ${isPinned ? 'active' : ''}`}
-          onClick={(e) => { e.stopPropagation(); togglePin(); }}
-          title={isPinned ? 'Unpin Always on Top' : 'Stay on Top (Sticky)'}
-          style={{ background: isPinned ? 'rgba(0, 229, 255, 0.25)' : undefined, color: isPinned ? '#00e5ff' : undefined, borderColor: isPinned ? '#00e5ff' : undefined }}
-        >
-          {isPinned ? <PinOff size={16} /> : <Pin size={16} />}
-        </button>
         <button
           className="btn-fullscreen"
           onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}

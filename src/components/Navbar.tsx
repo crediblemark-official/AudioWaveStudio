@@ -1,6 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, Pin, PinOff, ExternalLink } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/core';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -44,22 +43,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [presetValue, setPresetValue] = React.useState('');
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
-  const [isPinned, setIsPinned] = useState(false);
-
-  const togglePin = async () => {
-    const nextState = !isPinned;
-    try {
-      await invoke('set_always_on_top_cmd', { alwaysOnTop: nextState });
-      setIsPinned(nextState);
-    } catch {
-      try {
-        await appWindow.setAlwaysOnTop(nextState);
-        setIsPinned(nextState);
-      } catch (err) {
-        console.error('[Navbar] Failed to setAlwaysOnTop:', err);
-      }
-    }
-  };
 
   useEffect(() => {
     if (showDevicePicker) {
@@ -219,9 +202,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <div className="window-controls">
-          <button className={`btn-winctrl ${isPinned ? 'active' : ''}`} onClick={togglePin} title={isPinned ? 'Unpin Always on Top' : 'Stay on Top (Sticky)'}>
-            {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
-          </button>
           <button className="btn-winctrl" onClick={() => appWindow.minimize()} title="Minimize">
             <Minus size={14} />
           </button>
