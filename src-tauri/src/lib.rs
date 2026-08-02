@@ -887,24 +887,29 @@ async fn stop_system_listen(state: tauri::State<'_, AppState>) -> Result<(), Str
 fn open_detached_preview_window(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::Manager;
     if let Some(window) = app.get_webview_window("detached-preview") {
+        let _ = window.unminimize();
+        let _ = window.show();
         let _ = window.set_focus();
         return Ok(());
     }
 
     let url = tauri::WebviewUrl::App("index.html?detached=true".into());
-    tauri::WebviewWindowBuilder::new(&app, "detached-preview", url)
+    let window = tauri::WebviewWindowBuilder::new(&app, "detached-preview", url)
         .title("AudioWave Studio - Live Preview")
         .inner_size(1280.0, 720.0)
         .resizable(true)
         .decorations(true)
+        .visible(true)
         .build()
         .map_err(|e| e.to_string())?;
 
+    let _ = window.show();
+    let _ = window.set_focus();
     Ok(())
 }
 
 #[tauri::command]
-fn set_always_on_top_cmd(window: tauri::Window, always_on_top: bool) -> Result<(), String> {
+fn set_always_on_top_cmd(window: tauri::WebviewWindow, always_on_top: bool) -> Result<(), String> {
     window.set_always_on_top(always_on_top).map_err(|e| e.to_string())
 }
 
