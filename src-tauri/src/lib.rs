@@ -37,12 +37,19 @@ struct ListenSession {
     child: Child,
 }
 
+pub struct GpuPreviewEngine {
+    pub renderer: crate::gpu2d::GpuRenderer,
+    pub width: u32,
+    pub height: u32,
+}
+
 pub struct AppState {
     audio_data: Mutex<Option<Arc<AudioData>>>,
     export_session: Mutex<Option<ExportSession>>,
     listen_session: Mutex<Option<ListenSession>>,
     prev_smoothed: Mutex<Option<Vec<f32>>>,
     gpu_cancel: Mutex<Option<Arc<AtomicBool>>>,
+    pub preview_gpu: Mutex<Option<GpuPreviewEngine>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -931,6 +938,7 @@ pub fn run() {
             listen_session: Mutex::new(None),
             prev_smoothed: Mutex::new(None),
             gpu_cancel: Mutex::new(None),
+            preview_gpu: Mutex::new(None),
         })
         .invoke_handler(tauri::generate_handler![
             decode_audio,

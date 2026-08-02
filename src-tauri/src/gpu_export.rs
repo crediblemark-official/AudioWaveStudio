@@ -384,6 +384,7 @@ pub fn cancel_gpu_export(state: tauri::State<'_, crate::AppState>) {
 
 #[tauri::command]
 pub fn render_rust_preview_frame(
+  state: tauri::State<'_, crate::AppState>,
   config: VisualizerConfig,
   freq_data: Vec<u8>,
   time_data: Vec<u8>,
@@ -392,19 +393,25 @@ pub fn render_rust_preview_frame(
   height: u32,
 ) -> Result<Vec<u8>, String> {
   let bar_count = config.reactivity.bar_count.min(128);
-  let mut gpu = pollster::block_on(GpuRenderer::new(width, height))
-    .map_err(|e| format!("GPU unavailable: {}", e))?;
+  let mut lock = state.preview_gpu.lock().map_err(|e| e.to_string())?;
 
+  if lock.is_none() || lock.as_ref().unwrap().width != width || lock.as_ref().unwrap().height != height {
+    let renderer = pollster::block_on(GpuRenderer::new(width, height))
+      .map_err(|e| format!("GPU unavailable: {}", e))?;
+    *lock = Some(crate::GpuPreviewEngine { renderer, width, height });
+  }
+
+  let engine = lock.as_mut().unwrap();
   let mut rstate = RenderState::new(bar_count, 0xC0FFEE);
 
   if let Some((rgba, w, h)) = decode_background_image(config.background.custom_image_uri.as_deref()) {
-    if let Some((tw, th)) = gpu.upload_image_layer(IMAGE_LAYER, &rgba, w, h) {
+    if let Some((tw, th)) = engine.renderer.upload_image_layer(IMAGE_LAYER, &rgba, w, h) {
       rstate.background_image = Some(BackgroundImage { layer: IMAGE_LAYER, w: tw, h: th });
     }
   }
 
   if let Some((rgba, w, h)) = decode_background_image(config.background.radial_center_image_uri.as_deref()) {
-    if let Some((tw, th)) = gpu.upload_image_layer(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
+    if let Some((tw, th)) = engine.renderer.upload_image_layer(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
       rstate.radial_center_image = Some(BackgroundImage { layer: RADIAL_CENTER_IMAGE_LAYER, w: tw, h: th });
     }
   }
@@ -423,10 +430,10 @@ pub fn render_rust_preview_frame(
   );
 
   match fx {
-    Some(fx) => gpu.render_into_fx(&mesh, &fx, 0),
-    None => gpu.render_into(&mesh, 0),
+    Some(fx) => engine.renderer.render_into_fx(&mesh, &fx, 0),
+    None => engine.renderer.render_into(&mesh, 0),
   }
 
-  let rgba = gpu.readback(0);
+  let rgba = engine.renderer.readback(0);
   Ok(rgba)
 }
