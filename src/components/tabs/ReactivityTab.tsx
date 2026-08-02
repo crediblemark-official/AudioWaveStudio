@@ -43,12 +43,6 @@ export const ReactivityTab: React.FC<Props> = ({ config, updateConfig }) => {
             onChange={(e) => handleReactivityChange('peakColor', e.target.value)} />
         </div>
       )}
-
-      <div className="control-group mt-3">
-        <label className="label-row"><span>Smoothing ({config.reactivity.smoothing.toFixed(2)})</span></label>
-        <input type="range" min={0.1} max={0.95} step={0.05} value={config.reactivity.smoothing}
-          onChange={(e) => handleReactivityChange('smoothing', parseFloat(e.target.value))} className="input-range" />
-      </div>
     </div>
   );
 };

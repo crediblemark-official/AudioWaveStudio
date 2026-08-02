@@ -147,6 +147,12 @@ export const StyleTab: React.FC<Props> = ({ config, updateConfig }) => {
         </div>
       )}
 
+      <div className="control-group">
+        <label className="label-row"><span>Smoothing ({config.reactivity.smoothing.toFixed(2)})</span></label>
+        <input type="range" min={0.1} max={0.95} step={0.05} value={config.reactivity.smoothing}
+          onChange={(e) => handleReactivityChange('smoothing', parseFloat(e.target.value))} className="input-range" />
+      </div>
+
       {mirrorStyles.includes(config.style) && (
         <div className="control-group mt-2">
           <label className="checkbox-label">
