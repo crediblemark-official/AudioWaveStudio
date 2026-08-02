@@ -192,7 +192,9 @@ export class CanvasRenderer {
           .renderRustPreviewFrame(config, this.freqData, this.timeData, currentFrameTime, width, height)
           .then((rgbaBytes) => {
             if (this.ctx && rgbaBytes && rgbaBytes.length === width * height * 4) {
-              const imgData = new ImageData(new Uint8ClampedArray(rgbaBytes.buffer, rgbaBytes.byteOffset, rgbaBytes.byteLength), width, height);
+              const clamped = new Uint8ClampedArray(rgbaBytes.length);
+              clamped.set(rgbaBytes);
+              const imgData = new ImageData(clamped, width, height);
               this.ctx.putImageData(imgData, 0, 0);
             }
           })
