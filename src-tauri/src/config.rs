@@ -162,7 +162,7 @@ pub enum BackgroundFillType {
   Gradient,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq, Eq)]
 pub enum BackgroundEffect {
   #[default]
   #[serde(rename = "none")]

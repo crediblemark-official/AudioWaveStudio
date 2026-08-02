@@ -403,10 +403,16 @@ pub fn draw_frame(
   c.restore();
 
   // Particles / music notes render in screen space after the style.
-  if config.background.show_particles {
+  let active_effects = config.background.effects.as_ref().cloned().unwrap_or_else(|| {
+    config.background.effect.clone().map(|e| vec![e]).unwrap_or_default()
+  });
+  let show_p = config.background.show_particles || active_effects.contains(&BackgroundEffect::Particles);
+  let show_m = config.background.show_music_notes.unwrap_or(false) || active_effects.contains(&BackgroundEffect::MusicNotes);
+
+  if show_p {
     background::render_particles(c, &mut ctx);
   }
-  if config.background.show_music_notes.unwrap_or(false) {
+  if show_m {
     background::render_music_notes(c, &mut ctx);
   }
 
