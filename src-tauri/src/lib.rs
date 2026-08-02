@@ -910,7 +910,14 @@ fn open_detached_preview_window(app: tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn set_always_on_top_cmd(window: tauri::WebviewWindow, always_on_top: bool) -> Result<(), String> {
-    window.set_always_on_top(always_on_top).map_err(|e| e.to_string())
+    window.set_always_on_top(always_on_top).map_err(|e| e.to_string())?;
+    let _ = window.set_visible_on_all_workspaces(always_on_top);
+    if always_on_top {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
