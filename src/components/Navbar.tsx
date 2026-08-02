@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink, Maximize2, Minimize2, Info } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -139,15 +139,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             {isListening ? <StopCircle size={16} /> : <Headphones size={16} />}
             <span>{isListening ? 'Stop Listen' : 'Listen'}</span>
           </button>
-          <button
-            className="btn btn-secondary"
+          <div
+            className="crediblemark-ticker-container"
             onClick={onOpenAbout}
-            title="About AudioWave Studio & CredibleMark"
-            style={{ fontSize: 12, padding: '6px 12px', gap: 6, opacity: 0.9 }}
+            title="Klik untuk info pengembang & layanan CredibleMark (crediblemark.com)"
           >
-            <Info size={14} className="text-secondary" />
-            <span>crediblemark.com</span>
-          </button>
+            <div className="crediblemark-ticker-wrapper">
+              <span className="crediblemark-ticker-text">
+                🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
+              </span>
+            </div>
+          </div>
         </div>
 
         {showDevicePicker && (

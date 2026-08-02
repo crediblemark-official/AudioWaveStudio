@@ -89,6 +89,58 @@ html, body, #root {
   animation: pulseGlow 2s infinite ease-in-out;
 }
 
+/* CREDIBLEMARK PROMO TICKER */
+.crediblemark-ticker-container {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+  width: 320px;
+  height: 32px;
+  background: rgba(0, 229, 255, 0.06);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  border-radius: 8px;
+  padding: 0 8px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.crediblemark-ticker-container:hover {
+  background: rgba(0, 229, 255, 0.12);
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.2);
+}
+
+.crediblemark-ticker-wrapper {
+  display: flex;
+  width: 100%;
+  overflow: hidden;
+}
+
+.crediblemark-ticker-text {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 16s linear infinite;
+  font-size: 11px;
+  font-weight: 500;
+  color: #00e5ff;
+  letter-spacing: 0.2px;
+}
+
+.crediblemark-ticker-container:hover .crediblemark-ticker-text {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
 @keyframes pulseGlow {
   0%, 100% { transform: scale(1); filter: drop-shadow(0 0 4px var(--accent-cyan)); }
   50% { transform: scale(1.1); filter: drop-shadow(0 0 10px var(--accent-pink)); }
