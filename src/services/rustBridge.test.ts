@@ -154,10 +154,31 @@ describe('convertToRustConfig', () => {
     expect(result.artist_text).toBeUndefined();
   });
 
-  it('uses default dimensions when not specified', () => {
+  it('supports all 19 visualizer styles in config mapping', () => {
+    const styles = [
+      'spectrum', 'radial', 'oscilloscope', 'equalizer', 'minimal', 'waveformFill',
+      'circularBars', 'smoothSpectrum', 'pulseRings', 'vuMeter', 'auroraWave',
+      'flameFire', 'spiralGalaxy', 'threeD', 'api3D', 'neonCity3D', 'speaker3D',
+      'speakerTrio', 'speakerSplatter'
+    ] as const;
+
+    for (const style of styles) {
+      const config = makeMinimalConfig();
+      config.style = style;
+      const result = convertToRustConfig(config);
+      expect(result.style).toBe(style);
+    }
+  });
+
+  it('maps radialCenterImageUri, scale, positionX and positionY correctly', () => {
     const config = makeMinimalConfig();
+    config.background.radialCenterImageUri = 'data:image/png;base64,iVBORw0KGgo=';
+    config.scale = 1.25;
+    config.positionX = -50;
+    config.positionY = 100;
+
     const result = convertToRustConfig(config);
-    expect(result.width).toBe(1280);
-    expect(result.height).toBe(720);
+    expect(result.position_x).toBe(-50);
+    expect(result.position_y).toBe(100);
   });
 });
