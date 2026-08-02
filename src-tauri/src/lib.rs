@@ -898,7 +898,7 @@ fn open_detached_preview_window(app: tauri::AppHandle) -> Result<(), String> {
         .title("AudioWave Studio - Live Preview")
         .inner_size(1280.0, 720.0)
         .resizable(true)
-        .decorations(true)
+        .decorations(false)
         .visible(true)
         .build()
         .map_err(|e| e.to_string())?;

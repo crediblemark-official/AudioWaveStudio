@@ -117,6 +117,7 @@ const DetachedPreviewView: React.FC = () => {
 
   return (
     <div
+      data-tauri-drag-region
       style={{
         position: 'relative',
         width: '100vw',
