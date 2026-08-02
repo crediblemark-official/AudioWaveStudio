@@ -902,6 +902,44 @@ impl GpuCanvas {
     );
   }
 
+  pub fn push_circular_textured_quad(&mut self, layer: u32, cx: f32, cy: f32, r: f32, uv_bounds: [f32; 4], color: Color) {
+    if r <= 0.0 { return; }
+    let segments = 48usize;
+    let col = color.with_alpha(color.a * self.state.global_alpha);
+    let center_vt = self.state.transform.apply(cx, cy);
+    let u_center = (uv_bounds[0] + uv_bounds[2]) * 0.5;
+    let v_center = (uv_bounds[1] + uv_bounds[3]) * 0.5;
+    let u_half = (uv_bounds[2] - uv_bounds[0]) * 0.5;
+    let v_half = (uv_bounds[3] - uv_bounds[1]) * 0.5;
+
+    let center_v = Vertex::textured(center_vt, col, [u_center, v_center], layer);
+
+    let mut prev_v = {
+      let angle = 0.0f32;
+      let (sin, cos) = angle.sin_cos();
+      let px = cx + cos * r;
+      let py = cy + sin * r;
+      let pt = self.state.transform.apply(px, py);
+      let u = u_center + cos * u_half;
+      let v = v_center + sin * v_half;
+      Vertex::textured(pt, col, [u, v], layer)
+    };
+
+    for i in 1..=segments {
+      let angle = (i as f32 / segments as f32) * std::f32::consts::TAU;
+      let (sin, cos) = angle.sin_cos();
+      let px = cx + cos * r;
+      let py = cy + sin * r;
+      let pt = self.state.transform.apply(px, py);
+      let u = u_center + cos * u_half;
+      let v = v_center + sin * v_half;
+      let curr_v = Vertex::textured(pt, col, [u, v], layer);
+
+      self.push_tri(center_v, prev_v, curr_v);
+      prev_v = curr_v;
+    }
+  }
+
   pub fn push_atlas_layer(&mut self, layer: u32, rgba: Vec<u8>, w: u32, h: u32) {
     if layer >= super::renderer::TEXTURE_LAYERS {
       return;

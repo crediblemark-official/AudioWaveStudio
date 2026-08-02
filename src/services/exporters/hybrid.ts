@@ -223,8 +223,8 @@ export async function exportHybrid(
       const imageData = offCtx.getImageData(0, 0, width, height);
       await rustBridge.writeFrameRgba(width, height, new Uint8Array(imageData.data.buffer));
 
-      if (frame % 10 === 0) {
-        await new Promise((resolve) => setTimeout(resolve, 0));
+      if (frame % 30 === 0) {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
       }
 
       const pct = Math.min(100, ((frame + 1) * 100) / totalFrames);
