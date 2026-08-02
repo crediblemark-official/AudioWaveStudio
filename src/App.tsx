@@ -26,11 +26,21 @@ const DetachedPreviewView: React.FC = () => {
   const configRef = useRef<VisualizerConfig>(config);
   configRef.current = config;
 
+  const handleStartDrag = (e: React.MouseEvent) => {
+    if (e.button === 0) {
+      try {
+        getCurrentWindow().startDragging();
+      } catch (err) {
+        console.warn('[DetachedPreview] startDragging error:', err);
+      }
+    }
+  };
+
   const togglePin = async () => {
     const nextState = !isPinned;
     try {
-      await invoke('set_always_on_top_cmd', { alwaysOnTop: nextState });
-      setIsPinned(nextState);
+      const res = await invoke<boolean>('set_always_on_top_cmd', { alwaysOnTop: nextState });
+      setIsPinned(res);
     } catch {
       try {
         const win = getCurrentWindow();
@@ -118,6 +128,7 @@ const DetachedPreviewView: React.FC = () => {
   return (
     <div
       data-tauri-drag-region
+      onMouseDown={handleStartDrag}
       style={{
         position: 'relative',
         width: '100vw',
@@ -127,6 +138,8 @@ const DetachedPreviewView: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        userSelect: 'none',
+        cursor: 'grab',
       }}
       onDoubleClick={toggleFullscreen}
     >
@@ -134,9 +147,9 @@ const DetachedPreviewView: React.FC = () => {
         ref={canvasRef}
         width={1920}
         height={1080}
-        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
       />
-      <div className="canvas-overlay-controls" style={{ position: 'absolute', top: 12, right: 16, left: 'auto', display: 'flex', gap: 8, zIndex: 99 }}>
+      <div className="canvas-overlay-controls" style={{ position: 'absolute', top: 12, right: 16, left: 'auto', display: 'flex', gap: 8, zIndex: 99 }} onMouseDown={(e) => e.stopPropagation()}>
         <button
           className={`btn-fullscreen ${isPinned ? 'active' : ''}`}
           onClick={(e) => { e.stopPropagation(); togglePin(); }}

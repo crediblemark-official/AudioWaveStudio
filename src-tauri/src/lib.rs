@@ -909,15 +909,18 @@ fn open_detached_preview_window(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn set_always_on_top_cmd(window: tauri::WebviewWindow, always_on_top: bool) -> Result<(), String> {
-    window.set_always_on_top(always_on_top).map_err(|e| e.to_string())?;
+fn set_always_on_top_cmd(window: tauri::WebviewWindow, always_on_top: bool) -> Result<bool, String> {
+    let res = window.set_always_on_top(always_on_top);
     let _ = window.set_visible_on_all_workspaces(always_on_top);
     if always_on_top {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
-    Ok(())
+    if let Err(e) = res {
+        eprintln!("[Rust] set_always_on_top error: {:?}", e);
+    }
+    Ok(always_on_top)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
