@@ -973,7 +973,6 @@ pub struct Mesh {
   pub atlases: Vec<AtlasUpload>,
 }
 
-#[cfg(test)]
 impl Mesh {
   pub fn is_empty(&self) -> bool {
     self.idx.is_empty()

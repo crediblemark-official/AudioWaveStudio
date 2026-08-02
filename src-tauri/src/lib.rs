@@ -1,11 +1,11 @@
-mod audio_decoder;
-mod config;
-mod ffmpeg;
-mod fft_analyzer;
-mod gpu2d;
-mod gpu_export;
-mod hardware;
-mod renderers;
+pub mod audio_decoder;
+pub mod config;
+pub mod ffmpeg;
+pub mod fft_analyzer;
+pub mod gpu2d;
+pub mod gpu_export;
+pub mod hardware;
+pub mod renderers;
 
 use audio_decoder::AudioData;
 use base64::{engine::general_purpose, Engine as _};
@@ -37,7 +37,7 @@ struct ListenSession {
     child: Child,
 }
 
-pub(crate) struct AppState {
+pub struct AppState {
     audio_data: Mutex<Option<Arc<AudioData>>>,
     export_session: Mutex<Option<ExportSession>>,
     listen_session: Mutex<Option<ListenSession>>,

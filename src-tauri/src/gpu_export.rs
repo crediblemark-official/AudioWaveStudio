@@ -7,7 +7,7 @@ use crate::audio_decoder::AudioData;
 use crate::config::{ExportResolution, ExportSettings, VisualizerConfig};
 use crate::ffmpeg::resolve_ffmpeg;
 use crate::fft_analyzer::FftAnalyzer;
-use crate::gpu2d::{GpuCanvas, GpuRenderer, IMAGE_LAYER};
+use crate::gpu2d::{GpuCanvas, GpuRenderer, IMAGE_LAYER, RADIAL_CENTER_IMAGE_LAYER};
 use crate::renderers::{draw_frame, BackgroundImage, RenderState};
 use base64::{Engine as _, engine::general_purpose};
 use serde::Serialize;
@@ -223,6 +223,13 @@ pub async fn export_gpu(
       }
     }
 
+    // Radial center image: decode once, upload to a persistent atlas layer.
+    if let Some((rgba, w, h)) = decode_background_image(config.background.radial_center_image_uri.as_deref()) {
+      if let Some((tw, th)) = gpu.upload_image_layer(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
+        rstate.radial_center_image = Some(BackgroundImage { layer: RADIAL_CENTER_IMAGE_LAYER, w: tw, h: th });
+      }
+    }
+
     // Pipe raw RGBA frames to FFmpeg on a writer thread so the GPU can keep
     // rendering the next frame while FFmpeg consumes the current one.
     let mut stdin = child.stdin.take().ok_or_else(|| "No ffmpeg stdin".to_string())?;
@@ -258,7 +265,18 @@ pub async fn export_gpu(
       draw_frame(&mut canvas, &mut rstate, &config, &freq_u8, &time_u8, time_sec as f32);
       let mesh = canvas.finish();
 
-      gpu.render_into(&mesh, slot);
+      let above_floor = (rstate.bass_energy - rstate.bass_floor).max(0.0);
+      let fx = crate::renderers::screen_effects::post_fx(
+        &mut rstate.screen_fx,
+        &config.screen_effects,
+        above_floor,
+        rstate.beat_strength,
+        time_sec as f32,
+      );
+      match fx {
+        Some(fx) => gpu.render_into_fx(&mesh, &fx, slot),
+        None => gpu.render_into(&mesh, slot),
+      }
       Ok(())
     };
 

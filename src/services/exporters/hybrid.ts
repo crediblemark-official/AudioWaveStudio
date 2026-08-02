@@ -32,9 +32,9 @@ const GPU_STYLES = new Set([
   'speakerSplatter',
 ]);
 
-// Screen effects reproducible by the single-pass mesh pipeline. The rest
-// (glitch, chromatic, zoom, bars, shockwave, pixelate, tilt, heatHaze, invert)
-// need frame snapshots / post-processing and stay canvas-only.
+// Screen effects reproducible in the GPU export path. The single-pass mesh
+// pipeline covers shake/vignette/pulse/spotlight/strobe/scanline/hueShift;
+// the rest run through the Rust post-processing pass in gpu_export.rs.
 const GPU_SCREEN_EFFECTS = new Set([
   'shake',
   'vignette',
@@ -43,11 +43,19 @@ const GPU_SCREEN_EFFECTS = new Set([
   'strobe',
   'scanline',
   'hueShift',
+  'glitch',
+  'chromatic',
+  'zoom',
+  'invert',
+  'bars',
+  'shockwave',
+  'pixelate',
+  'tilt',
+  'heatHaze',
 ]);
 
-function canUseGpuExport(config: VisualizerConfig): boolean {
+export function canUseGpuExport(config: VisualizerConfig): boolean {
   if (!GPU_STYLES.has(config.style)) return false;
-  if (config.background.radialCenterImageUri) return false;
   if (config.screenEffects.enabled && !GPU_SCREEN_EFFECTS.has(config.screenEffects.mainEffect)) return false;
   return true;
 }

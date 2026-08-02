@@ -120,15 +120,37 @@ pub fn radial(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let bar_count = ctx.config.reactivity.bar_count.min(96);
   let sensitivity = ctx.config.reactivity.sensitivity;
 
-  // Center disc (clipped to circle; fallback path when no center image).
-  c.save();
-  let disc_grad = Fill::radial_gradient(center_x, center_y, 5.0, center_x, center_y, base_radius, &[
-    (0.0, theme_primary(theme)),
-    (1.0, theme_secondary(theme)),
-  ]);
-  c.set_fill(disc_grad);
-  c.fill_circle(center_x, center_y, (base_radius - 5.0).max(0.0));
-  c.restore();
+  if let Some(img) = &ctx.state.radial_center_image {
+    let img_size = (base_radius - 5.0).max(0.0) * 2.0;
+    let (iw, ih) = (img.w as f32, img.h as f32);
+    if iw > 0.0 && ih > 0.0 {
+      let s = (img_size / iw).min(img_size / ih);
+      let w = iw * s;
+      let h = ih * s;
+      let ox = center_x - w / 2.0;
+      let oy = center_y - h / 2.0;
+      let layer_size = crate::gpu2d::LAYER_SIZE as f32;
+      c.push_textured_quad(
+        img.layer,
+        ox,
+        oy,
+        w,
+        h,
+        [0.0, 0.0, iw / layer_size, ih / layer_size],
+        Color::rgba(1.0, 1.0, 1.0, 1.0),
+      );
+    }
+  } else {
+    // Center disc (fallback path when no center image).
+    c.save();
+    let disc_grad = Fill::radial_gradient(center_x, center_y, 5.0, center_x, center_y, base_radius, &[
+      (0.0, theme_primary(theme)),
+      (1.0, theme_secondary(theme)),
+    ]);
+    c.set_fill(disc_grad);
+    c.fill_circle(center_x, center_y, (base_radius - 5.0).max(0.0));
+    c.restore();
+  }
 
   // Outer ring.
   c.save();

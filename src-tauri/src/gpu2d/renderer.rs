@@ -11,8 +11,36 @@ pub const GLYPH_LAYER: u32 = 0;
 pub const IMAGE_LAYER: u32 = 20;
 /// Per-frame layer used for the film-grain noise tile.
 pub const NOISE_LAYER: u32 = 21;
+/// Persistent layer used for the radial center image.
+pub const RADIAL_CENTER_IMAGE_LAYER: u32 = 22;
 
 const SHADER_SRC: &str = include_str!("shader.wgsl");
+const POST_FX_SRC: &str = include_str!("postfx.wgsl");
+
+/// Parameters for a post-processing pass (screen effects that sample the frame).
+#[derive(Clone, Copy, Debug)]
+pub struct PostFx {
+  /// Effect id: 1 = glitch, 2 = chromatic, 3 = zoom, 4 = invert,
+  /// 5 = bars, 6 = shockwave, 7 = pixelate, 8 = tilt, 9 = heat haze.
+  pub mode: u32,
+  pub intensity: f32,
+  /// Seconds since export start.
+  pub time: f32,
+  /// 0..=1 energy of the current beat, decays between beats.
+  pub beat: f32,
+}
+
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[repr(C)]
+struct RawFxParams {
+  mode: u32,
+  intensity: f32,
+  time: f32,
+  beat: f32,
+  width: f32,
+  height: f32,
+  pad: [f32; 3],
+}
 
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
 #[repr(C)]
@@ -65,6 +93,12 @@ pub struct GpuRenderer {
   pipeline: wgpu::RenderPipeline,
   width: u32,
   height: u32,
+  // Post-processing pass (screen effects that need frame sampling).
+  post_texture: wgpu::Texture,
+  post_texture_view: wgpu::TextureView,
+  post_pipeline: wgpu::RenderPipeline,
+  post_params_buf: wgpu::Buffer,
+  post_bind_group: wgpu::BindGroup,
 }
 
 impl GpuRenderer {
@@ -102,7 +136,9 @@ impl GpuRenderer {
       sample_count: 1,
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::Rgba8Unorm,
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT
+        | wgpu::TextureUsages::COPY_SRC
+        | wgpu::TextureUsages::TEXTURE_BINDING,
       view_formats: &[],
     });
     let texture_view = texture.create_view(&Default::default());
@@ -228,6 +264,124 @@ impl GpuRenderer {
       cache: None,
     });
 
+    // --- Post-processing pass (frame-sampling screen effects) ---
+    let post_texture = device.create_texture(&wgpu::TextureDescriptor {
+      label: Some("Post Frame"),
+      size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+      mip_level_count: 1,
+      sample_count: 1,
+      dimension: wgpu::TextureDimension::D2,
+      format: wgpu::TextureFormat::Rgba8Unorm,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      view_formats: &[],
+    });
+    let post_texture_view = post_texture.create_view(&Default::default());
+
+    let post_sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+      label: Some("Post Sampler"),
+      address_mode_u: wgpu::AddressMode::ClampToEdge,
+      address_mode_v: wgpu::AddressMode::ClampToEdge,
+      address_mode_w: wgpu::AddressMode::ClampToEdge,
+      mag_filter: wgpu::FilterMode::Linear,
+      min_filter: wgpu::FilterMode::Linear,
+      mipmap_filter: wgpu::FilterMode::Nearest,
+      ..Default::default()
+    });
+
+    let post_shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+      label: Some("postfx"),
+      source: wgpu::ShaderSource::Wgsl(POST_FX_SRC.into()),
+    });
+    let post_bgl = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      label: Some("PostBGL"),
+      entries: &[
+        wgpu::BindGroupLayoutEntry {
+          binding: 0,
+          visibility: wgpu::ShaderStages::FRAGMENT,
+          ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+          count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+          binding: 1,
+          visibility: wgpu::ShaderStages::FRAGMENT,
+          ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+          },
+          count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+          binding: 2,
+          visibility: wgpu::ShaderStages::FRAGMENT,
+          ty: wgpu::BindingType::Buffer {
+            ty: wgpu::BufferBindingType::Uniform,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+          },
+          count: None,
+        },
+      ],
+    });
+    let post_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      label: Some("PostPL"),
+      bind_group_layouts: &[&post_bgl],
+      push_constant_ranges: &[],
+    });
+    let post_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+      label: Some("postfx pipeline"),
+      layout: Some(&post_pipeline_layout),
+      vertex: wgpu::VertexState {
+        module: &post_shader,
+        entry_point: Some("vs_main"),
+        buffers: &[],
+        compilation_options: Default::default(),
+      },
+      fragment: Some(wgpu::FragmentState {
+        module: &post_shader,
+        entry_point: Some("fs_main"),
+        targets: &[Some(wgpu::ColorTargetState {
+          format: wgpu::TextureFormat::Rgba8Unorm,
+          blend: None,
+          write_mask: wgpu::ColorWrites::ALL,
+        })],
+        compilation_options: Default::default(),
+      }),
+      primitive: wgpu::PrimitiveState {
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        ..Default::default()
+      },
+      depth_stencil: None,
+      multisample: wgpu::MultisampleState::default(),
+      multiview: None,
+      cache: None,
+    });
+
+    let post_params_buf = device.create_buffer(&wgpu::BufferDescriptor {
+      label: Some("Post Params"),
+      size: std::mem::size_of::<RawFxParams>() as u64,
+      usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+      mapped_at_creation: false,
+    });
+    let post_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+      label: Some("PostBG"),
+      layout: &post_bgl,
+      entries: &[
+        wgpu::BindGroupEntry {
+          binding: 0,
+          resource: wgpu::BindingResource::Sampler(&post_sampler),
+        },
+        wgpu::BindGroupEntry {
+          binding: 1,
+          resource: wgpu::BindingResource::TextureView(&texture_view),
+        },
+        wgpu::BindGroupEntry {
+          binding: 2,
+          resource: post_params_buf.as_entire_binding(),
+        },
+      ],
+    });
+
     Ok(Self {
       device,
       queue,
@@ -244,6 +398,11 @@ impl GpuRenderer {
       pipeline,
       width,
       height,
+      post_texture,
+      post_texture_view,
+      post_pipeline,
+      post_params_buf,
+      post_bind_group,
     })
   }
 
@@ -500,52 +659,47 @@ impl GpuRenderer {
     }
   }
 
-  /// Upload atlases, build the frame geometry and submit a render pass that
-  /// copies the result into `staging[slot]`. Never blocks; the matching
-  /// `readback` call waits only for that slot.
-  pub fn render_into(&mut self, mesh: &Mesh, slot: usize) {
+  /// Record the scene pass: upload atlases, build geometry and draw the frame
+  /// into `self.texture`. Caller submits the encoder after adding copies/post.
+  fn record_scene(&mut self, enc: &mut wgpu::CommandEncoder, mesh: &Mesh) {
     for atlas in &mesh.atlases {
       self.upload_layer(atlas.layer, &atlas.rgba, atlas.width, atlas.height);
     }
     self.ensure_geometry(mesh);
 
     let clear = mesh.clear;
-    let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("frame enc"),
+    let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+      label: Some("gpu2d pass"),
+      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        view: &self.texture_view,
+        resolve_target: None,
+        ops: wgpu::Operations {
+          load: wgpu::LoadOp::Clear(wgpu::Color {
+            r: clear.r as f64,
+            g: clear.g as f64,
+            b: clear.b as f64,
+            a: clear.a as f64,
+          }),
+          store: wgpu::StoreOp::Store,
+        },
+      })],
+      depth_stencil_attachment: None,
+      ..Default::default()
     });
 
-    {
-      let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("gpu2d pass"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-          view: &self.texture_view,
-          resolve_target: None,
-          ops: wgpu::Operations {
-            load: wgpu::LoadOp::Clear(wgpu::Color {
-              r: clear.r as f64,
-              g: clear.g as f64,
-              b: clear.b as f64,
-              a: clear.a as f64,
-            }),
-            store: wgpu::StoreOp::Store,
-          },
-        })],
-        depth_stencil_attachment: None,
-        ..Default::default()
-      });
-
-      if !mesh.idx.is_empty() {
-        pass.set_pipeline(&self.pipeline);
-        pass.set_bind_group(0, &self.bind_group, &[]);
-        pass.set_vertex_buffer(0, self.vert_buf.as_ref().unwrap().slice(..));
-        pass.set_index_buffer(self.idx_buf.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint32);
-        pass.draw_indexed(0..mesh.idx.len() as u32, 0, 0..1);
-      }
+    if !mesh.idx.is_empty() {
+      pass.set_pipeline(&self.pipeline);
+      pass.set_bind_group(0, &self.bind_group, &[]);
+      pass.set_vertex_buffer(0, self.vert_buf.as_ref().unwrap().slice(..));
+      pass.set_index_buffer(self.idx_buf.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint32);
+      pass.draw_indexed(0..mesh.idx.len() as u32, 0, 0..1);
     }
+  }
 
+  fn copy_to_staging(&self, enc: &mut wgpu::CommandEncoder, slot: usize, tex: &wgpu::Texture) {
     enc.copy_texture_to_buffer(
       wgpu::ImageCopyTexture {
-        texture: &self.texture,
+        texture: tex,
         mip_level: 0,
         origin: wgpu::Origin3d::ZERO,
         aspect: wgpu::TextureAspect::All,
@@ -560,7 +714,62 @@ impl GpuRenderer {
       },
       wgpu::Extent3d { width: self.width, height: self.height, depth_or_array_layers: 1 },
     );
+  }
 
+  /// Upload atlases, build the frame geometry and submit a render pass that
+  /// copies the result into `staging[slot]`. Never blocks; the matching
+  /// `readback` call waits only for that slot.
+  pub fn render_into(&mut self, mesh: &Mesh, slot: usize) {
+    let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("frame enc"),
+    });
+    self.record_scene(&mut enc, mesh);
+    self.copy_to_staging(&mut enc, slot, &self.texture);
+    self.queue.submit(std::iter::once(enc.finish()));
+  }
+
+  /// Like `render_into`, but run the frame through the post-processing
+  /// pipeline first (screen effects that sample the frame) and copy the
+  /// post-pass result into `staging[slot]`.
+  pub fn render_into_fx(&mut self, mesh: &Mesh, fx: &PostFx, slot: usize) {
+    let params = RawFxParams {
+      mode: fx.mode,
+      intensity: fx.intensity,
+      time: fx.time,
+      beat: fx.beat,
+      width: self.width as f32,
+      height: self.height as f32,
+      pad: [0.0, 0.0, 0.0],
+    };
+    self
+      .queue
+      .write_buffer(&self.post_params_buf, 0, bytemuck::bytes_of(&params));
+
+    let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("frame fx enc"),
+    });
+    self.record_scene(&mut enc, mesh);
+
+    {
+      let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("postfx pass"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+          view: &self.post_texture_view,
+          resolve_target: None,
+          ops: wgpu::Operations {
+            load: wgpu::LoadOp::Load,
+            store: wgpu::StoreOp::Store,
+          },
+        })],
+        depth_stencil_attachment: None,
+        ..Default::default()
+      });
+      pass.set_pipeline(&self.post_pipeline);
+      pass.set_bind_group(0, &self.post_bind_group, &[]);
+      pass.draw(0..3, 0..1);
+    }
+
+    self.copy_to_staging(&mut enc, slot, &self.post_texture);
     self.queue.submit(std::iter::once(enc.finish()));
   }
 
@@ -587,13 +796,11 @@ impl GpuRenderer {
     data
   }
 
-  #[cfg(test)]
   pub fn render(&mut self, mesh: &Mesh) -> Vec<u8> {
     self.render_into(mesh, 0);
     self.readback(0)
   }
 
-  #[cfg(test)]
   pub fn jpeg(&mut self, mesh: &Mesh) -> Result<Vec<u8>, String> {
     let rgba = self.render(mesh);
     self.rgba_to_jpeg(&rgba)
@@ -621,7 +828,6 @@ impl GpuRenderer {
     out
   }
 
-  #[cfg(test)]
   pub fn rgba_to_jpeg(&self, rgba: &[u8]) -> Result<Vec<u8>, String> {
     let mut rgb = Vec::with_capacity(rgba.len() / 4 * 3);
     for px in rgba.chunks_exact(4) {

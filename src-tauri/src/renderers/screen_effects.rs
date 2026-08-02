@@ -8,6 +8,7 @@
 
 use super::{hsl_to_color, RenderContext};
 use crate::config::{ScreenEffect, ScreenEffectsSettings};
+use crate::gpu2d::renderer::PostFx;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 
 /// Per-session screen-effect state (mirrors the TS module-level vars).
@@ -16,6 +17,8 @@ pub struct ScreenFxState {
   pub shake_bucket: i64,
   pub shake_x: f32,
   pub shake_y: f32,
+  pub prev_beat_high: bool,
+  pub shock_start: f32,
 }
 
 impl ScreenFxState {
@@ -24,6 +27,8 @@ impl ScreenFxState {
       shake_bucket: -1,
       shake_x: 0.0,
       shake_y: 0.0,
+      prev_beat_high: false,
+      shock_start: -1e9,
     }
   }
 }
@@ -79,6 +84,72 @@ pub fn compute_shake_offset(
     state.shake_y = angle.sin() * dist;
   }
   (state.shake_x, state.shake_y)
+}
+
+/// Computes the post-processing pass parameters for frame-sampling screen
+/// effects (glitch, chromatic, zoom, invert, bars, shockwave, pixelate, tilt,
+/// heatHaze). Returns `None` when the effect is inactive or below threshold,
+/// mirroring the per-effect early-outs in `screenEffects.ts`.
+pub fn post_fx(
+  state: &mut ScreenFxState,
+  settings: &ScreenEffectsSettings,
+  use_be: f32,
+  beat: f32,
+  frame_time: f32,
+) -> Option<PostFx> {
+  if !settings.enabled {
+    return None;
+  }
+  let mode = match settings.main_effect {
+    ScreenEffect::Glitch => 1,
+    ScreenEffect::Chromatic => 2,
+    ScreenEffect::Zoom => 3,
+    ScreenEffect::Invert => 4,
+    ScreenEffect::Bars => 5,
+    ScreenEffect::Shockwave => 6,
+    ScreenEffect::Pixelate => 7,
+    ScreenEffect::Tilt => 8,
+    ScreenEffect::HeatHaze => 9,
+    _ => return None,
+  };
+  let eff_beat = |v: f32| if beat > 0.15 { v * beat } else { 0.0 };
+  let intensity = match settings.main_effect {
+    ScreenEffect::Glitch => settings.glitch_intensity * use_be * 0.8 + eff_beat(settings.glitch_intensity * 8.0),
+    ScreenEffect::Chromatic => settings.chromatic_intensity * use_be * 0.5 + eff_beat(settings.chromatic_intensity),
+    ScreenEffect::Zoom => settings.zoom_intensity * use_be * 0.5 + eff_beat(settings.zoom_intensity),
+    ScreenEffect::Invert => {
+      let amount = (settings.invert_intensity * use_be * 0.4 + eff_beat(settings.invert_intensity)) * 2.0;
+      return if amount < 0.05 { None } else { Some(PostFx { mode, intensity: amount.min(1.0), time: frame_time, beat }) };
+    }
+    ScreenEffect::Bars => (settings.bars_amount * use_be * 0.3 + eff_beat(settings.bars_amount)).min(0.5),
+    ScreenEffect::Shockwave => {
+      let beat_high = beat > 0.15;
+      if beat_high && !state.prev_beat_high {
+        state.shock_start = frame_time * 1000.0;
+      }
+      state.prev_beat_high = beat_high;
+      let elapsed = (frame_time * 1000.0 - state.shock_start) / 650.0;
+      if elapsed < 0.0 || elapsed >= 1.0 {
+        return None;
+      }
+      settings.shockwave_intensity * (1.0 - elapsed) * 1.1
+    }
+    ScreenEffect::Pixelate => settings.pixelate_intensity * use_be * 0.4 + eff_beat(settings.pixelate_intensity),
+    ScreenEffect::Tilt => settings.tilt_intensity * use_be * 0.4 + eff_beat(settings.tilt_intensity),
+    ScreenEffect::HeatHaze => settings.heat_haze_intensity * use_be * 0.3 + eff_beat(settings.heat_haze_intensity),
+    _ => return None,
+  };
+  let threshold = match mode {
+    1 => 0.05,
+    2 => 0.03,
+    3 => 0.01,
+    5 => 0.01,
+    _ => 0.02,
+  };
+  if intensity < threshold {
+    return None;
+  }
+  Some(PostFx { mode, intensity, time: frame_time, beat })
 }
 
 /// Draws the overlay-style screen effects (applied after text, mirroring

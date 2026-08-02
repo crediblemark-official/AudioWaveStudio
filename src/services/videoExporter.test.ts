@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getExportDimensions } from './videoExporter';
+import { canUseGpuExport } from './exporters/hybrid';
 import { createTextBlock } from '../utils/presets';
 import type { VisualizerConfig } from '../types/visualizer';
 
@@ -116,5 +117,28 @@ describe('getExportDimensions', () => {
   it('4K 1:1 square', () => {
     const config = makeConfig({ export: { aspectRatio: '1:1', resolution: '4K', fps: 60, format: 'mp4' } });
     expect(getExportDimensions(config)).toEqual({ width: 3840, height: 3840 });
+  });
+});
+
+describe('canUseGpuExport', () => {
+  it('returns true for supported style and default settings', () => {
+    const config = makeConfig({ style: 'radial' });
+    expect(canUseGpuExport(config)).toBe(true);
+  });
+
+  it('returns true when radialCenterImageUri is set', () => {
+    const config = makeConfig({
+      style: 'radial',
+      background: { ...makeConfig().background, radialCenterImageUri: 'data:image/png;base64,iVBORw0KGgo=' },
+    });
+    expect(canUseGpuExport(config)).toBe(true);
+  });
+
+  it('returns true for ported screen effects like glitch, heatHaze, chromatic', () => {
+    const config = makeConfig({
+      style: 'spectrum',
+      screenEffects: { ...makeConfig().screenEffects, enabled: true, mainEffect: 'glitch' },
+    });
+    expect(canUseGpuExport(config)).toBe(true);
   });
 });
