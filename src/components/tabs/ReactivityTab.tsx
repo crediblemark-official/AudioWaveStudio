@@ -49,27 +49,6 @@ export const ReactivityTab: React.FC<Props> = ({ config, updateConfig }) => {
         <input type="range" min={0.1} max={0.95} step={0.05} value={config.reactivity.smoothing}
           onChange={(e) => handleReactivityChange('smoothing', parseFloat(e.target.value))} className="input-range" />
       </div>
-
-      {config.style === 'spectrum' && (
-        <>
-          <div className="control-group mt-3">
-            <label className="label-row"><span>Bar Gap ({config.reactivity.barGap}px)</span></label>
-            <input type="range" min={0} max={20} step={1} value={config.reactivity.barGap}
-              onChange={(e) => handleReactivityChange('barGap', parseInt(e.target.value))} className="input-range" />
-          </div>
-          <div className="control-group">
-            <label className="label-row"><span>Bar Width ({config.reactivity.barWidth}px)</span></label>
-            <input type="range" min={2} max={40} step={1} value={config.reactivity.barWidth}
-              onChange={(e) => handleReactivityChange('barWidth', parseInt(e.target.value))} className="input-range" />
-          </div>
-          <div className="control-group">
-            <label className="label-row"><span>Bar Rounding ({config.reactivity.barRounding}px)</span></label>
-            <input type="range" min={0} max={20} step={1} value={config.reactivity.barRounding}
-              onChange={(e) => handleReactivityChange('barRounding', parseInt(e.target.value))} className="input-range" />
-          </div>
-        </>
-      )}
-
     </div>
   );
 };
