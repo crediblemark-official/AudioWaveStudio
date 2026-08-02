@@ -145,6 +145,48 @@ fn draw_line(
   c.draw_text(text, anchor_x, y, font_size, family, weight, align_of(align), fill, opacity, &opts);
 }
 
+fn wrap_text(
+  text: &str,
+  max_width_px: f32,
+  family: &str,
+  weight: f32,
+  font_size: f32,
+  letter_spacing: f32,
+) -> Vec<String> {
+  let paragraphs = text.split('\n');
+  let mut lines: Vec<String> = Vec::new();
+  let font = text::select_font(family, weight);
+  for paragraph in paragraphs {
+    if paragraph.is_empty() {
+      lines.push(String::new());
+      continue;
+    }
+    if max_width_px <= 0.0 || font.is_none() {
+      lines.push(paragraph.to_string());
+      continue;
+    }
+    let font_ref = font.unwrap();
+    let words: Vec<&str> = paragraph.split_whitespace().collect();
+    let mut current_line = String::new();
+    for word in words {
+      let candidate = if current_line.is_empty() {
+        word.to_string()
+      } else {
+        format!("{} {}", current_line, word)
+      };
+      let width = text::measure(font_ref, &candidate, font_size, letter_spacing);
+      if current_line.is_empty() || width <= max_width_px {
+        current_line = candidate;
+      } else {
+        lines.push(current_line);
+        current_line = word.to_string();
+      }
+    }
+    lines.push(current_line);
+  }
+  lines
+}
+
 fn draw_block(
   c: &mut GpuCanvas,
   width: f32,
@@ -166,6 +208,11 @@ fn draw_block(
     &block.font_family
   };
   let line_height = font_size * block.line_height.max(0.1);
+  let max_width_px = if block.max_width > 0.0 {
+    (block.max_width / 100.0) * width
+  } else {
+    0.0
+  };
 
   let text = apply_transform(&block.text, &block.transform);
   let opacity = block.opacity * (if block.fade_in { global_fade } else { 1.0 });
@@ -176,8 +223,10 @@ fn draw_block(
   let anchor_x = (block.position_x / 100.0) * width;
   let anchor_y = (block.position_y / 100.0) * height;
 
+  let lines = wrap_text(&text, max_width_px, family, block.font_weight, font_size, block.letter_spacing);
+
   let mut char_index = 0usize;
-  for (i, line) in text.split('\n').enumerate() {
+  for (i, line) in lines.iter().enumerate() {
     if line.is_empty() {
       char_index += 1;
       continue;
