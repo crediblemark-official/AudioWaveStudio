@@ -201,18 +201,6 @@ export const BackgroundTab: React.FC<Props> = ({ config, updateConfig }) => {
               className="input-range"
             />
           </div>
-          <div className="control-group mt-2">
-            <label className="label-row"><span>Background Blur ({config.background.blurAmount || 0}px)</span></label>
-            <input
-              type="range"
-              min={0}
-              max={20}
-              step={1}
-              value={config.background.blurAmount || 0}
-              onChange={(e) => updateConfig((prev) => ({ ...prev, background: { ...prev.background, blurAmount: parseInt(e.target.value) } }))}
-              className="input-range"
-            />
-          </div>
         </>
       )}
 
