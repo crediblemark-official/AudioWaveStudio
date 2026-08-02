@@ -1576,7 +1576,7 @@ pub fn speaker_splatter(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
   };
 
-  c.set_shadow(p, 30.0);
+  c.set_shadow(Color::TRANSPARENT, 0.0);
   for k in 1..=4 {
     let radius = base_r * (1.0 + k as f32 * 0.35) * pulse;
     let spread = (TAU * 0.30) * wide;
@@ -1594,7 +1594,6 @@ pub fn speaker_splatter(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     );
   }
 
-  c.set_shadow(s, 30.0);
   for k in 1..=4 {
     let radius = base_r * (1.0 + k as f32 * 0.35) * pulse;
     let spread = (TAU * 0.28) * wide;
@@ -1612,7 +1611,6 @@ pub fn speaker_splatter(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     );
   }
 
-  c.set_shadow(a, 30.0);
   for k in 1..=3 {
     let radius = base_r * (1.1 + k as f32 * 0.38) * pulse;
     let spread = (TAU * 0.23) * wide;

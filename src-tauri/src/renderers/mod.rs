@@ -224,8 +224,7 @@ fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
 
   // Custom background image (cover-fit, mirrors canvas drawCoverImage).
   if let Some(img) = &ctx.state.background_image {
-    let default_opacity = if matches!(bg.mode, crate::config::BackgroundMode::CustomImage) { 1.0 } else { 0.7 };
-    let alpha = bg.image_opacity.unwrap_or(default_opacity).clamp(0.0, 1.0);
+    let alpha = bg.image_opacity.unwrap_or(1.0).clamp(0.0, 1.0);
     let (iw, ih) = (img.w as f32, img.h as f32);
     let img_ratio = iw / ih;
     let canvas_ratio = ctx.width / ctx.height;
