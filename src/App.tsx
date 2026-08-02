@@ -5,6 +5,7 @@ import { AudioPlayerBar } from './components/AudioPlayerBar';
 import { ControlPanel } from './components/ControlPanel';
 import { ExportModal } from './components/ExportModal';
 import { HardwareModal } from './components/HardwareModal';
+import { AboutModal } from './components/AboutModal';
 import { PRESETS, migrateTextSettings, loadSavedConfig, saveConfig } from './utils/presets';
 import { SongMetadata, VisualizerConfig } from './types/visualizer';
 import { rustBridge } from './services/rustBridge';
@@ -192,6 +193,7 @@ export const App: React.FC = () => {
   const [songMeta, setSongMeta] = useState<SongMetadata | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isHardwareModalOpen, setIsHardwareModalOpen] = useState<boolean>(false);
+  const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
   const [isListening, setIsListening] = useState<boolean>(false);
@@ -400,6 +402,7 @@ export const App: React.FC = () => {
         songMeta={songMeta}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
+        onOpenAbout={() => setIsAboutModalOpen(true)}
         onLoadSong={handleLoadSong}
         onLoadSongPath={handleLoadSongPath}
         onApplyPreset={handleApplyPreset}
@@ -445,6 +448,11 @@ export const App: React.FC = () => {
       <HardwareModal
         isOpen={isHardwareModalOpen}
         onClose={() => setIsHardwareModalOpen(false)}
+      />
+
+      <AboutModal
+        isOpen={isAboutModalOpen}
+        onClose={() => setIsAboutModalOpen(false)}
       />
     </div>
   );

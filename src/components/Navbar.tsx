@@ -14,6 +14,7 @@ interface NavbarProps {
   songMeta: SongMetadata | null;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
+  onOpenAbout?: () => void;
   onLoadSong: (file: File) => void;
   onLoadSongPath: (path: string) => void;
   onApplyPreset: (presetId: string) => void;
@@ -31,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   songMeta,
   isFullscreen,
   onToggleFullscreen,
+  onOpenAbout,
   onLoadSong,
   onLoadSongPath,
   onApplyPreset,
@@ -102,13 +104,18 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="navbar" data-tauri-drag-region>
       <div className="navbar-left">
-        <div className="brand">
+        <div className="brand" onClick={onOpenAbout} style={{ cursor: 'pointer' }} title="About AudioWave Studio & CredibleMark">
           <div className="brand-icon">
             <Activity className="icon-pulse" size={24} />
           </div>
           <div className="brand-text">
             <span className="brand-name">AudioWave</span>
-            <span className="brand-tag">Studio</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <span className="brand-tag">Studio</span>
+              <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: 4, textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
+                by crediblemark.com
+              </span>
+            </div>
           </div>
         </div>
 
