@@ -3,16 +3,14 @@
 //! Phase 4/5: frequency/time-domain renderers + complex particle & 3D-style
 //! renderers. Background/screen effects are Phase 6 (structured hooks below).
 
-mod advanced;
+pub mod advanced;
 mod background;
-mod effects;
 pub mod screen_effects;
-mod spectral;
+mod styles;
 mod text;
 
 use crate::config::{
   AudioReactivitySettings, BackgroundEffect, BackgroundFillType, ColorTheme, VisualizerConfig,
-  VisualizerStyle,
 };
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 
@@ -299,27 +297,7 @@ fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
 // ---------------------------------------------------------------------------
 
 pub fn render_style(c: &mut GpuCanvas, ctx: &mut RenderContext) {
-  match &ctx.config.style {
-    VisualizerStyle::Spectrum => spectral::spectrum_bars(c, ctx),
-    VisualizerStyle::Radial => spectral::radial(c, ctx),
-    VisualizerStyle::Oscilloscope => spectral::oscilloscope(c, ctx),
-    VisualizerStyle::Equalizer => spectral::equalizer_matrix(c, ctx),
-    VisualizerStyle::Minimal => spectral::minimal_wave(c, ctx),
-    VisualizerStyle::WaveformFill => spectral::waveform_fill(c, ctx),
-    VisualizerStyle::CircularBars => spectral::circular_bars(c, ctx),
-    VisualizerStyle::SmoothSpectrum => spectral::smooth_spectrum(c, ctx),
-    VisualizerStyle::PulseRings => effects::pulse_rings(c, ctx),
-    VisualizerStyle::VuMeter => effects::vu_meter(c, ctx),
-    VisualizerStyle::AuroraWave => effects::aurora_wave(c, ctx),
-    VisualizerStyle::FlameFire => advanced::flame_fire(c, ctx),
-    VisualizerStyle::SpiralGalaxy => advanced::spiral_galaxy(c, ctx),
-    VisualizerStyle::ThreeD => advanced::three_d(c, ctx),
-    VisualizerStyle::Api3D => advanced::api_3d(c, ctx),
-    VisualizerStyle::NeonCity3D => advanced::neon_city_3d(c, ctx),
-    VisualizerStyle::Speaker3D => advanced::speaker_3d(c, ctx),
-    VisualizerStyle::SpeakerTrio => advanced::speaker_trio(c, ctx),
-    VisualizerStyle::SpeakerSplatter => advanced::speaker_splatter(c, ctx),
-  }
+  styles::render_style(&ctx.config.style, c, ctx);
 }
 
 // ---------------------------------------------------------------------------

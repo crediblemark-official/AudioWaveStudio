@@ -1,14 +1,4 @@
-//! Phase 5: complex particle + 3D-style renderers.
-//! Submodules for particles (flame_fire, spiral_galaxy), 3D perspective grids
-//! (three_d, api_3d, neon_city_3d), and speaker woofers (speaker_3d, speaker_trio, speaker_splatter).
-
-pub mod particles;
-pub mod speakers;
-pub mod three_d;
-
-pub use particles::*;
-pub use speakers::*;
-pub use three_d::*;
+//! Shared state structs and helper functions for complex visualizer styles.
 
 use crate::gpu2d::{Color, GpuCanvas};
 
@@ -25,6 +15,7 @@ pub struct FireParticle {
   pub alpha: f32,
   pub life: f32,
   pub max_life: f32,
+  pub heat: f32,
 }
 
 pub struct GalaxyParticle {
@@ -33,6 +24,7 @@ pub struct GalaxyParticle {
   pub speed: f32,
   pub size: f32,
   pub arm: u32,
+  pub offset: f32,
 }
 
 pub struct Spark {
@@ -107,6 +99,7 @@ pub struct AdvancedState {
   pub notes: Vec<FloatingNote>,
   pub splatter: Vec<SplatterDot>,
   pub arc_rotation: f32,
+  pub galaxy_rotation: f32,
 }
 
 impl Default for AdvancedState {
@@ -126,6 +119,7 @@ impl Default for AdvancedState {
       notes: Vec::new(),
       splatter: Vec::new(),
       arc_rotation: 0.0,
+      galaxy_rotation: 0.0,
     }
   }
 }
