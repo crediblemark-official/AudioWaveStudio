@@ -301,6 +301,10 @@ export class CanvasRenderer {
       this.ctx.restore();
     }
 
+    // Apply Screen Effects (Glitch, CRT, Chromatic, etc.) to the background layer only
+    applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor, frameTime);
+
+    // Outermost Top Layer: Render Visualizer Style, Particles, Notes & Text Overlay (Unaffected by screen effects)
     this.ctx.save();
     this.ctx.translate(shakeOff.x, shakeOff.y);
     const sx = config.scale ?? 1;
@@ -344,8 +348,6 @@ export class CanvasRenderer {
     }
 
     renderTextOverlay(r);
-
-    applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor, frameTime);
 
     this.rotationAngle = r.rotationAngle;
   }
