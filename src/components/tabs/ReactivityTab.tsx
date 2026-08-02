@@ -77,6 +77,7 @@ export const ReactivityTab: React.FC<Props> = ({ config, updateConfig }) => {
               onChange={(e) => handleReactivityChange('mirrorBars', e.target.checked)} />
             <span>Mirror Waves Downwards</span>
           </label>
+          <span className="hint-text">Reflects the visualization symmetrically below the center line</span>
         </div>
       )}
     </div>
