@@ -43,17 +43,20 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   c.save();
 
+  let fire_w_ratio = ctx.config.reactivity.fire_width_ratio.unwrap_or(0.94);
+  let fire_h_scale = ctx.config.reactivity.fire_height_scale.unwrap_or(1.0);
+
   let point_count = 32usize;
   let step = (freq.len() / point_count).max(1);
   let mut disp = vec![0.0f32; point_count];
   for i in 0..point_count {
     let raw = bin_sum(freq, step, i) * sensitivity;
     let wave = (time * 3.0 + i as f32 * 0.35).sin() * 0.15;
-    disp[i] = (raw + wave.max(0.0)) * height * 0.28;
+    disp[i] = (raw + wave.max(0.0)) * height * 0.28 * fire_h_scale;
   }
 
-  let margin = width * 0.08;
-  let usable_w = width - margin * 2.0;
+  let usable_w = width * fire_w_ratio;
+  let margin = (width - usable_w) / 2.0;
   let px_of = |idx: usize| margin + (idx as f32 / (point_count - 1) as f32) * usable_w;
 
   let hero_raw: Vec<(f32, f32)> =
