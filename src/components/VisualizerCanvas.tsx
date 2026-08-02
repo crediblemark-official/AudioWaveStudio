@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2, ExternalLink } from 'lucide-react';
+import { Maximize2, Minimize2 } from 'lucide-react';
 import { VisualizerConfig } from '../types/visualizer';
 import { canvasRenderer } from '../services/canvasRenderer';
 import { audioEngine } from '../services/audioEngine';
@@ -100,22 +100,13 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({ config, onTo
           height={canvasSize.height}
           className="visualizer-canvas"
         />
-        <div className="canvas-overlay-controls">
-          <button
-            className="btn-fullscreen"
-            onClick={(e) => { e.stopPropagation(); detachedPreviewService.openDetachedPreview(); }}
-            title="Pisah Preview Ke Window/Monitor Lain"
-          >
-            <ExternalLink size={16} />
-          </button>
-          <button
-            className="btn-fullscreen"
-            onClick={(e) => { e.stopPropagation(); onToggleFullscreen(); }}
-            title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'}
-          >
-            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-          </button>
-        </div>
+        <button
+          className="btn-fullscreen"
+          onClick={(e) => { e.stopPropagation(); onToggleFullscreen(); }}
+          title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'}
+        >
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+        </button>
         {!isFullscreen && (
           <div className="aspect-badge">
             {config.export.aspectRatio} ({config.export.resolution})
