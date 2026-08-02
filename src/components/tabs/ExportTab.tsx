@@ -12,6 +12,10 @@ export const ExportTab: React.FC<Props> = ({ config, updateConfig }) => {
     updateConfig((prev) => ({ ...prev, export: { ...prev.export, [key]: value } }));
   };
 
+  const handleReactivityChange = (key: keyof typeof config.reactivity, value: unknown) => {
+    updateConfig((prev) => ({ ...prev, reactivity: { ...prev.reactivity, [key]: value } }));
+  };
+
   return (
     <div className="tab-pane">
       <h3 className="section-title">Video Export Settings</h3>
@@ -57,6 +61,20 @@ export const ExportTab: React.FC<Props> = ({ config, updateConfig }) => {
           <button className={`btn-toggle ${config.export.format === 'webm' ? 'active' : ''}`}
             onClick={() => handleExportSettingChange('format', 'webm')}>WebM</button>
         </div>
+      </div>
+
+      <h3 className="section-title mt-4">Audio Analysis</h3>
+      <div className="control-group">
+        <label className="label-row">FFT Frequency Resolution</label>
+        <CustomSelect value={String(config.reactivity.fftSize)}
+          onChange={(v) => handleReactivityChange('fftSize', parseInt(v))}
+          options={[
+            { value: '256', label: '256 Bins (Fast)' },
+            { value: '512', label: '512 Bins (Balanced)' },
+            { value: '1024', label: '1024 Bins (High Precision)' },
+            { value: '2048', label: '2048 Bins (Ultra Detail)' },
+          ]} />
+        <span className="hint-text">Higher precision produces more detailed visualizations but uses more processing power</span>
       </div>
     </div>
   );
