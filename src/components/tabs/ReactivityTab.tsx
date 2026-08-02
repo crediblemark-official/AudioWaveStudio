@@ -27,22 +27,6 @@ export const ReactivityTab: React.FC<Props> = ({ config, updateConfig }) => {
             { value: '2048', label: '2048 Bins (Ultra Detail)' },
           ]} />
       </div>
-
-      <div className="control-group">
-        <label className="checkbox-label">
-          <input type="checkbox" checked={config.reactivity.showPeaks}
-            onChange={(e) => handleReactivityChange('showPeaks', e.target.checked)} />
-          <span>Show Dynamic Peak Drop Markers</span>
-        </label>
-      </div>
-
-      {config.reactivity.showPeaks && (
-        <div className="picker-item mt-2">
-          <span>Peak Marker Color</span>
-          <input type="color" value={config.reactivity.peakColor}
-            onChange={(e) => handleReactivityChange('peakColor', e.target.value)} />
-        </div>
-      )}
     </div>
   );
 };
