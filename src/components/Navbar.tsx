@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink, Maximize2, Minimize2, Info } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -104,18 +104,13 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="navbar" data-tauri-drag-region>
       <div className="navbar-left">
-        <div className="brand" onClick={onOpenAbout} style={{ cursor: 'pointer' }} title="About AudioWave Studio & CredibleMark">
+        <div className="brand">
           <div className="brand-icon">
             <Activity className="icon-pulse" size={24} />
           </div>
           <div className="brand-text">
             <span className="brand-name">AudioWave</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-              <span className="brand-tag">Studio</span>
-              <span style={{ fontSize: 10, color: '#94a3b8', background: 'rgba(255, 255, 255, 0.08)', padding: '1px 5px', borderRadius: 4, textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
-                by crediblemark.com
-              </span>
-            </div>
+            <span className="brand-tag">Studio</span>
           </div>
         </div>
 
@@ -143,6 +138,15 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {isListening ? <StopCircle size={16} /> : <Headphones size={16} />}
             <span>{isListening ? 'Stop Listen' : 'Listen'}</span>
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={onOpenAbout}
+            title="About AudioWave Studio & CredibleMark"
+            style={{ fontSize: 12, padding: '6px 12px', gap: 6, opacity: 0.9 }}
+          >
+            <Info size={14} className="text-secondary" />
+            <span>crediblemark.com</span>
           </button>
         </div>
 
