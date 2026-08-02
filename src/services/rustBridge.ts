@@ -229,6 +229,25 @@ export class RustBridge {
     await invoke('cancel_gpu_export');
   }
 
+  public async renderRustPreviewFrame(
+    config: VisualizerConfig,
+    freqData: Uint8Array,
+    timeData: Uint8Array,
+    frameTime: number,
+    width: number,
+    height: number,
+  ): Promise<Uint8Array> {
+    const raw = await invoke<number[]>('render_rust_preview_frame', {
+      config,
+      freqData: Array.from(freqData),
+      timeData: Array.from(timeData),
+      frameTime,
+      width,
+      height,
+    });
+    return new Uint8Array(raw);
+  }
+
   public async convertWebmToMp4(
     webmPath: string,
     audioPath: string,

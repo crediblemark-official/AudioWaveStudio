@@ -381,3 +381,52 @@ pub fn cancel_gpu_export(state: tauri::State<'_, crate::AppState>) {
     }
   }
 }
+
+#[tauri::command]
+pub fn render_rust_preview_frame(
+  config: VisualizerConfig,
+  freq_data: Vec<u8>,
+  time_data: Vec<u8>,
+  frame_time: f32,
+  width: u32,
+  height: u32,
+) -> Result<Vec<u8>, String> {
+  let bar_count = config.reactivity.bar_count.min(128);
+  let mut gpu = pollster::block_on(GpuRenderer::new(width, height))
+    .map_err(|e| format!("GPU unavailable: {}", e))?;
+
+  let mut rstate = RenderState::new(bar_count, 0xC0FFEE);
+
+  if let Some((rgba, w, h)) = decode_background_image(config.background.custom_image_uri.as_deref()) {
+    if let Some((tw, th)) = gpu.upload_image_layer(IMAGE_LAYER, &rgba, w, h) {
+      rstate.background_image = Some(BackgroundImage { layer: IMAGE_LAYER, w: tw, h: th });
+    }
+  }
+
+  if let Some((rgba, w, h)) = decode_background_image(config.background.radial_center_image_uri.as_deref()) {
+    if let Some((tw, th)) = gpu.upload_image_layer(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
+      rstate.radial_center_image = Some(BackgroundImage { layer: RADIAL_CENTER_IMAGE_LAYER, w: tw, h: th });
+    }
+  }
+
+  let mut canvas = GpuCanvas::new(width, height);
+  draw_frame(&mut canvas, &mut rstate, &config, &freq_data, &time_data, frame_time);
+  let mesh = canvas.finish();
+
+  let above_floor = (rstate.bass_energy - rstate.bass_floor).max(0.0);
+  let fx = crate::renderers::screen_effects::post_fx(
+    &mut rstate.screen_fx,
+    &config.screen_effects,
+    above_floor,
+    rstate.beat_strength,
+    frame_time,
+  );
+
+  match fx {
+    Some(fx) => gpu.render_into_fx(&mesh, &fx, 0),
+    None => gpu.render_into(&mesh, 0),
+  }
+
+  let rgba = gpu.readback(0);
+  Ok(rgba)
+}

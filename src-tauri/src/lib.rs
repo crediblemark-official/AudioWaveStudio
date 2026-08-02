@@ -955,6 +955,7 @@ pub fn run() {
             finish_export_session,
             gpu_export::export_gpu,
             gpu_export::cancel_gpu_export,
+            gpu_export::render_rust_preview_frame,
             convert_webm_to_mp4,
             start_system_listen,
             stop_system_listen,
