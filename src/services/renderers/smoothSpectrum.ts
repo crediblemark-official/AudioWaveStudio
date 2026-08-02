@@ -29,6 +29,8 @@ export function renderSmoothSpectrum(ctx: RenderContext) {
     points.push({ x, y: bottomY - barH });
   }
 
+  const mirror = config.reactivity.mirrorBars;
+
   c.save();
   c.beginPath();
   c.moveTo(points[0].x, bottomY);
@@ -50,6 +52,25 @@ export function renderSmoothSpectrum(ctx: RenderContext) {
   c.shadowBlur = 20;
   c.shadowColor = theme.glowColor;
   c.fill();
+
+  if (mirror) {
+    c.globalAlpha = 0.5;
+    c.beginPath();
+    c.moveTo(points[0].x, bottomY);
+    for (let i = 0; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = bottomY + (bottomY - (points[i].y + points[i + 1].y) / 2);
+      const my = bottomY + (bottomY - points[i].y);
+      c.quadraticCurveTo(points[i].x, my, xc, yc);
+    }
+    const myLast = bottomY + (bottomY - last.y);
+    c.lineTo(last.x, myLast);
+    c.lineTo(last.x, bottomY);
+    c.closePath();
+    c.fill();
+    c.globalAlpha = 1;
+  }
+
   c.restore();
 
   c.save();
@@ -61,6 +82,19 @@ export function renderSmoothSpectrum(ctx: RenderContext) {
     c.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
   }
   c.lineTo(last.x, last.y);
+
+  if (mirror) {
+    c.moveTo(points[0].x, bottomY + (bottomY - points[0].y));
+    for (let i = 0; i < points.length - 1; i++) {
+      const xc = (points[i].x + points[i + 1].x) / 2;
+      const yc = bottomY + (bottomY - (points[i].y + points[i + 1].y) / 2);
+      const my = bottomY + (bottomY - points[i].y);
+      c.quadraticCurveTo(points[i].x, my, xc, yc);
+    }
+    const myLast = bottomY + (bottomY - last.y);
+    c.lineTo(last.x, myLast);
+  }
+
   c.strokeStyle = theme.accentColor;
   c.lineWidth = 2;
   c.shadowBlur = 10;

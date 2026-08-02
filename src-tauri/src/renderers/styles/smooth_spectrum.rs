@@ -47,6 +47,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let last = points[points.len() - 1];
   curve.push(last);
 
+  let mirror = ctx.config.reactivity.mirror_bars;
+
   let mut poly: Vec<(f32, f32)> = Vec::with_capacity(curve.len() + 3);
   poly.push((points[0].0, bottom_y));
   poly.extend_from_slice(&curve);
@@ -61,6 +63,22 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_fill(fill_grad);
   c.set_shadow(theme_glow(theme), 20.0);
   c.fill_polygon(&poly);
+
+  if mirror {
+    let mirror_curve: Vec<(f32, f32)> = curve
+      .iter()
+      .map(|&(x, y)| (x, bottom_y + (bottom_y - y)))
+      .collect();
+    let mut mirror_poly: Vec<(f32, f32)> = Vec::with_capacity(mirror_curve.len() + 3);
+    mirror_poly.push((points[0].0, bottom_y));
+    mirror_poly.extend_from_slice(&mirror_curve);
+    mirror_poly.push((last.0, bottom_y));
+
+    c.set_global_alpha(0.5);
+    c.fill_polygon(&mirror_poly);
+    c.set_global_alpha(1.0);
+  }
+
   c.restore();
 
   c.save();
@@ -68,5 +86,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_line_width(2.0);
   c.set_shadow(theme_glow(theme), 10.0);
   c.stroke_polyline(&curve);
+  if mirror {
+    let mirror_curve: Vec<(f32, f32)> = curve
+      .iter()
+      .map(|&(x, y)| (x, bottom_y + (bottom_y - y)))
+      .collect();
+    c.set_global_alpha(0.6);
+    c.stroke_polyline(&mirror_curve);
+    c.set_global_alpha(1.0);
+  }
   c.restore();
 }

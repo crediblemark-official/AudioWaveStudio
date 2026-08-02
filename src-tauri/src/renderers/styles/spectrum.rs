@@ -51,8 +51,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
 
     if mirror_bars {
-      c.set_global_alpha(0.4);
-      c.fill_rect(x, center_y + 2.0, bar_width, bar_height * 0.5);
+      c.set_global_alpha(0.6);
+      if bar_rounding > 0.0 {
+        c.fill_rounded_rect(x, center_y + 2.0, bar_width, bar_height, bar_rounding);
+      } else {
+        c.fill_rect(x, center_y + 2.0, bar_width, bar_height);
+      }
       c.set_global_alpha(1.0);
     }
 
@@ -66,6 +70,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       if *peak > 0.0 {
         c.set_fill(Fill::Solid(peak_color));
         c.fill_rect(x, center_y - *peak - 4.0, bar_width, 3.0);
+        if mirror_bars {
+          c.fill_rect(x, center_y + *peak + 2.0, bar_width, 3.0);
+        }
         c.set_fill(gradient.clone());
       }
     }

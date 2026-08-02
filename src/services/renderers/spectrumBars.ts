@@ -58,14 +58,23 @@ export function renderSpectrumBars(ctx: RenderContext) {
     }
 
     if (mirror) {
-      c.globalAlpha = 0.4;
-      c.fillRect(x, centerY + 2, barWidth, barH * 0.5);
+      c.globalAlpha = 0.6;
+      if (doRound) {
+        c.beginPath();
+        c.roundRect(x, centerY + 2, barWidth, barH, [0, 0, barRounding, barRounding]);
+        c.fill();
+      } else {
+        c.fillRect(x, centerY + 2, barWidth, barH);
+      }
       c.globalAlpha = 1;
     }
 
     if (isPeaks && peakData[i] > 2) {
       c.fillStyle = config.reactivity.peakColor || theme.accentColor;
       c.fillRect(x, centerY - peakData[i] - 4, barWidth, 3);
+      if (mirror) {
+        c.fillRect(x, centerY + peakData[i] + 2, barWidth, 3);
+      }
       c.fillStyle = barGradient;
     }
   }
