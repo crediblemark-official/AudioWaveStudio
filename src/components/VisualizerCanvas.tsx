@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, ExternalLink } from 'lucide-react';
 import { VisualizerConfig } from '../types/visualizer';
 import { canvasRenderer } from '../services/canvasRenderer';
 import { audioEngine } from '../services/audioEngine';
+import { detachedPreviewService } from '../services/detachedPreviewService';
 
 interface VisualizerCanvasProps {
   config: VisualizerConfig;
@@ -50,10 +51,21 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({ config, onTo
   }, [config.reactivity.smoothing]);
 
   useEffect(() => {
+    detachedPreviewService.broadcastConfig(config);
+  }, [config]);
+
+  const freqBuffer = useRef(new Uint8Array(512));
+  const timeBuffer = useRef(new Uint8Array(512));
+
+  useEffect(() => {
     let animId: number;
     const renderLoop = () => {
       try {
         canvasRenderer.drawFrame(configRef.current);
+        detachedPreviewService.broadcastAudioFrame(
+          audioEngine.getFrequencyData(freqBuffer.current),
+          audioEngine.getTimeDomainData(timeBuffer.current)
+        );
       } catch (e) {
         console.error('[VisualizerCanvas] drawFrame error:', e);
       }
@@ -88,13 +100,22 @@ export const VisualizerCanvas: React.FC<VisualizerCanvasProps> = ({ config, onTo
           height={canvasSize.height}
           className="visualizer-canvas"
         />
-        <button
-          className="btn-fullscreen"
-          onClick={(e) => { e.stopPropagation(); onToggleFullscreen(); }}
-          title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'}
-        >
-          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-        </button>
+        <div className="canvas-overlay-controls">
+          <button
+            className="btn-fullscreen"
+            onClick={(e) => { e.stopPropagation(); detachedPreviewService.openDetachedPreview(); }}
+            title="Pisah Preview Ke Window/Monitor Lain"
+          >
+            <ExternalLink size={16} />
+          </button>
+          <button
+            className="btn-fullscreen"
+            onClick={(e) => { e.stopPropagation(); onToggleFullscreen(); }}
+            title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'}
+          >
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
+        </div>
         {!isFullscreen && (
           <div className="aspect-badge">
             {config.export.aspectRatio} ({config.export.resolution})

@@ -396,10 +396,20 @@ html, body, #root {
   display: block;
 }
 
-.btn-fullscreen {
+.canvas-overlay-controls {
   position: absolute;
   top: 12px;
   left: 16px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.canvas-overlay-controls .btn-fullscreen {
+  position: static;
+}
+
+.btn-fullscreen {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -419,6 +429,11 @@ html, body, #root {
   background: rgba(0, 0, 0, 0.7);
   color: #fff;
   border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-winctrl.active {
+  color: var(--primary);
+  background: rgba(0, 229, 255, 0.15);
 }
 
 /* FULLSCREEN MODE */

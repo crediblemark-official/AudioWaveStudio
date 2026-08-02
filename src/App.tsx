@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Navbar } from './components/Navbar';
 import { VisualizerCanvas } from './components/VisualizerCanvas';
 import { AudioPlayerBar } from './components/AudioPlayerBar';
@@ -9,10 +9,76 @@ import { PRESETS, migrateTextSettings, loadSavedConfig, saveConfig } from './uti
 import { SongMetadata, VisualizerConfig } from './types/visualizer';
 import { rustBridge } from './services/rustBridge';
 import { audioEngine } from './services/audioEngine';
+import { canvasRenderer } from './services/canvasRenderer';
+import { detachedPreviewService } from './services/detachedPreviewService';
 import { save, open } from '@tauri-apps/plugin-dialog';
 import { RefreshCw, Headphones } from 'lucide-react';
 
+const isDetachedWindow = typeof window !== 'undefined' && window.location.search.includes('detached=true');
+
+const DetachedPreviewView: React.FC = () => {
+  const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const configRef = useRef<VisualizerConfig>(config);
+  configRef.current = config;
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRenderer.init(canvasRef.current);
+    }
+  }, []);
+
+  useEffect(() => {
+    canvasRenderer.setCustomBackgroundImage(config.background.customImageUri);
+  }, [config.background.customImageUri]);
+
+  useEffect(() => {
+    canvasRenderer.setRadialCenterImage(config.background.radialCenterImageUri);
+  }, [config.background.radialCenterImageUri]);
+
+  useEffect(() => {
+    const unsub = detachedPreviewService.listen(
+      (newConfig) => {
+        setConfig(newConfig);
+      },
+      (freqData, timeData) => {
+        canvasRenderer.setExportData(freqData, timeData, 0.5);
+      }
+    );
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    let animId: number;
+    const renderLoop = () => {
+      try {
+        canvasRenderer.drawFrame(configRef.current);
+      } catch (e) {
+        console.error('[DetachedPreview] drawFrame error:', e);
+      }
+      animId = requestAnimationFrame(renderLoop);
+    };
+    renderLoop();
+    return () => cancelAnimationFrame(animId);
+  }, []);
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', background: '#000', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <canvas
+        ref={canvasRef}
+        width={1920}
+        height={1080}
+        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+      />
+    </div>
+  );
+};
+
 export const App: React.FC = () => {
+  if (isDetachedWindow) {
+    return <DetachedPreviewView />;
+  }
+
   const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
   const [songMeta, setSongMeta] = useState<SongMetadata | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);

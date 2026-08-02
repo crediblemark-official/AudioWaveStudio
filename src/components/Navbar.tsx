@@ -1,10 +1,11 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, Pin, PinOff, ExternalLink } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
 import { SongMetadata, VisualizerConfig } from '../types/visualizer';
 import { CustomSelect } from './CustomSelect';
+import { detachedPreviewService } from '../services/detachedPreviewService';
 
 const appWindow = getCurrentWindow();
 
@@ -42,6 +43,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [presetValue, setPresetValue] = React.useState('');
   const [audioDevices, setAudioDevices] = useState<MediaDeviceInfo[]>([]);
   const [showDevicePicker, setShowDevicePicker] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+
+  const togglePin = async () => {
+    try {
+      const nextState = !isPinned;
+      await appWindow.setAlwaysOnTop(nextState);
+      setIsPinned(nextState);
+    } catch (err) {
+      console.error('[Navbar] Failed to setAlwaysOnTop:', err);
+    }
+  };
 
   useEffect(() => {
     if (showDevicePicker) {
@@ -178,8 +190,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
         </div>
 
-        {/* Save / Load Preset / Hardware Check Buttons */}
+        {/* Save / Load Preset / Hardware Check / Pop-out Preview Buttons */}
         <div className="preset-actions">
+          <button className="btn btn-icon" onClick={() => detachedPreviewService.openDetachedPreview()} title="Pisah Preview ke Window/Monitor Lain">
+            <ExternalLink size={16} />
+          </button>
           <button className="btn btn-icon" onClick={onOpenHardware} title="Cek Kesiapan Hardware & GPU">
             <Cpu size={16} />
           </button>
@@ -198,6 +213,9 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <div className="window-controls">
+          <button className={`btn-winctrl ${isPinned ? 'active' : ''}`} onClick={togglePin} title={isPinned ? 'Unpin Always on Top' : 'Stay on Top (Sticky)'}>
+            {isPinned ? <PinOff size={14} /> : <Pin size={14} />}
+          </button>
           <button className="btn-winctrl" onClick={() => appWindow.minimize()} title="Minimize">
             <Minus size={14} />
           </button>
