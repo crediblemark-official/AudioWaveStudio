@@ -1,7 +1,7 @@
 //! Neon City 3D style renderer (`neonCity3D`).
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::advanced::mix;
+use crate::renderers::helpers::mix;
 use crate::renderers::RenderContext;
 
 const HISTORY_DEPTH: usize = 12;

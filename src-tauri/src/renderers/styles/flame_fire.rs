@@ -1,7 +1,7 @@
 //! Flame Fire style renderer (`flameFire`).
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::advanced::{mix, FireParticle};
+use crate::renderers::helpers::{mix, FireParticle};
 use crate::renderers::RenderContext;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {

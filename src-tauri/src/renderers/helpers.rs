@@ -1,9 +1,9 @@
-//! Shared state structs and helper functions for complex visualizer styles.
+//! Shared state structs and helper functions for visualizer style renderers.
 
 use crate::gpu2d::{Color, GpuCanvas};
 
 // ---------------------------------------------------------------------------
-// Shared State Structs
+// Shared State Structs for Styles
 // ---------------------------------------------------------------------------
 
 pub struct FireParticle {
@@ -128,15 +128,15 @@ impl Default for AdvancedState {
 // Common Helpers
 // ---------------------------------------------------------------------------
 
-pub(crate) fn lerp(a: f32, b: f32, t: f32) -> f32 {
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
   a + (b - a) * t
 }
 
-pub(crate) fn mix(p: Color, s: Color, t: f32) -> Color {
+pub fn mix(p: Color, s: Color, t: f32) -> Color {
   Color::rgba(lerp(p.r, s.r, t), lerp(p.g, s.g, t), lerp(p.b, s.b, t), 1.0)
 }
 
-pub(crate) fn bright(c: Color, f: f32) -> Color {
+pub fn bright(c: Color, f: f32) -> Color {
   Color::rgba(
     (c.r * f).clamp(0.0, 1.0),
     (c.g * f).clamp(0.0, 1.0),
@@ -145,7 +145,7 @@ pub(crate) fn bright(c: Color, f: f32) -> Color {
   )
 }
 
-pub(crate) fn bin_sum(freq: &[u8], step: usize, idx: usize) -> f32 {
+pub fn bin_sum(freq: &[u8], step: usize, idx: usize) -> f32 {
   let mut sum = 0usize;
   let mut n = 0;
   for j in 0..step {
@@ -162,7 +162,7 @@ pub(crate) fn bin_sum(freq: &[u8], step: usize, idx: usize) -> f32 {
 }
 
 /// Canvas `quadraticCurveTo(prev, mid)` woven polyline.
-pub(crate) fn quadratic_wave(raw: &[(f32, f32)], steps: u32) -> Vec<(f32, f32)> {
+pub fn quadratic_wave(raw: &[(f32, f32)], steps: u32) -> Vec<(f32, f32)> {
   if raw.is_empty() {
     return Vec::new();
   }

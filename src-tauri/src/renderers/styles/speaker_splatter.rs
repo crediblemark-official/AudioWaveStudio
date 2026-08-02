@@ -3,7 +3,7 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas, LineCap};
-use crate::renderers::advanced::{SplatterDot};
+use crate::renderers::helpers::SplatterDot;
 use crate::renderers::RenderContext;
 
 use super::woofer::{draw_woofer, WooferStyle};

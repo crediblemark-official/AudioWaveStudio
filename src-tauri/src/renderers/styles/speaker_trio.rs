@@ -2,7 +2,7 @@
 
 use crate::gpu2d::text::{TextAlign, TextOpts};
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::advanced::{bin_sum, bright, mix, FloatingNote};
+use crate::renderers::helpers::{bin_sum, bright, mix, FloatingNote};
 use crate::renderers::RenderContext;
 
 use super::woofer::{draw_woofer, WooferStyle};

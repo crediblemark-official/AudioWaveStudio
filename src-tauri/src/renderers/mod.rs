@@ -3,8 +3,8 @@
 //! Phase 4/5: frequency/time-domain renderers + complex particle & 3D-style
 //! renderers. Background/screen effects are Phase 6 (structured hooks below).
 
-pub mod advanced;
 mod background;
+pub mod helpers;
 pub mod screen_effects;
 mod styles;
 mod text;
@@ -76,7 +76,7 @@ pub struct RenderState {
   pub beat_strength: f32,
   pub beat_strength_raw: f32,
   pub rng: Rng,
-  pub advanced: advanced::AdvancedState,
+  pub advanced: helpers::AdvancedState,
   /// Custom background image uploaded once to a persistent atlas layer.
   /// `w`/`h` are the scaled layer-space dimensions (for UV mapping).
   pub background_image: Option<BackgroundImage>,
@@ -114,7 +114,7 @@ impl RenderState {
       beat_strength: 0.0,
       beat_strength_raw: 0.0,
       rng: Rng::new(seed),
-      advanced: advanced::AdvancedState::default(),
+      advanced: helpers::AdvancedState::default(),
       background_image: None,
       radial_center_image: None,
       stars: background::build_stars(),

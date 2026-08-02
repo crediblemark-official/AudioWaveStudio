@@ -1,7 +1,7 @@
 //! Fire 3D style renderer (`api3D`).
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::advanced::{bin_sum, quadratic_wave, Ember};
+use crate::renderers::helpers::{bin_sum, quadratic_wave, Ember};
 use crate::renderers::RenderContext;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
