@@ -5,7 +5,7 @@ import { rustBridge } from './rustBridge';
 export class CanvasRenderer {
   private canvas: HTMLCanvasElement | null = null;
   private ctx: CanvasRenderingContext2D | null = null;
-  private useRustGpuPreview: boolean = true;
+  private useRustGpuPreview: boolean = false;
   private isRenderingRustFrame: boolean = false;
 
   private freqData: Uint8Array = new Uint8Array(512);

@@ -437,14 +437,15 @@ pub fn render_noise(c: &mut GpuCanvas, ctx: &RenderContext) {
 pub fn render_bokeh(c: &mut GpuCanvas, ctx: &RenderContext) {
   let bg = &ctx.config.background;
   let count = bg.bokeh_count.unwrap_or(18) as usize;
-  let base_size = bg.bokeh_size.unwrap_or(30.0);
+  let scale_factor = ctx.width.min(ctx.height) / 1080.0;
+  let base_size = bg.bokeh_size.unwrap_or(30.0) * scale_factor;
   let base_opacity = bg.bokeh_opacity.unwrap_or(0.3);
   let t = ctx.frame_time / 5.0;
   for i in 0..count {
     let seed = i as f32 * 137.5;
     let x = ((seed + t * (0.2 + i as f32 * 0.03)).sin() * 0.5 + 0.5) * ctx.width;
     let y = ((seed * 0.7 + t * (0.15 + i as f32 * 0.02)).cos() * 0.5 + 0.5) * ctx.height;
-    let radius = ((base_size + (seed * 0.3 + t).sin() * (base_size * 0.4) + ctx.beat_strength * 40.0).abs()).max(1.0);
+    let radius = ((base_size + (seed * 0.3 + t).sin() * (base_size * 0.4) + ctx.beat_strength * 15.0 * scale_factor).abs()).clamp(2.0, 100.0 * scale_factor);
     let hue = (seed + t * 30.0) % 360.0;
     let a1 = (base_opacity + ctx.bass_energy * 0.15).clamp(0.0, 1.0);
     c.set_fill(Fill::Solid(hsl_to_color(hue, 0.80, 0.65, a1)));
