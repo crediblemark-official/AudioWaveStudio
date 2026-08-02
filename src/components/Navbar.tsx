@@ -145,7 +145,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Klik untuk info pengembang & layanan CredibleMark (crediblemark.com)"
           >
             <div className="crediblemark-ticker-wrapper">
-              <span className="crediblemark-ticker-text">
+              <span className="crediblemark-ticker-item">
+                🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
+              </span>
+              <span className="crediblemark-ticker-item">
                 🚀 Powered by CredibleMark — Jasa Pembuatan Software Web, Mobile & Desktop Professional • Visit crediblemark.com •
               </span>
             </div>
