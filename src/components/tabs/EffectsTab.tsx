@@ -84,6 +84,17 @@ export const EffectsTab: React.FC<Props> = ({ config, updateConfig }) => {
       {s.enabled && (
         <>
           <div className="control-group">
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={s.backgroundOnly ?? true}
+                onChange={(e) => handleChange('backgroundOnly', e.target.checked)}
+              />
+              <span>Apply Effects to Background Only (Keep Visualizer & Text on Outermost Top Layer)</span>
+            </label>
+          </div>
+
+          <div className="control-group">
             <label className="label-row">Effect Type</label>
             <CustomSelect value={s.mainEffect}
               onChange={(v) => handleChange('mainEffect', v)}

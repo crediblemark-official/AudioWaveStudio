@@ -421,6 +421,7 @@ pub struct ExportSettings {
 #[serde(default, rename_all = "camelCase")]
 pub struct ScreenEffectsSettings {
   pub enabled: bool,
+  pub background_only: Option<bool>,
   pub main_effect: ScreenEffect,
   pub shake_intensity: f32,
   pub shake_frequency: f32,

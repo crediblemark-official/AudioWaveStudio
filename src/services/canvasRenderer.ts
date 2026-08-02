@@ -301,10 +301,14 @@ export class CanvasRenderer {
       this.ctx.restore();
     }
 
-    // Apply Screen Effects (Glitch, CRT, Chromatic, etc.) to the background layer only
-    applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor, frameTime);
+    const applyToBgOnly = config.screenEffects.backgroundOnly ?? true;
 
-    // Outermost Top Layer: Render Visualizer Style, Particles, Notes & Text Overlay (Unaffected by screen effects)
+    if (applyToBgOnly) {
+      // Apply Screen Effects (Glitch, CRT, Chromatic, etc.) to the background layer only
+      applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor, frameTime);
+    }
+
+    // Render Visualizer Style, Particles, Notes & Text Overlay
     this.ctx.save();
     this.ctx.translate(shakeOff.x, shakeOff.y);
     const sx = config.scale ?? 1;
@@ -348,6 +352,11 @@ export class CanvasRenderer {
     }
 
     renderTextOverlay(r);
+
+    if (!applyToBgOnly) {
+      // Apply Screen Effects to the entire canvas (including visualizer)
+      applyScreenEffects(this.canvas, this.ctx, config.screenEffects, this.beatStrength, aboveFloor, frameTime);
+    }
 
     this.rotationAngle = r.rotationAngle;
   }

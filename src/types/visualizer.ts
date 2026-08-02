@@ -146,6 +146,7 @@ export interface ExportSettings {
 
 export interface ScreenEffectsSettings {
   enabled: boolean;
+  backgroundOnly?: boolean; // If true, screen effects apply only to background layer, leaving visualizer on top
   mainEffect: ScreenEffect;
   shakeIntensity: number;
   shakeFrequency: number;
