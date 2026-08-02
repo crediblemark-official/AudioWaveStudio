@@ -54,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     if (showDevicePicker) {
       navigator.mediaDevices.enumerateDevices().then(devices => {
         setAudioDevices(devices.filter(d => d.kind === 'audioinput'));
-      }).catch(() => {});
+      }).catch(() => { });
     }
   }, [showDevicePicker]);
 
@@ -130,7 +130,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             disabled={isListening}
           >
             <Upload size={16} />
-            <span>{songMeta ? 'Change Song' : 'Open Audio File'}</span>
+            <span>{songMeta ? 'Change Song' : 'Load Audio'}</span>
           </button>
           <button
             className={`btn ${isListening ? 'btn-danger' : 'btn-secondary'}`}
