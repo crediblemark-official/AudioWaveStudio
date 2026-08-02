@@ -899,42 +899,59 @@ fn open_detached_preview_window(app: tauri::AppHandle) -> Result<(), String> {
         .inner_size(1280.0, 720.0)
         .resizable(true)
         .decorations(false)
+        .always_on_top(true)
         .visible(true)
         .build()
         .map_err(|e| e.to_string())?;
 
+    let _ = window.set_always_on_top(true);
+    let _ = window.set_visible_on_all_workspaces(true);
     let _ = window.show();
     let _ = window.set_focus();
     Ok(())
 }
 
 #[tauri::command]
-fn set_always_on_top_cmd(window: tauri::WebviewWindow, always_on_top: bool) -> Result<bool, String> {
-    let res = window.set_always_on_top(always_on_top);
-    let _ = window.set_visible_on_all_workspaces(always_on_top);
-    if always_on_top {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-    if let Err(e) = res {
-        eprintln!("[Rust] set_always_on_top error: {:?}", e);
+fn set_always_on_top_cmd(app: tauri::AppHandle, window: tauri::WebviewWindow, always_on_top: bool) -> Result<bool, String> {
+    use tauri::Manager;
+    let label = window.label();
+    if let Some(win) = app.get_webview_window(label) {
+        let res = win.set_always_on_top(always_on_top);
+        let _ = win.set_visible_on_all_workspaces(always_on_top);
+        if always_on_top {
+            let _ = win.unminimize();
+            let _ = win.show();
+            let _ = win.set_focus();
+        }
+        if let Err(e) = res {
+            eprintln!("[Rust] set_always_on_top error: {:?}", e);
+        }
     }
     Ok(always_on_top)
 }
 
 #[tauri::command]
-fn toggle_detached_always_on_top(window: tauri::WebviewWindow) -> Result<bool, String> {
-    let current = window.is_always_on_top().unwrap_or(false);
-    let target = !current;
-    let _ = window.set_always_on_top(target);
-    let _ = window.set_visible_on_all_workspaces(target);
-    if target {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
+fn toggle_detached_always_on_top(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<bool, String> {
+    use tauri::Manager;
+    let label = window.label();
+    if let Some(win) = app.get_webview_window(label) {
+        let current = win.is_always_on_top().unwrap_or(false);
+        let target = !current;
+        let _ = win.set_always_on_top(target);
+        let _ = win.set_visible_on_all_workspaces(target);
+        if target {
+            let _ = win.unminimize();
+            let _ = win.show();
+            let _ = win.set_focus();
+        }
+        println!("[Rust] toggle_detached_always_on_top: label={}, target={}", label, target);
+        Ok(target)
+    } else {
+        let current = window.is_always_on_top().unwrap_or(false);
+        let target = !current;
+        let _ = window.set_always_on_top(target);
+        Ok(target)
     }
-    Ok(target)
 }
 
 #[tauri::command]

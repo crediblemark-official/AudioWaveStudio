@@ -20,7 +20,7 @@ const isDetachedWindow = typeof window !== 'undefined' && window.location.search
 
 const DetachedPreviewView: React.FC = () => {
   const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
-  const [isPinned, setIsPinned] = useState(false);
+  const [isPinned, setIsPinned] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const configRef = useRef<VisualizerConfig>(config);
