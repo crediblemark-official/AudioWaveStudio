@@ -17,6 +17,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   let step = ((ctx.freq_data.len() as f32) / cols as f32).floor().max(1.0) as usize;
 
+  let mirror = ctx.config.reactivity.mirror_bars;
+
   for col in 0..cols {
     let val = (bin_value(ctx.freq_data, step, col) * ctx.config.reactivity.sensitivity).min(1.0);
     let active_rows = (val * rows as f32).floor() as usize;
@@ -36,6 +38,13 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_fill(Fill::Solid(col_r));
         c.set_shadow(theme_glow(theme), 8.0);
         c.fill_rect(bx, by, block_w, block_h);
+
+        if mirror {
+          let mirror_by = start_y + (r + 1) as f32 * (block_h + 3.0);
+          c.set_global_alpha(0.6);
+          c.fill_rect(bx, mirror_by, block_w, block_h);
+          c.set_global_alpha(1.0);
+        }
       } else {
         c.set_global_alpha(0.12);
         c.set_fill(Fill::Solid(Color::WHITE));

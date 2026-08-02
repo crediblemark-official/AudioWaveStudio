@@ -70,13 +70,15 @@ export const ReactivityTab: React.FC<Props> = ({ config, updateConfig }) => {
         </>
       )}
 
-      <div className="control-group mt-3">
-        <label className="checkbox-label">
-          <input type="checkbox" checked={config.reactivity.mirrorBars}
-            onChange={(e) => handleReactivityChange('mirrorBars', e.target.checked)} />
-          <span>Mirror Waves Downwards</span>
-        </label>
-      </div>
+      {['spectrum', 'smoothSpectrum', 'equalizer', 'waveformFill'].includes(config.style) && (
+        <div className="control-group mt-3">
+          <label className="checkbox-label">
+            <input type="checkbox" checked={config.reactivity.mirrorBars}
+              onChange={(e) => handleReactivityChange('mirrorBars', e.target.checked)} />
+            <span>Mirror Waves Downwards</span>
+          </label>
+        </div>
+      )}
     </div>
   );
 };

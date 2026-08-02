@@ -38,6 +38,11 @@ export function renderEqualizerMatrix(ctx: RenderContext) {
       }
 
       c.fillRect(bx, by, blockW, blockH);
+      if (config.reactivity.mirrorBars && isActive) {
+        const mirrorBy = startY + (r + 1) * (blockH + 3);
+        c.globalAlpha = 0.6;
+        c.fillRect(bx, mirrorBy, blockW, blockH);
+      }
       c.restore();
     }
   }
