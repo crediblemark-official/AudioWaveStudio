@@ -163,7 +163,7 @@ fn compute_spectrum_rust(
     _bar_count: usize,
     fft_size: usize,
     smoothing: f32,
-    bass_multiplier: f32,
+    _bass_multiplier: f32,
 ) -> Result<SpectrumResultRust, String> {
     let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
     let audio = guard
@@ -213,7 +213,7 @@ fn compute_spectrum_rust(
     let bass_bins = 16.min(num_bins);
     let bass_energy = if bass_bins > 0 {
         let sum: usize = freq_data.iter().take(bass_bins).map(|&v| v as usize).sum();
-        (sum as f32 / (bass_bins as f32 * 255.0)) * bass_multiplier
+        sum as f32 / (bass_bins as f32 * 255.0)
     } else {
         0.0
     };
@@ -242,7 +242,7 @@ async fn precompute_spectra(
     bar_count: usize,
     fft_size: usize,
     smoothing: f32,
-    bass_multiplier: f32,
+    _bass_multiplier: f32,
 ) -> Result<PrecomputedSpectra, String> {
     let audio = {
         let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
@@ -310,7 +310,7 @@ async fn precompute_spectra(
                     .iter()
                     .map(|&v| v as usize)
                     .sum();
-                (sum as f32 / (bass_bins as f32 * 255.0)) * bass_multiplier
+                sum as f32 / (bass_bins as f32 * 255.0)
             } else {
                 0.0
             };

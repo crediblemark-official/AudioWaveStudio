@@ -53,7 +53,6 @@ export async function exportOffscreen(
   const fftSize = config.reactivity.fftSize;
   const bassMultiplier = config.reactivity.bassMultiplier;
   const smoothing = config.reactivity.smoothing;
-  let rotationAngle = 0;
   let sessionStarted = false;
 
   try {
@@ -72,10 +71,8 @@ export async function exportOffscreen(
       const freqData = new Uint8Array(rustResult.freq_data);
       const timeData = new Uint8Array(rustResult.time_data);
 
-      rotationAngle += 0.003;
       renderer.setExportData(freqData, timeData, rustResult.bass_energy);
       renderer.setFrameTime(timeSec);
-      renderer.setRotationAngle(rotationAngle);
       renderer.drawFrame(config);
 
       const imageData = offCtx.getImageData(0, 0, width, height);

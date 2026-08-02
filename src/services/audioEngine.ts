@@ -1,6 +1,7 @@
 import { SongMetadata } from '../types/visualizer';
 import { rustBridge } from './rustBridge';
 import { listen } from '@tauri-apps/api/event';
+import { resetVisualizerState } from './renderers/resetState';
 
 export class AudioEngine {
   private audioCtx: AudioContext | null = null;
@@ -432,6 +433,9 @@ export class AudioEngine {
     }
 
     const startOffset = offsetSeconds !== undefined ? offsetSeconds : this.pausedAt;
+    if (startOffset === 0) {
+      resetVisualizerState();
+    }
     
     // Create new AudioBufferSourceNode
     this.sourceNode = this.audioCtx.createBufferSource();

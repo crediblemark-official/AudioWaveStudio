@@ -199,7 +199,6 @@ export async function exportHybrid(
   const freqAll = concatUint8Arrays(freqChunks);
   const timeAll = concatUint8Arrays(timeChunks);
 
-  let rotationAngle = 0;
   let sessionStarted = false;
 
   try {
@@ -219,8 +218,6 @@ export async function exportHybrid(
 
       renderer.setExportData(freqData, timeData, bassEnergy);
       renderer.setFrameTime(frame / fps);
-      rotationAngle += 0.003;
-      renderer.setRotationAngle(rotationAngle);
       renderer.drawFrame(config);
 
       const imageData = offCtx.getImageData(0, 0, width, height);

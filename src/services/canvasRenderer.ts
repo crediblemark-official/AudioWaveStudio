@@ -180,7 +180,7 @@ export class CanvasRenderer {
       this.freqData = this.exportFreqData;
       this.timeData = this.exportTimeData!;
       rawBass = this.exportBassEnergy;
-      targetBass = rawBass * (config.reactivity.sensitivity || 1.0);
+      targetBass = rawBass * (config.reactivity.bassMultiplier || 1.0) * (config.reactivity.sensitivity || 1.0);
       this.bassEnergy += (targetBass - this.bassEnergy) * 0.2;
       this.bassEnergyRaw += (rawBass - this.bassEnergyRaw) * 0.2;
     } else {
