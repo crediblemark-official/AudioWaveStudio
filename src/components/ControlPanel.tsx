@@ -54,9 +54,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({ config, onChangeConf
         {activeTab === 'export' && <ExportTab {...tabProps} />}
       </div>
 
-      <div className="panel-footer" style={{ padding: '10px 16px', borderTop: '1px solid rgba(255, 255, 255, 0.06)', fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>© 2026 AudioWave Studio</span>
-        <a href="https://crediblemark.com" target="_blank" rel="noreferrer" style={{ color: '#00e5ff', textDecoration: 'none', fontWeight: 500 }}>
+      <div className="panel-footer" style={{ padding: '10px 16px', borderTop: '1px solid rgba(255, 215, 0, 0.12)', fontSize: 11, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>AudioWave Studio v1.9.0</span>
+        <a href="https://crediblemark.com" target="_blank" rel="noreferrer" style={{ color: '#ffd700', textDecoration: 'none', fontWeight: 500 }}>
           crediblemark.com
         </a>
       </div>
