@@ -883,6 +883,31 @@ async fn stop_system_listen(state: tauri::State<'_, AppState>) -> Result<(), Str
     Ok(())
 }
 
+#[tauri::command]
+fn open_detached_preview_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Manager;
+    if let Some(window) = app.get_webview_window("detached-preview") {
+        let _ = window.set_focus();
+        return Ok(());
+    }
+
+    let url = tauri::WebviewUrl::App("index.html?detached=true".into());
+    tauri::WebviewWindowBuilder::new(&app, "detached-preview", url)
+        .title("AudioWave Studio - Live Preview")
+        .inner_size(1280.0, 720.0)
+        .resizable(true)
+        .decorations(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn set_always_on_top_cmd(window: tauri::Window, always_on_top: bool) -> Result<(), String> {
+    window.set_always_on_top(always_on_top).map_err(|e| e.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = std::fs::remove_dir_all(std::env::temp_dir().join("audiowave_pcm"));
@@ -923,7 +948,9 @@ pub fn run() {
             start_system_listen,
             stop_system_listen,
             hardware::check_hardware,
-            hardware::get_system_memory_cmd
+            hardware::get_system_memory_cmd,
+            open_detached_preview_window,
+            set_always_on_top_cmd
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

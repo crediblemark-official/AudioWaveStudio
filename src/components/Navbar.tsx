@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, Pin, PinOff, ExternalLink } from 'lucide-react';
+import { invoke } from '@tauri-apps/api/core';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -46,12 +47,17 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [isPinned, setIsPinned] = useState(false);
 
   const togglePin = async () => {
+    const nextState = !isPinned;
     try {
-      const nextState = !isPinned;
-      await appWindow.setAlwaysOnTop(nextState);
+      await invoke('set_always_on_top_cmd', { alwaysOnTop: nextState });
       setIsPinned(nextState);
-    } catch (err) {
-      console.error('[Navbar] Failed to setAlwaysOnTop:', err);
+    } catch {
+      try {
+        await appWindow.setAlwaysOnTop(nextState);
+        setIsPinned(nextState);
+      } catch (err) {
+        console.error('[Navbar] Failed to setAlwaysOnTop:', err);
+      }
     }
   };
 

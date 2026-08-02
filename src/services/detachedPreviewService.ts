@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { VisualizerConfig } from '../types/visualizer';
 
@@ -14,28 +15,28 @@ class DetachedPreviewService {
 
   public async openDetachedPreview(): Promise<void> {
     try {
-      const existing = await WebviewWindow.getByLabel('detached-preview');
-      if (existing) {
-        await existing.setFocus();
-        return;
-      }
-      const webview = new WebviewWindow('detached-preview', {
-        url: 'index.html?detached=true',
-        title: 'AudioWave Studio - Live Preview',
-        width: 1280,
-        height: 720,
-        resizable: true,
-      });
-      webview.once('tauri://created', () => {
-        console.log('[DetachedPreview] Webview created');
-      });
-      webview.once('tauri://error', (e) => {
-        console.error('[DetachedPreview] Error:', e);
-        window.open(window.location.origin + '?detached=true', 'audiowave-preview', 'width=1280,height=720');
-      });
+      await invoke('open_detached_preview_window');
     } catch (err) {
-      console.warn('[DetachedPreview] Falling back to window.open', err);
-      window.open(window.location.origin + '?detached=true', 'audiowave-preview', 'width=1280,height=720');
+      console.warn('[DetachedPreviewService] Native invoke fallback:', err);
+      try {
+        const existing = await WebviewWindow.getByLabel('detached-preview');
+        if (existing) {
+          await existing.setFocus();
+          return;
+        }
+        const webview = new WebviewWindow('detached-preview', {
+          url: 'index.html?detached=true',
+          title: 'AudioWave Studio - Live Preview',
+          width: 1280,
+          height: 720,
+          resizable: true,
+        });
+        webview.once('tauri://error', () => {
+          window.open(window.location.origin + '?detached=true', 'audiowave-preview', 'width=1280,height=720');
+        });
+      } catch {
+        window.open(window.location.origin + '?detached=true', 'audiowave-preview', 'width=1280,height=720');
+      }
     }
   }
 
