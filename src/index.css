@@ -95,7 +95,8 @@ html, body, #root {
   align-items: center;
   overflow: hidden;
   white-space: nowrap;
-  width: 340px;
+  width: 240px;
+  max-width: 240px;
   height: 32px;
   background: rgba(255, 215, 0, 0.08);
   border: none;
@@ -105,6 +106,8 @@ html, body, #root {
   position: relative;
   transition: all 0.2s ease;
   user-select: none;
+  margin-right: 8px;
+  flex-shrink: 0;
 }
 
 .crediblemark-ticker-container:hover {
