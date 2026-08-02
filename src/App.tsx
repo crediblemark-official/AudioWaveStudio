@@ -21,6 +21,7 @@ const isDetachedWindow = typeof window !== 'undefined' && window.location.search
 const DetachedPreviewView: React.FC = () => {
   const [config, setConfig] = useState<VisualizerConfig>(() => loadSavedConfig());
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const configRef = useRef<VisualizerConfig>(config);
   configRef.current = config;
@@ -124,6 +125,8 @@ const DetachedPreviewView: React.FC = () => {
     <div
       data-tauri-drag-region
       onMouseDown={handleStartDrag}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       style={{
         position: 'relative',
         width: '100vw',
@@ -144,7 +147,22 @@ const DetachedPreviewView: React.FC = () => {
         height={1080}
         style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }}
       />
-      <div className="canvas-overlay-controls" style={{ position: 'absolute', top: 12, right: 16, left: 'auto', display: 'flex', gap: 8, zIndex: 99 }} onMouseDown={(e) => e.stopPropagation()}>
+      <div
+        className="canvas-overlay-controls"
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 16,
+          left: 'auto',
+          display: 'flex',
+          gap: 8,
+          zIndex: 99,
+          opacity: isHovered ? 1 : 0,
+          pointerEvents: isHovered ? 'auto' : 'none',
+          transition: 'opacity 0.25s ease-in-out',
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <button
           className="btn-fullscreen"
           onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
