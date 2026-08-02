@@ -37,13 +37,13 @@ const DetachedPreviewView: React.FC = () => {
   };
 
   const togglePin = async () => {
-    const nextState = !isPinned;
     try {
-      const res = await invoke<boolean>('set_always_on_top_cmd', { alwaysOnTop: nextState });
+      const res = await invoke<boolean>('toggle_detached_always_on_top');
       setIsPinned(res);
     } catch {
       try {
         const win = getCurrentWindow();
+        const nextState = !isPinned;
         await win.setAlwaysOnTop(nextState);
         setIsPinned(nextState);
       } catch (err) {
@@ -54,12 +54,17 @@ const DetachedPreviewView: React.FC = () => {
 
   const toggleFullscreen = async () => {
     try {
-      const win = getCurrentWindow();
-      const next = !isFullscreen;
-      await win.setFullscreen(next);
-      setIsFullscreen(next);
+      const res = await invoke<boolean>('toggle_detached_fullscreen');
+      setIsFullscreen(res);
     } catch {
-      setIsFullscreen((prev) => !prev);
+      try {
+        const win = getCurrentWindow();
+        const next = !isFullscreen;
+        await win.setFullscreen(next);
+        setIsFullscreen(next);
+      } catch {
+        setIsFullscreen((prev) => !prev);
+      }
     }
   };
 

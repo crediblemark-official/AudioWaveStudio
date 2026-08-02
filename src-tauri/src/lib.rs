@@ -923,6 +923,31 @@ fn set_always_on_top_cmd(window: tauri::WebviewWindow, always_on_top: bool) -> R
     Ok(always_on_top)
 }
 
+#[tauri::command]
+fn toggle_detached_always_on_top(window: tauri::WebviewWindow) -> Result<bool, String> {
+    let current = window.is_always_on_top().unwrap_or(false);
+    let target = !current;
+    let _ = window.set_always_on_top(target);
+    let _ = window.set_visible_on_all_workspaces(target);
+    if target {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+    Ok(target)
+}
+
+#[tauri::command]
+fn toggle_detached_fullscreen(window: tauri::WebviewWindow) -> Result<bool, String> {
+    let current = window.is_fullscreen().unwrap_or(false);
+    let target = !current;
+    let _ = window.set_fullscreen(target);
+    if !target {
+        let _ = window.set_focus();
+    }
+    Ok(target)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let _ = std::fs::remove_dir_all(std::env::temp_dir().join("audiowave_pcm"));
@@ -965,7 +990,9 @@ pub fn run() {
             hardware::check_hardware,
             hardware::get_system_memory_cmd,
             open_detached_preview_window,
-            set_always_on_top_cmd
+            set_always_on_top_cmd,
+            toggle_detached_always_on_top,
+            toggle_detached_fullscreen
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
