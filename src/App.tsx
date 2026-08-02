@@ -26,6 +26,17 @@ const DetachedPreviewView: React.FC = () => {
   const configRef = useRef<VisualizerConfig>(config);
   configRef.current = config;
 
+  useEffect(() => {
+    invoke<boolean>('is_always_on_top_cmd')
+      .then((pinned) => setIsPinned(pinned))
+      .catch(() => {});
+    try {
+      const win = getCurrentWindow();
+      win.isAlwaysOnTop().then((pinned) => setIsPinned(pinned)).catch(() => {});
+      win.isFullscreen().then((fs) => setIsFullscreen(fs)).catch(() => {});
+    } catch {}
+  }, []);
+
   const handleStartDrag = (e: React.MouseEvent) => {
     if (e.button === 0) {
       try {
