@@ -16,12 +16,12 @@ use super::{bin_sum, bright, mix, quadratic_wave, LightMote, Spark};
 
 #[allow(dead_code)]
 struct BarInfo {
-  x: f32,
-  by: f32,
-  bh: f32,
-  bw: f32,
-  dy: f32,
-  val: f32,
+  _x: f32,
+  _by: f32,
+  _bh: f32,
+  _bw: f32,
+  _dy: f32,
+  _val: f32,
 }
 
 pub fn three_d(c: &mut GpuCanvas, ctx: &mut RenderContext) {
@@ -167,7 +167,7 @@ pub fn three_d(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let depth = 1.0f32.max(bw * 0.4 * ps);
     let dx = depth * 0.7;
     let dy = depth * 0.5;
-    bars.push(BarInfo { x, by, bh, bw, dy, val });
+    bars.push(BarInfo { _x: x, _by: by, _bh: bh, _bw: bw, _dy: dy, _val: val });
 
     let freq_ratio = i as f32 / bar_count as f32;
     let base = mix(p, s, freq_ratio);
