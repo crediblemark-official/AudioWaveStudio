@@ -155,6 +155,7 @@ fn test_config() -> VisualizerConfig {
     },
     screen_effects: ScreenEffectsSettings {
       enabled: false,
+      background_only: Some(true),
       main_effect: ScreenEffect::None,
       shake_intensity: 1.0,
       shake_frequency: 8.0,
