@@ -380,6 +380,8 @@ export const App: React.FC = () => {
       <Navbar
         config={config}
         songMeta={songMeta}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
         onLoadSong={handleLoadSong}
         onLoadSongPath={handleLoadSongPath}
         onApplyPreset={handleApplyPreset}

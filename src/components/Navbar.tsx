@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink } from 'lucide-react';
+import { Activity, Upload, Film, Sparkles, Save, FolderOpen, Minus, Square, X, Headphones, StopCircle, Cpu, ExternalLink, Maximize2, Minimize2 } from 'lucide-react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { open } from '@tauri-apps/plugin-dialog';
 import { PRESETS } from '../utils/presets';
@@ -12,6 +12,8 @@ const appWindow = getCurrentWindow();
 interface NavbarProps {
   config: VisualizerConfig;
   songMeta: SongMetadata | null;
+  isFullscreen?: boolean;
+  onToggleFullscreen?: () => void;
   onLoadSong: (file: File) => void;
   onLoadSongPath: (path: string) => void;
   onApplyPreset: (presetId: string) => void;
@@ -27,6 +29,8 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({
   songMeta,
+  isFullscreen,
+  onToggleFullscreen,
   onLoadSong,
   onLoadSongPath,
   onApplyPreset,
@@ -179,8 +183,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
         </div>
 
-        {/* Save / Load Preset / Hardware Check / Pop-out Preview Buttons */}
+        {/* Save / Load Preset / Hardware Check / Fullscreen / Pop-out Preview Buttons */}
         <div className="preset-actions">
+          <button className="btn btn-icon" onClick={onToggleFullscreen} title={isFullscreen ? 'Exit Fullscreen (F11)' : 'Fullscreen (F11)'}>
+            {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </button>
           <button className="btn btn-icon" onClick={() => detachedPreviewService.openDetachedPreview()} title="Pisah Preview ke Window/Monitor Lain">
             <ExternalLink size={16} />
           </button>
