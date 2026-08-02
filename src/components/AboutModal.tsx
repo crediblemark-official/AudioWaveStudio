@@ -20,8 +20,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
   };
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content about-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460 }}>
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal-container about-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 460, width: '90%' }}>
         <div className="modal-header">
           <div className="brand" style={{ gap: 10 }}>
             <div className="brand-icon" style={{ width: 36, height: 36, borderRadius: 10 }}>
