@@ -36,10 +36,13 @@ function drawCoverImage(
     offsetY = (height - renderHeight) / 2;
   }
 
+  const pad = margin + (blur > 0 ? blur * 2 : 0);
+
   c.save();
   if (alpha < 1) c.globalAlpha = Math.max(0, Math.min(1, alpha));
-  if (blur > 0) c.filter = `blur(${blur}px)`;
-  c.drawImage(img, offsetX - margin, offsetY - margin, renderWidth + margin * 2, renderHeight + margin * 2);
+  if (blur > 0) c.filter = `blur(${Math.round(blur)}px)`;
+  c.drawImage(img, offsetX - pad, offsetY - pad, renderWidth + pad * 2, renderHeight + pad * 2);
+  c.filter = 'none';
   c.restore();
   return true;
 }
