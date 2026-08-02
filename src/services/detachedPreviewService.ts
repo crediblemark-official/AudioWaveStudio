@@ -46,8 +46,14 @@ class DetachedPreviewService {
     }
   }
 
+  private hasListeners: boolean = false;
+
+  public setHasListeners(active: boolean) {
+    this.hasListeners = active;
+  }
+
   public broadcastAudioFrame(freqData: Uint8Array, timeData: Uint8Array): void {
-    if (this.channel) {
+    if (this.channel && this.hasListeners) {
       this.channel.postMessage({
         type: 'AUDIO_FRAME',
         freqData: Array.from(freqData),
@@ -72,8 +78,10 @@ class DetachedPreviewService {
       }
     };
 
+    this.hasListeners = true;
     this.channel.addEventListener('message', handler);
     return () => {
+      this.hasListeners = false;
       this.channel?.removeEventListener('message', handler);
     };
   }
