@@ -1260,6 +1260,24 @@ body,
   overflow: hidden;
 }
 
+.modal-card.modal-landscape {
+  width: 860px;
+  max-width: 92vw;
+}
+
+.modal-landscape-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .modal-landscape-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -1410,7 +1428,7 @@ body,
 .export-section {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 12px;
   width: 100%;
 }
 
@@ -1427,6 +1445,7 @@ body,
   display: flex;
   gap: 12px;
   width: 100%;
+  align-items: stretch;
 }
 
 .export-mode-card {
@@ -1436,6 +1455,8 @@ body,
   flex-direction: column;
   align-items: center;
   text-align: center;
+  justify-content: flex-start;
+  min-height: 145px;
   gap: 4px;
   padding: 16px 12px;
   background: rgba(255, 215, 0, 0.03);
@@ -1463,6 +1484,7 @@ body,
 .recommended-badge {
   position: absolute;
   top: -10px;
+  right: 12px;
   background: linear-gradient(135deg, #ffd700, #b8860b);
   color: #000;
   font-size: 0.6rem;
@@ -1498,6 +1520,47 @@ body,
   margin-top: 2px;
 }
 
+/* EXPORT PILL / SEGMENTED CONTROLS */
+.export-pill-group {
+  display: flex;
+  gap: 6px;
+  width: 100%;
+  padding: 4px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  border-radius: var(--radius-md);
+}
+
+.export-pill-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.export-pill-button:hover {
+  color: var(--text-primary);
+  background: rgba(255, 215, 0, 0.08);
+}
+
+.export-pill-button.selected {
+  background: rgba(255, 215, 0, 0.16);
+  border-color: rgba(255, 215, 0, 0.45);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 215, 0, 0.08);
+}
+
 .video-preview-wrapper {
   width: 100%;
   max-height: 240px;
@@ -1514,7 +1577,8 @@ body,
 
 .modal-footer {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
   padding: 16px 20px;
   border-top: 1px solid var(--border-color);
@@ -1531,6 +1595,12 @@ body,
 
 .text-secondary {
   color: var(--accent-cyan);
+}
+
+.crediblemark-ad-banner:hover {
+  border-color: rgba(254, 215, 0, 0.7) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7), inset 0 0 25px rgba(254, 215, 0, 0.12) !important;
 }
 
 .w-full {
