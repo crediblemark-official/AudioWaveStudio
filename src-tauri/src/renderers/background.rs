@@ -43,8 +43,6 @@ pub struct MusicNote {
   pub phase: f32,
 }
 
-const NOTE_SYMBOLS: [&str; 4] = ["\u{2669}", "\u{266A}", "\u{266B}", "\u{266C}"];
-
 fn make_particle(rng: &mut super::Rng, edge_spawn: bool) -> Particle {
   let angle = rng.next() * std::f32::consts::TAU;
   let speed = 0.0004 + rng.next() * 0.0004;
@@ -325,19 +323,17 @@ pub fn render_music_notes(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.translate(n.x, n.y);
     c.rotate(n.rotation);
-    c.set_fill(Fill::Solid(color));
-    c.draw_text(
-      NOTE_SYMBOLS[n.symbol as usize],
-      0.0,
-      sz * 0.35,
-      sz,
-      "serif",
-      400.0,
-      crate::gpu2d::text::TextAlign::Center,
-      Fill::Solid(color),
-      alpha.clamp(0.0, 1.0),
-      &crate::gpu2d::text::TextOpts::default(),
-    );
+    let n_color = color.with_alpha(alpha.clamp(0.0, 1.0));
+    c.set_fill(Fill::Solid(n_color));
+    c.set_stroke(Fill::Solid(n_color));
+    c.set_line_width((sz * 0.08).max(2.0));
+    c.fill_circle(0.0, 0.0, sz * 0.22);
+    c.stroke_line(sz * 0.18, 0.0, sz * 0.18, -sz * 0.65);
+    if n.symbol % 2 == 1 {
+      c.stroke_line(sz * 0.18, -sz * 0.65, sz * 0.42, -sz * 0.45);
+    } else {
+      c.stroke_line(sz * 0.18, -sz * 0.65, sz * 0.45, -sz * 0.65);
+    }
     c.restore();
 
     alive.push(n);
@@ -363,6 +359,74 @@ pub fn build_stars() -> Vec<Star> {
       }
     })
     .collect()
+}
+
+// ---------------------------------------------------------------------------
+// Pure formula helpers (mirrors of the TS renderers). Extracted so the
+// render functions can be unit-tested against golden values computed from
+// src/services/renderers/background/*.ts.
+// ---------------------------------------------------------------------------
+
+/// Pure bokeh blob math — mirrors bokeh.ts. Returns (x, y, radius, hue).
+pub fn bokeh_blob(
+  i: usize,
+  t: f32,
+  width: f32,
+  height: f32,
+  base_size: f32,
+  scale_factor: f32,
+  beat_strength: f32,
+) -> (f32, f32, f32, f32) {
+  let seed = i as f32 * 137.5;
+  let x = ((seed + t * (0.2 + i as f32 * 0.03)).sin() * 0.5 + 0.5) * width;
+  let y = ((seed * 0.7 + t * (0.15 + i as f32 * 0.02)).cos() * 0.5 + 0.5) * height;
+  let radius = (4.0 * scale_factor).max(
+    base_size + (seed * 0.3 + t).sin() * (base_size * 0.4) + beat_strength * 15.0 * scale_factor,
+  );
+  let hue = (seed + t * 30.0) % 360.0;
+  (x, y, radius, hue)
+}
+
+/// Clamped bokeh fill alpha — mirrors the browser clamping hsla() alpha to 1.
+pub fn bokeh_alpha(base_opacity: f32, bass_energy: f32) -> f32 {
+  (base_opacity + bass_energy * 0.15).clamp(0.0, 1.0)
+}
+
+/// Pure starfield position — mirrors starfield.ts. Returns wrapped (x, y).
+pub fn star_position(s: &Star, t: f32, width: f32, height: f32) -> (f32, f32) {
+  let raw_x = s.x * width + (t * s.speed + s.phase).sin() * 12.0;
+  let raw_y = s.y * height + (t * s.speed * 0.7 + s.phase).cos() * 12.0;
+  (raw_x.rem_euclid(width), raw_y.rem_euclid(height))
+}
+
+/// Star fill alpha (twinkle * pulse * beat factor * brightness), clamped to [0, 1].
+pub fn star_alpha(s: &Star, t: f32, pulse: f32, beat_strength: f32, brightness: f32) -> f32 {
+  let twinkle = 0.4 + (t * (1.5 + s.speed * 4.0) + s.phase).sin() * 0.6;
+  (twinkle * pulse * (0.6 + beat_strength * 0.4) * brightness).clamp(0.0, 1.0)
+}
+
+/// Pure aurora wave height at pixel x for band `band` — mirrors aurora.ts.
+pub fn aurora_y(x: f32, band: usize, t: f32, speed: f32, amp: f32, height: f32) -> f32 {
+  let i = band as f32;
+  height * 0.45
+    + (x * 0.006 + t * speed + i * 1.5).sin() * amp
+    + (x * 0.012 + t * speed * 0.7 + i * 2.0).sin() * (amp * 0.5)
+}
+
+/// Pure nebula blob math — mirrors nebula.ts. Returns (cx, cy, r, hue).
+pub fn nebula_blob(
+  i: usize,
+  t: f32,
+  width: f32,
+  height: f32,
+  beat_strength: f32,
+) -> (f32, f32, f32, f32) {
+  let seed = i as f32 * 73.0;
+  let cx = ((seed * 0.1 + t * (0.1 + i as f32 * 0.02)).sin() * 0.5 + 0.5) * width;
+  let cy = ((seed * 0.13 + t * (0.08 + i as f32 * 0.03)).cos() * 0.5 + 0.5) * height;
+  let r = 180.0 + (seed + t * 0.05).sin() * 80.0 + beat_strength * 100.0;
+  let hue = (seed * 0.7 + t * 20.0 + i as f32 * 50.0) % 360.0;
+  (cx, cy, r, hue)
 }
 
 pub fn render_grid(c: &mut GpuCanvas, ctx: &RenderContext) {
@@ -392,36 +456,54 @@ pub fn render_aurora(c: &mut GpuCanvas, ctx: &RenderContext) {
   let t = ctx.frame_time * speed_mult;
   let speed = (0.3 + ctx.bass_energy * 0.6) * speed_mult;
   let amp = base_amp + ctx.beat_strength * 60.0;
+
+  // Match TS: c.globalCompositeOperation = 'screen'
+  c.set_blend_screen();
+
   for i in 0..4 {
     let hue = (i as f32 * 60.0 + t * 25.0) % 360.0;
+    // Match TS: Math.min(1.0, (baseOpacity * 0.6) + bassEnergy * 0.1)
     let alpha = (base_opacity * 0.6 + ctx.bass_energy * 0.1).min(1.0);
     c.set_fill(Fill::Solid(hsl_to_color(hue, 0.85, 0.60, alpha)));
+
+    // Match TS: wave points from x=0 to x=width, then close the region down to
+    // y=height. fill_polygon's fan from pts[0] overdraws wherever the wave is
+    // not star-shaped from the top-left corner (the doubled region is
+    // screen-blended twice -> bright streaks absent from the TS preview);
+    // fill_polyline_to_base tiles the exact wave->base region with convex quad
+    // strips, matching canvas fill()'s non-zero winding coverage.
     let mut pts: Vec<(f32, f32)> = Vec::new();
     let mut x = 0.0;
     while x <= ctx.width {
-      let y = ctx.height * 0.45
-        + (x * 0.006 + t * speed + i as f32 * 1.5).sin() * amp
-        + (x * 0.012 + t * speed * 0.7 + i as f32 * 2.0).sin() * (amp * 0.5);
-      pts.push((x, y));
+      pts.push((x, aurora_y(x, i, t, speed, amp, ctx.height)));
       x += 6.0;
     }
-    pts.push((ctx.width, ctx.height));
-    pts.push((0.0, ctx.height));
-    c.fill_polygon(&pts);
+    c.fill_polyline_to_base(&pts, ctx.height);
   }
+
+  // Restore normal blending for subsequent draws.
+  c.set_blend_normal();
 }
 
 pub fn render_noise(c: &mut GpuCanvas, ctx: &RenderContext) {
   let bg = &ctx.config.background;
   let base_opacity = bg.grain_opacity.unwrap_or(0.08);
   let alpha = (base_opacity + ctx.bass_energy * 0.08 + ctx.beat_strength * 0.06).min(1.0);
-  let seed = (ctx.frame_time * 60.0).floor() as u32;
+  // Static grain: the same 128x128 tile every frame (parity with noise.ts),
+  // so the background stays temporally static and H.264/HEVC/AV1 can compress
+  // it instead of re-encoding random noise at ~100 Mbps.
+  let seed = 0u32;
   let mut rgba = Vec::with_capacity(128 * 128 * 4);
   let mut rng = super::Rng::new(seed.wrapping_add(0x5EED));
   for _ in 0..128 * 128 {
     let v = (rng.next() * 255.0) as u8;
     rgba.extend_from_slice(&[v, v, v, 255]);
   }
+  // UVs span [0, w/128] x [0, h/128] (one 128px tile per 128 canvas px);
+  // fs_main in shader.wgsl folds them back into the tile's sub-rect so the
+  // grain tiles 1:1 across the canvas (matches TS createPattern 'repeat').
+  let uv_w = ctx.width / 128.0;
+  let uv_h = ctx.height / 128.0;
   c.push_atlas_layer(NOISE_LAYER, rgba, 128, 128);
   c.push_textured_quad(
     NOISE_LAYER,
@@ -429,31 +511,35 @@ pub fn render_noise(c: &mut GpuCanvas, ctx: &RenderContext) {
     0.0,
     ctx.width,
     ctx.height,
-    [0.0, 0.0, 1.0, 1.0],
+    [0.0, 0.0, uv_w, uv_h],
     Color::rgba(1.0, 1.0, 1.0, alpha),
   );
 }
 
 pub fn render_bokeh(c: &mut GpuCanvas, ctx: &RenderContext) {
   let bg = &ctx.config.background;
-  let count = bg.bokeh_count.unwrap_or(18) as usize;
+  // Match TS: Math.min(40, bg.bokehCount ?? 18)
+  let count = (bg.bokeh_count.unwrap_or(18) as usize).min(40);
   let scale_factor = ctx.width.min(ctx.height) / 1080.0;
   let base_size = bg.bokeh_size.unwrap_or(30.0) * scale_factor;
   let base_opacity = bg.bokeh_opacity.unwrap_or(0.3);
+  // Match TS: const t = ctx.frameTime / 5
   let t = ctx.frame_time / 5.0;
+
+  // Match TS: c.globalCompositeOperation = 'screen'
+  c.set_blend_screen();
+
   for i in 0..count {
-    let seed = i as f32 * 137.5;
-    let x = ((seed + t * (0.2 + i as f32 * 0.03)).sin() * 0.5 + 0.5) * ctx.width;
-    let y = ((seed * 0.7 + t * (0.15 + i as f32 * 0.02)).cos() * 0.5 + 0.5) * ctx.height;
-    let radius = ((base_size + (seed * 0.3 + t).sin() * (base_size * 0.4) + ctx.beat_strength * 15.0 * scale_factor).abs()).clamp(2.0, 100.0 * scale_factor);
-    let hue = (seed + t * 30.0) % 360.0;
-    let a1 = (base_opacity + ctx.bass_energy * 0.15).clamp(0.0, 1.0);
+    let (x, y, radius, hue) =
+      bokeh_blob(i, t, ctx.width, ctx.height, base_size, scale_factor, ctx.beat_strength);
+    // Match TS (browser clamps hsla alpha to 1.0 at fill time).
+    let a1 = bokeh_alpha(base_opacity, ctx.bass_energy);
     c.set_fill(Fill::Solid(hsl_to_color(hue, 0.80, 0.65, a1)));
     c.fill_circle(x, y, radius);
-    let a2 = (base_opacity * 1.3 + ctx.bass_energy * 0.2).clamp(0.0, 1.0);
-    c.set_fill(Fill::Solid(hsl_to_color(hue, 0.90, 0.85, a2)));
-    c.fill_circle(x - radius * 0.25, y - radius * 0.25, radius * 0.45);
   }
+
+  // Restore normal blending for subsequent draws.
+  c.set_blend_normal();
 }
 
 pub fn render_starfield(c: &mut GpuCanvas, ctx: &RenderContext, stars: &[Star]) {
@@ -461,15 +547,13 @@ pub fn render_starfield(c: &mut GpuCanvas, ctx: &RenderContext, stars: &[Star]) 
   let target = bg.star_count.unwrap_or(160).clamp(20, STAR_COUNT as u32) as usize;
   let speed_mult = bg.star_speed.unwrap_or(1.0);
   let brightness = bg.star_brightness.unwrap_or(1.0);
+  // Match TS: const t = ctx.frameTime * speedMult
   let t = ctx.frame_time * speed_mult;
   let pulse = 0.7 + ctx.bass_energy * 0.4;
   for s in &stars[..target] {
-    let raw_x = s.x * ctx.width + (t * s.speed + s.phase).sin() * 12.0;
-    let raw_y = s.y * ctx.height + (t * s.speed * 0.7 + s.phase).cos() * 12.0;
-    let x = raw_x.rem_euclid(ctx.width);
-    let y = raw_y.rem_euclid(ctx.height);
-    let twinkle = 0.4 + (t * (1.5 + s.speed * 4.0) + s.phase).sin() * 0.6;
-    let alpha = (twinkle * pulse * (0.6 + ctx.beat_strength * 0.4) * brightness).min(1.0).max(0.0);
+    // Match TS starfield.ts: stars wobble in place around their anchor point.
+    let (x, y) = star_position(s, t, ctx.width, ctx.height);
+    let alpha = star_alpha(s, t, pulse, ctx.beat_strength, brightness);
     c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, alpha)));
     c.fill_circle(x, y, s.size * pulse);
   }
@@ -479,25 +563,31 @@ pub fn render_nebula(c: &mut GpuCanvas, ctx: &RenderContext) {
   let bg = &ctx.config.background;
   let speed_mult = bg.nebula_speed.unwrap_or(1.0);
   let intensity_mult = bg.nebula_intensity.unwrap_or(0.6);
+  // Match TS: t = (frameTime / 7) * speedMult
   let t = (ctx.frame_time / 7.0) * speed_mult;
+  // Match TS: intensity = (0.5 + bassEnergy * 0.5) * intensityMult
   let intensity = (0.5 + ctx.bass_energy * 0.5) * intensity_mult;
+
+  // Match TS: c.globalCompositeOperation = 'screen'
+  c.set_blend_screen();
+
   for i in 0..5 {
-    let seed = i as f32 * 73.0;
-    let cx = ((seed * 0.1 + t * (0.1 + i as f32 * 0.02)).sin() * 0.5 + 0.5) * ctx.width;
-    let cy = ((seed * 0.13 + t * (0.08 + i as f32 * 0.03)).cos() * 0.5 + 0.5) * ctx.height;
-    let r = 180.0 + (seed + t * 0.05).sin() * 80.0 + ctx.beat_strength * 100.0;
-    let hue = (seed * 0.7 + t * 20.0 + i as f32 * 50.0) % 360.0;
+    let (cx, cy, r, hue) = nebula_blob(i, t, ctx.width, ctx.height, ctx.beat_strength);
+    // Match TS gradient stops: 0.50*intensity, 0.25*intensity, 0
     let g = Fill::radial_gradient(
       cx, cy, 0.0, cx, cy, r,
       &[
-        (0.0, hsl_to_color(hue, 0.85, 0.65, 0.50 * intensity)),
-        (0.5, hsl_to_color(hue + 30.0, 0.75, 0.45, 0.25 * intensity)),
+        (0.0, hsl_to_color(hue, 0.85, 0.65, (0.50 * intensity).min(1.0))),
+        (0.5, hsl_to_color(hue + 30.0, 0.75, 0.45, (0.25 * intensity).min(1.0))),
         (1.0, hsl_to_color(hue + 60.0, 0.65, 0.25, 0.0)),
       ],
     );
     c.set_fill(g);
-    c.fill_rect(0.0, 0.0, ctx.width, ctx.height);
+    c.fill_circle(cx, cy, r);
   }
+
+  // Restore normal blending.
+  c.set_blend_normal();
 }
 
 pub fn render_psychedelic(c: &mut GpuCanvas, ctx: &RenderContext) {

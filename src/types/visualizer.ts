@@ -142,6 +142,8 @@ export interface ExportSettings {
   resolution: '1080p' | '720p' | '4K';
   fps: 30 | 60;
   format: 'mp4' | 'webm';
+  renderEngine?: 'gpu' | 'canvas';
+  encoder?: 'auto' | 'h264' | 'hevc' | 'av1';
 }
 
 export interface ScreenEffectsSettings {

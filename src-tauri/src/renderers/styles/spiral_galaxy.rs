@@ -1,4 +1,12 @@
-//! Spiral Galaxy style renderer (`spiralGalaxy`).
+//! Spiral Galaxy style renderer (`spiralGalaxy`) — faithful port of
+//! `src/services/renderers/spiralGalaxy.ts` (export path parity).
+//!
+//! Mirrors the TS model exactly: 400 uniformly random particles across 3
+//! arms, per-particle rotation speed `0.002 + (1-r)*0.008` plus a shared
+//! `rotSpeed = 0.003 + be*0.01 + bs*0.02`, arm spiral offset
+//! `p.radius * 0.5`, color mixing by radius, and a small white core circle
+//! (NO radial core glow — a stale port added a large gradient halo that the
+//! preview never shows).
 
 use std::f32::consts::TAU;
 
@@ -13,7 +21,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let p = crate::renderers::theme_primary(theme);
   let s = crate::renderers::theme_secondary(theme);
   let glow = crate::renderers::theme_glow(theme);
-  let sensitivity = ctx.config.reactivity.sensitivity;
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
 
@@ -22,61 +29,42 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   let cx = width / 2.0;
   let cy = height / 2.0;
-  let max_radius = width.min(height) * 0.42;
+  let max_r = width.min(height) * 0.45;
 
+  // TS `initGalaxy`: 400 particles, `arm = floor(rand*3)`, `r = rand()`.
   if st.galaxy.is_empty() {
-    let arms = 3;
-    let particles_per_arm = 80;
-    for arm in 0..arms {
-      for i in 0..particles_per_arm {
-        let r = (i as f32 / particles_per_arm as f32).powf(0.7);
-        let angle = r * TAU * 1.8 + arm as f32 * (TAU / arms as f32);
-        let spread = (rng.next() - 0.5) * 0.35 * (1.0 - r * 0.5);
-        st.galaxy.push(GalaxyParticle {
-          arm,
-          radius: r,
-          angle: angle + spread,
-          speed: 0.003 + (1.0 - r) * 0.008,
-          size: 1.0 + (1.0 - r) * 3.5 + rng.next() * 1.5,
-          offset: (rng.next() - 0.5) * 20.0,
-        });
-      }
+    for _ in 0..400 {
+      let arm = (rng.next() * 3.0) as u32;
+      let r = rng.next();
+      st.galaxy.push(GalaxyParticle {
+        angle: rng.next() * TAU + arm as f32 * 2.1,
+        radius: r,
+        speed: 0.002 + (1.0 - r) * 0.008,
+        size: 0.5 + r * 2.5,
+        arm,
+        offset: 0.0,
+      });
     }
   }
 
-  st.galaxy_rotation += 0.005 + be * 0.015 + bs * 0.01;
-  let rot = st.galaxy_rotation;
+  // TS: `const rotSpeed = 0.003 + be * 0.01 + bs * 0.02;`
+  let rot_speed = 0.003 + be * 0.01 + bs * 0.02;
+  // TS: `const glowIntensity = 0.5 + be * 1.5;`
+  let glow_intensity = 0.5 + be * 1.5;
 
-  c.save();
-  c.set_shadow(Color::TRANSPARENT, 0.0);
+  for gp in st.galaxy.iter_mut() {
+    // TS: `p.angle += p.speed + rotSpeed;`
+    gp.angle += gp.speed + rot_speed;
 
-  let core_r = max_radius * 0.15 * (1.0 + be * 0.3);
-  let core_grad = Fill::radial_gradient(cx, cy, 0.0, cx, cy, core_r * 2.0, &[
-    (0.0, Color::WHITE.with_alpha(0.9)),
-    (0.3, p.with_alpha(0.7)),
-    (0.7, s.with_alpha(0.3)),
-    (1.0, Color::TRANSPARENT),
-  ]);
-  c.set_fill(core_grad);
-  c.set_shadow(glow, 25.0 * (1.0 + be));
-  c.fill_circle(cx, cy, core_r * 2.0);
+    // TS: `dist = p.radius * maxR; spiralOffset = p.radius * 0.5;
+    //      a = p.angle + p.arm * 2.1 + p.radius * 3;`
+    let dist = gp.radius * max_r;
+    let spiral = gp.radius * 0.5;
+    let a = gp.angle + gp.arm as f32 * 2.1 + gp.radius * 3.0;
+    let x = cx + a.cos() * (dist + (gp.angle * 3.0 + gp.arm as f32).sin() * spiral);
+    let y = cy + a.sin() * (dist + (gp.angle * 3.0 + gp.arm as f32).cos() * spiral);
 
-  let freq_count = ctx.freq_data.len();
-  let step = (freq_count / st.galaxy.len().max(1)).max(1);
-
-  let spiral_offset = be * 25.0 * sensitivity;
-  let glow_intensity = 0.4 + be * 0.6;
-
-  for (idx, gp) in st.galaxy.iter_mut().enumerate() {
-    let freq_val = *ctx.freq_data.get((idx * step) % freq_count).unwrap_or(&0) as f32 / 255.0;
-    let boost = freq_val * sensitivity * 0.4;
-    gp.angle += gp.speed + boost * 0.01;
-
-    let dist = gp.radius * max_radius * (1.0 + be * 0.12);
-    let a = rot + gp.angle + gp.arm as f32 * 2.1 + gp.radius * 3.0;
-    let x = cx + a.cos() * (dist + (gp.angle * 3.0 + gp.arm as f32).sin() * spiral_offset);
-    let y = cy + a.sin() * (dist + (gp.angle * 3.0 + gp.arm as f32).cos() * spiral_offset);
-    let alpha: f32 = (0.3 + gp.radius * 0.4) * (0.5 + be * 0.5);
+    let alpha = (0.3 + gp.radius * 0.4) * (0.5 + be * 0.5);
     let size = gp.size * (1.0 + be * 0.5);
     let col = mix(p, s, gp.radius);
     c.set_global_alpha(alpha.clamp(0.0, 1.0));
@@ -85,12 +73,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.fill_circle(x, y, size);
   }
 
+  // TS white core: `arc(cx, cy, 2 + be*4)`, alpha `0.8 + be*0.2`.
   c.set_fill(Fill::Solid(Color::WHITE));
   c.set_shadow(glow, 20.0 * glow_intensity);
-  c.set_global_alpha((0.8f32 + be * 0.2).clamp(0.0, 1.0));
+  c.set_global_alpha((0.8 + be * 0.2).clamp(0.0, 1.0));
   c.fill_circle(cx, cy, 2.0 + be * 4.0);
 
   c.set_global_alpha(1.0);
   c.set_shadow(Color::TRANSPARENT, 0.0);
-  c.restore();
 }

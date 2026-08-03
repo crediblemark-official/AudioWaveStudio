@@ -108,12 +108,24 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       c.set_line_width(0.7);
       c.stroke_rect(x, by, bw, bh);
 
+      // TS fills then `c.stroke()`s the CLOSED path of the top and side caps
+      // (strokeStyle = strokeCol, lineWidth 0.7) — mirror the closed path by
+      // appending the start point.
       c.set_fill(Fill::Solid(top));
       c.fill_polygon(&[
         (x, by),
         (x + dx, by - dy),
         (x + bw + dx, by - dy),
         (x + bw, by),
+      ]);
+      c.set_stroke(Fill::Solid(stroke_col));
+      c.set_line_width(0.7);
+      c.stroke_polyline(&[
+        (x, by),
+        (x + dx, by - dy),
+        (x + bw + dx, by - dy),
+        (x + bw, by),
+        (x, by),
       ]);
 
       c.set_fill(Fill::Solid(side));
@@ -122,6 +134,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         (x + bw + dx, by - dy),
         (x + bw + dx, row_y - dy),
         (x + bw, row_y),
+      ]);
+      c.set_stroke(Fill::Solid(stroke_col));
+      c.set_line_width(0.7);
+      c.stroke_polyline(&[
+        (x + bw, by),
+        (x + bw + dx, by - dy),
+        (x + bw + dx, row_y - dy),
+        (x + bw, row_y),
+        (x + bw, by),
       ]);
 
       if val > 0.45 && row == 0 {

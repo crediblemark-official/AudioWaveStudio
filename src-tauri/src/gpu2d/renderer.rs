@@ -17,6 +17,14 @@ pub const RADIAL_CENTER_IMAGE_LAYER: u32 = 22;
 const SHADER_SRC: &str = include_str!("shader.wgsl");
 const POST_FX_SRC: &str = include_str!("postfx.wgsl");
 
+/// Render target for a scene pass (self.texture or the post-pass texture
+/// when compositing over a post-processed background).
+#[derive(Clone, Copy, Debug)]
+enum SceneTarget {
+  Frame,
+  Post,
+}
+
 /// Parameters for a post-processing pass (screen effects that sample the frame).
 #[derive(Clone, Copy, Debug)]
 pub struct PostFx {
@@ -91,6 +99,11 @@ pub struct GpuRenderer {
   atlas_view: wgpu::TextureView,
   bind_group: wgpu::BindGroup,
   pipeline: wgpu::RenderPipeline,
+  /// Additive blend pipeline for glow composite mode.
+  additive_pipeline: wgpu::RenderPipeline,
+  /// Canvas2D `globalCompositeOperation = 'screen'` blend pipeline
+  /// (premultiplied src * (1 - dst) + dst).
+  screen_pipeline: wgpu::RenderPipeline,
   width: u32,
   height: u32,
   // Post-processing pass (screen effects that need frame sampling).
@@ -245,7 +258,100 @@ impl GpuRenderer {
               operation: wgpu::BlendOperation::Add,
             },
             alpha: wgpu::BlendComponent {
+              src_factor: wgpu::BlendFactor::One,
+              dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+              operation: wgpu::BlendOperation::Add,
+            },
+          }),
+          write_mask: wgpu::ColorWrites::ALL,
+        })],
+        compilation_options: Default::default(),
+      }),
+      primitive: wgpu::PrimitiveState {
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        ..Default::default()
+      },
+      depth_stencil: None,
+      multisample: wgpu::MultisampleState::default(),
+      multiview: None,
+      cache: None,
+    });
+
+    // Additive blend pipeline for screen/glow composite mode.
+    let additive_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+      label: Some("gpu2d additive pipeline"),
+      layout: Some(&pipeline_layout),
+      vertex: wgpu::VertexState {
+        module: &shader,
+        entry_point: Some("vs_main"),
+        buffers: &[wgpu::VertexBufferLayout {
+          array_stride: std::mem::size_of::<RawVertex>() as u64,
+          step_mode: wgpu::VertexStepMode::Vertex,
+          attributes: &vertex_layout(),
+        }],
+        compilation_options: Default::default(),
+      },
+      fragment: Some(wgpu::FragmentState {
+        module: &shader,
+        entry_point: Some("fs_main"),
+        targets: &[Some(wgpu::ColorTargetState {
+          format: wgpu::TextureFormat::Rgba8Unorm,
+          blend: Some(wgpu::BlendState {
+            color: wgpu::BlendComponent {
               src_factor: wgpu::BlendFactor::SrcAlpha,
+              dst_factor: wgpu::BlendFactor::One,
+              operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+              src_factor: wgpu::BlendFactor::One,
+              dst_factor: wgpu::BlendFactor::One,
+              operation: wgpu::BlendOperation::Add,
+            },
+          }),
+          write_mask: wgpu::ColorWrites::ALL,
+        })],
+        compilation_options: Default::default(),
+      }),
+      primitive: wgpu::PrimitiveState {
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        ..Default::default()
+      },
+      depth_stencil: None,
+      multisample: wgpu::MultisampleState::default(),
+      multiview: None,
+      cache: None,
+    });
+
+    // Canvas2D 'screen' blend pipeline. Vertex colors for Screen batches are
+    // premultiplied on the CPU at batch flush, so `src * (1 - dst) + dst`
+    // matches the compositing spec formula for an opaque backdrop:
+    //   Co = αs·Cs·(1 − Cb) + Cb,  αo = αs + αb·(1 − αs) = 1
+    let screen_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+      label: Some("gpu2d screen pipeline"),
+      layout: Some(&pipeline_layout),
+      vertex: wgpu::VertexState {
+        module: &shader,
+        entry_point: Some("vs_main"),
+        buffers: &[wgpu::VertexBufferLayout {
+          array_stride: std::mem::size_of::<RawVertex>() as u64,
+          step_mode: wgpu::VertexStepMode::Vertex,
+          attributes: &vertex_layout(),
+        }],
+        compilation_options: Default::default(),
+      },
+      fragment: Some(wgpu::FragmentState {
+        module: &shader,
+        entry_point: Some("fs_main"),
+        targets: &[Some(wgpu::ColorTargetState {
+          format: wgpu::TextureFormat::Rgba8Unorm,
+          blend: Some(wgpu::BlendState {
+            color: wgpu::BlendComponent {
+              src_factor: wgpu::BlendFactor::OneMinusDst,
+              dst_factor: wgpu::BlendFactor::One,
+              operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+              src_factor: wgpu::BlendFactor::One,
               dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
               operation: wgpu::BlendOperation::Add,
             },
@@ -396,6 +502,8 @@ impl GpuRenderer {
       atlas_view,
       bind_group,
       pipeline,
+      additive_pipeline,
+      screen_pipeline,
       width,
       height,
       post_texture,
@@ -662,24 +770,51 @@ impl GpuRenderer {
   /// Record the scene pass: upload atlases, build geometry and draw the frame
   /// into `self.texture`. Caller submits the encoder after adding copies/post.
   fn record_scene(&mut self, enc: &mut wgpu::CommandEncoder, mesh: &Mesh) {
+    let clear = mesh.clear;
+    self.record_scene_op(
+      enc,
+      mesh,
+      SceneTarget::Frame,
+      wgpu::LoadOp::Clear(wgpu::Color {
+        r: clear.r as f64,
+        g: clear.g as f64,
+        b: clear.b as f64,
+        a: clear.a as f64,
+      }),
+    );
+  }
+
+  /// Like `record_scene` but composites over the CURRENT target contents
+  /// (LoadOp::Load) instead of clearing — used to draw the foreground mesh on
+  /// top of a post-processed background.
+  fn record_scene_over(&mut self, enc: &mut wgpu::CommandEncoder, mesh: &Mesh, target: SceneTarget) {
+    self.record_scene_op(enc, mesh, target, wgpu::LoadOp::Load);
+  }
+
+  fn record_scene_op(
+    &mut self,
+    enc: &mut wgpu::CommandEncoder,
+    mesh: &Mesh,
+    target: SceneTarget,
+    load: wgpu::LoadOp<wgpu::Color>,
+  ) {
     for atlas in &mesh.atlases {
       self.upload_layer(atlas.layer, &atlas.rgba, atlas.width, atlas.height);
     }
     self.ensure_geometry(mesh);
 
-    let clear = mesh.clear;
+    let view = match target {
+      SceneTarget::Frame => &self.texture_view,
+      SceneTarget::Post => &self.post_texture_view,
+    };
+
     let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: Some("gpu2d pass"),
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view: &self.texture_view,
+        view: &view,
         resolve_target: None,
         ops: wgpu::Operations {
-          load: wgpu::LoadOp::Clear(wgpu::Color {
-            r: clear.r as f64,
-            g: clear.g as f64,
-            b: clear.b as f64,
-            a: clear.a as f64,
-          }),
+          load,
           store: wgpu::StoreOp::Store,
         },
       })],
@@ -688,11 +823,29 @@ impl GpuRenderer {
     });
 
     if !mesh.idx.is_empty() {
-      pass.set_pipeline(&self.pipeline);
       pass.set_bind_group(0, &self.bind_group, &[]);
       pass.set_vertex_buffer(0, self.vert_buf.as_ref().unwrap().slice(..));
       pass.set_index_buffer(self.idx_buf.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint32);
-      pass.draw_indexed(0..mesh.idx.len() as u32, 0, 0..1);
+
+      if mesh.batches.is_empty() {
+        // Fallback: no batches recorded, draw all with normal pipeline.
+        pass.set_pipeline(&self.pipeline);
+        pass.draw_indexed(0..mesh.idx.len() as u32, 0, 0..1);
+      } else {
+        use super::scene::BlendMode;
+        let mut current_blend = None;
+        for batch in &mesh.batches {
+          if current_blend != Some(batch.blend) {
+            match batch.blend {
+              BlendMode::Normal => pass.set_pipeline(&self.pipeline),
+              BlendMode::Additive => pass.set_pipeline(&self.additive_pipeline),
+              BlendMode::Screen => pass.set_pipeline(&self.screen_pipeline),
+            }
+            current_blend = Some(batch.blend);
+          }
+          pass.draw_indexed(batch.idx_start..(batch.idx_start + batch.idx_count), 0, 0..1);
+        }
+      }
     }
   }
 
@@ -725,6 +878,68 @@ impl GpuRenderer {
     });
     self.record_scene(&mut enc, mesh);
     self.copy_to_staging(&mut enc, slot, &self.texture);
+    self.queue.submit(std::iter::once(enc.finish()));
+  }
+
+  /// Two-pass render for `backgroundOnly` screen effects: the background mesh
+  /// is drawn into `self.texture`, run through the post-processing pipeline
+  /// into `post_texture`, then the foreground mesh is composited OVER the
+  /// post-processed background (LoadOp::Load — no clear) and the combined
+  /// result is copied into `staging[slot]`. Mirrors canvasRenderer, which
+  /// applies frame-sampling effects to the background BEFORE drawing the
+  /// visualizer style on top.
+  pub fn render_bg_fx_then_over(&mut self, bg_mesh: &Mesh, fg_mesh: &Mesh, fx: &PostFx, slot: usize) {
+    let params = RawFxParams {
+      mode: fx.mode,
+      intensity: fx.intensity,
+      time: fx.time,
+      beat: fx.beat,
+      width: self.width as f32,
+      height: self.height as f32,
+      pad: [0.0, 0.0, 0.0],
+    };
+    self
+      .queue
+      .write_buffer(&self.post_params_buf, 0, bytemuck::bytes_of(&params));
+
+    let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("frame bg fx enc"),
+    });
+    self.record_scene(&mut enc, bg_mesh);
+
+    {
+      let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+        label: Some("postfx bg pass"),
+        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+          view: &self.post_texture_view,
+          resolve_target: None,
+          ops: wgpu::Operations {
+            load: wgpu::LoadOp::Load,
+            store: wgpu::StoreOp::Store,
+          },
+        })],
+        depth_stencil_attachment: None,
+        ..Default::default()
+      });
+      pass.set_pipeline(&self.post_pipeline);
+      pass.set_bind_group(0, &self.post_bind_group, &[]);
+      pass.draw(0..3, 0..1);
+    }
+
+    // Submit the background + post-fx FIRST, then the foreground in a second
+    // submission: a later `write_buffer` into the shared geometry buffers in
+    // the same submit can alias the background pass's reads on some drivers
+    // (observed on Intel ANV), leaving the post-fx output sampling stale
+    // pixels.
+    self.queue.submit(std::iter::once(enc.finish()));
+
+    let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+      label: Some("frame fg over enc"),
+    });
+    // Composite the foreground (style/particles/notes/text) over the fx'd
+    // background without clearing.
+    self.record_scene_over(&mut enc, fg_mesh, SceneTarget::Post);
+    self.copy_to_staging(&mut enc, slot, &self.post_texture);
     self.queue.submit(std::iter::once(enc.finish()));
   }
 

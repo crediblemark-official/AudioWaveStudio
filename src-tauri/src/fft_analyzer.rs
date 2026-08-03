@@ -41,7 +41,11 @@ impl FftAnalyzer {
     let num_freq_bins = output.len();
     let magnitudes: Vec<f32> = output
       .iter()
-      .map(|c| (c.norm() / (n as f32 / 2.0)).min(1.0))
+      .map(|c| {
+        let norm = c.norm() / (n as f32 / 2.0);
+        let db = 20.0 * norm.max(1e-5).log10();
+        ((db + 100.0) / 70.0).clamp(0.0, 1.0)
+      })
       .collect();
 
     let bin_size = (num_freq_bins / target_bins).max(1);
@@ -90,7 +94,11 @@ impl FftAnalyzer {
     let magnitudes: Vec<f32> = output
       .iter()
       .take(n / 2)
-      .map(|c| (c.norm() / (n as f32 / 2.0)).min(1.0))
+      .map(|c| {
+        let norm = c.norm() / (n as f32 / 2.0);
+        let db = 20.0 * norm.max(1e-5).log10();
+        ((db + 100.0) / 70.0).clamp(0.0, 1.0)
+      })
       .collect();
 
     let bass_bins = 8.min(magnitudes.len());

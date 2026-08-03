@@ -250,6 +250,7 @@ fn spotlight(
     ],
   ];
   let positions = [[0.0, 0.0], [w, 0.0], [w, h], [0.0, h]];
+  c.set_blend_screen();
   for (i, [x, y]) in positions.iter().enumerate() {
     let [r, g, b] = corners[i];
     let fill = Fill::radial_gradient(
@@ -268,6 +269,7 @@ fn spotlight(
     c.set_fill(fill);
     c.fill_rect(0.0, 0.0, w, h);
   }
+  c.set_blend_normal();
 }
 
 fn strobe(
@@ -335,14 +337,15 @@ fn hue_shift(
     return;
   }
   let hue = (frame_time * 25.0) % 360.0;
+  let reduced = amount * 0.3;
   let fill = Fill::linear_gradient(
     0.0,
     0.0,
     w,
     h,
     &[
-      (0.0, hsl_to_color(hue, 0.85, 0.5, amount)),
-      (1.0, hsl_to_color((hue + 180.0) % 360.0, 0.85, 0.5, amount)),
+      (0.0, hsl_to_color(hue, 0.85, 0.5, reduced)),
+      (1.0, hsl_to_color((hue + 180.0) % 360.0, 0.85, 0.5, reduced)),
     ],
   );
   c.set_fill(fill);

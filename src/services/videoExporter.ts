@@ -77,6 +77,15 @@ export class VideoExporter {
     }
   }
 
+  public async cleanupTempFile(filePath?: string) {
+    if (!filePath) return;
+    try {
+      await rustBridge.deleteFile(filePath);
+    } catch {
+      // Best-effort cleanup
+    }
+  }
+
   public async saveToFile(sourcePath: string, defaultFilename: string): Promise<boolean> {
     const destPath = await save({
       defaultPath: defaultFilename,
@@ -84,11 +93,6 @@ export class VideoExporter {
     });
     if (!destPath) return false;
     await rustBridge.copyFileToPath(sourcePath, destPath);
-    try {
-      await rustBridge.deleteFile(sourcePath);
-    } catch {
-      // Temp file cleanup is best-effort
-    }
     return true;
   }
 }

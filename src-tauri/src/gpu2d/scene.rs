@@ -26,7 +26,13 @@ impl Color {
 
   pub fn hex(hex: &str) -> Color {
     let h = hex.trim_start_matches('#');
+    if h.is_empty() {
+      return Color { r: 0.043, g: 0.047, b: 0.063, a: 1.0 }; // #0b0c10 default
+    }
     let parse = |i: usize| -> f32 {
+      if i * 2 >= h.len() {
+        return 0.0;
+      }
       let s = &h[i * 2..(i * 2 + 2).min(h.len())];
       u8::from_str_radix(s, 16).unwrap_or(0) as f32 / 255.0
     };
@@ -209,6 +215,14 @@ impl Vertex {
   }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum BlendMode {
+  #[default]
+  Normal,
+  Additive,
+  Screen,
+}
+
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LineCap {
   Butt,
@@ -279,6 +293,12 @@ pub struct AtlasUpload {
   pub height: u32,
 }
 
+pub struct DrawBatch {
+  pub blend: BlendMode,
+  pub idx_start: u32,
+  pub idx_count: u32,
+}
+
 pub struct GpuCanvas {
   pub width: f32,
   pub height: f32,
@@ -290,6 +310,9 @@ pub struct GpuCanvas {
   pub segments: u32,
   atlases: Vec<AtlasUpload>,
   next_text_layer: u32,
+  blend_mode: BlendMode,
+  batches: Vec<DrawBatch>,
+  batch_idx_start: u32,
 }
 
 impl GpuCanvas {
@@ -305,7 +328,63 @@ impl GpuCanvas {
       segments: 64,
       atlases: Vec::new(),
       next_text_layer: 0,
+      blend_mode: BlendMode::Normal,
+      batches: Vec::new(),
+      batch_idx_start: 0,
     }
+  }
+
+  /// Switch to additive blending.
+  pub fn set_blend_additive(&mut self) {
+    if self.blend_mode != BlendMode::Additive {
+      self.flush_batch();
+      self.blend_mode = BlendMode::Additive;
+    }
+  }
+
+  /// Switch to Canvas2D `globalCompositeOperation = 'screen'` blending.
+  /// Source colors are premultiplied at batch flush so the screen pipeline's
+  /// `src * (1 - dst) + dst` blend reproduces the compositing spec's formula
+  /// (Co = αs·Cs·(1 − Cb) + Cb for an opaque backdrop).
+  ///
+  /// NOTE: screen batches must only contain flat (untextured) geometry — the
+  /// shader multiplies premultiplied colors by the atlas sample for textured
+  /// quads, which would double-apply alpha.
+  pub fn set_blend_screen(&mut self) {
+    if self.blend_mode != BlendMode::Screen {
+      self.flush_batch();
+      self.blend_mode = BlendMode::Screen;
+    }
+  }
+
+  /// Switch back to normal alpha blending.
+  pub fn set_blend_normal(&mut self) {
+    if self.blend_mode != BlendMode::Normal {
+      self.flush_batch();
+      self.blend_mode = BlendMode::Normal;
+    }
+  }
+
+  fn flush_batch(&mut self) {
+    let idx_count = self.idx.len() as u32 - self.batch_idx_start;
+    if idx_count > 0 {
+      if self.blend_mode == BlendMode::Screen {
+        // Premultiply straight-alpha colors so the screen pipeline can blend
+        // `src * (1 - dst) + dst` with premultiplied source colors.
+        for v in &mut self.verts[self.batch_idx_start as usize..] {
+          let a = v.color[3];
+          v.color[0] *= a;
+          v.color[1] *= a;
+          v.color[2] *= a;
+        }
+      }
+      self.batches.push(DrawBatch {
+        blend: self.blend_mode,
+        idx_start: self.batch_idx_start,
+        idx_count,
+      });
+    }
+    self.batch_idx_start = self.idx.len() as u32;
   }
 
   fn push_tri(&mut self, a: Vertex, b: Vertex, c: Vertex) {
@@ -603,6 +682,10 @@ impl GpuCanvas {
   }
 
   fn stroke_polyline_impl(&mut self, pts: &[(f32, f32)]) {
+    if pts.len() < 2 {
+      return;
+    }
+    let hw = self.state.stroke_width / 2.0;
     for seg in pts.windows(2) {
       let (p0, p1) = (seg[0], seg[1]);
       let dx = p1.0 - p0.0;
@@ -613,7 +696,6 @@ impl GpuCanvas {
       }
       let nx = -dy / len;
       let ny = dx / len;
-      let hw = self.state.stroke_width / 2.0;
       let a = (p0.0 + nx * hw, p0.1 + ny * hw);
       let b = (p0.0 - nx * hw, p0.1 - ny * hw);
       let c = (p1.0 + nx * hw, p1.1 + ny * hw);
@@ -621,8 +703,12 @@ impl GpuCanvas {
       let stroke = self.state.stroke.clone();
       let xform = self.state.transform;
       self.push_quad(a, b, d, c, &stroke, &xform);
-      if self.state.line_cap == LineCap::Round {
+    }
+    if self.state.line_cap == LineCap::Round {
+      if let Some(&p0) = pts.first() {
         self.cap_round(p0, hw);
+      }
+      if let Some(&p1) = pts.last() {
         self.cap_round(p1, hw);
       }
     }
@@ -658,6 +744,12 @@ impl GpuCanvas {
       self.fill_rect(x, y, w, h);
       return;
     }
+    // Canvas roundRect() draws ONE shadow for the whole shape. The pieces
+    // below must not re-trigger draw_shadow (each fill_rect would, previously
+    // stacking 2-3 overlapping glows per bar and over-brightening dense bars).
+    self.draw_shadow(x, y, w, h);
+    let saved_shadow = (self.state.shadow_color, self.state.shadow_blur);
+    self.set_shadow(Color::TRANSPARENT, 0.0);
     self.fill_rect(x + r, y, w - 2.0 * r, h);
     self.fill_rect(x, y + r, w, h - 2.0 * r);
     let corners = [
@@ -669,6 +761,7 @@ impl GpuCanvas {
     for (cx, cy) in corners {
       self.fill_arc(cx, cy, r, 0.0, std::f32::consts::TAU);
     }
+    self.set_shadow(saved_shadow.0, saved_shadow.1);
   }
 
   /// Canvas roundRect with only the top corners rounded (bars).
@@ -678,13 +771,32 @@ impl GpuCanvas {
       self.fill_rect(x, y, w, h);
       return;
     }
-    let fill = self.state.fill.clone();
-    let xform = self.state.transform;
+    // One shadow for the whole shape (see fill_rounded_rect).
+    self.draw_shadow(x, y, w, h);
+    let saved_shadow = (self.state.shadow_color, self.state.shadow_blur);
+    self.set_shadow(Color::TRANSPARENT, 0.0);
     self.fill_rect(x + r, y, w - 2.0 * r, h);
     self.fill_rect(x, y + r, w, h - r);
     self.fill_arc(x + r, y + r, r, std::f32::consts::PI, std::f32::consts::PI * 1.5);
     self.fill_arc(x + w - r, y + r, r, std::f32::consts::PI * 1.5, std::f32::consts::TAU);
-    let _ = (fill, xform);
+    self.set_shadow(saved_shadow.0, saved_shadow.1);
+  }
+
+  /// Canvas roundRect with only the bottom corners rounded (mirror bars).
+  pub fn fill_rounded_rect_bottom(&mut self, x: f32, y: f32, w: f32, h: f32, r: f32) {
+    let r = r.clamp(0.0, w.min(h) / 2.0);
+    if r <= 0.0 {
+      self.fill_rect(x, y, w, h);
+      return;
+    }
+    self.draw_shadow(x, y, w, h);
+    let saved_shadow = (self.state.shadow_color, self.state.shadow_blur);
+    self.set_shadow(Color::TRANSPARENT, 0.0);
+    self.fill_rect(x + r, y, w - 2.0 * r, h);
+    self.fill_rect(x, y, w, h - r);
+    self.fill_arc(x + r, y + h - r, r, std::f32::consts::PI * 1.5, std::f32::consts::TAU);
+    self.fill_arc(x + w - r, y + h - r, r, 0.0, std::f32::consts::PI * 0.5);
+    self.set_shadow(saved_shadow.0, saved_shadow.1);
   }
 
   /// Fill a simple (roughly convex/star-shaped) polygon via fan from pts[0].
@@ -702,6 +814,122 @@ impl GpuCanvas {
       let cb = self.vertex_color(&self.state.fill, bx, by, &self.state.transform);
       let ta = self.state.transform.apply(ax, ay);
       let tb = self.state.transform.apply(bx, by);
+      self.push_tri(Vertex::flat(t0, c0), Vertex::flat(ta, ca), Vertex::flat(tb, cb));
+    }
+  }
+
+  /// Fill the region between an x-monotone polyline and a horizontal base line
+  /// (`y = base_y`) with vertical quad strips.
+  ///
+  /// Equivalent to Canvas2D `fill()` of the closed polygon
+  /// `[polyline, (last.x, base_y), (first.x, base_y)]` under the non-zero
+  /// winding rule — but WITHOUT the fan-overflow bug: `fill_polygon` fans from
+  /// `pts[0]`, and when the polyline is NOT star-shaped from that corner (e.g.
+  /// a waveform that dips below and rises above, common at high sensitivity)
+  /// the fan triangles spill OUTSIDE the polygon into the background. A strip
+  /// of quads spanning each segment to the base covers exactly the area a
+  /// canvas `fill()` would paint for an x-monotone curve.
+  ///
+  /// LINEAR GRADIENT PARITY: canvas samples gradients per-pixel, but this
+  /// renderer samples at vertices and lets the GPU interpolate — the two agree
+  /// EXACTLY only while the gradient is linear over a triangle's y-range
+  /// (vertical gradient). Color stops introduce slope breaks: a single strip
+  /// spanning a stop blends the two segments and drifts from the true color
+  /// (waveformFill's mid band read up to ~40% too dim). Strips are therefore
+  /// split at every interior stop's projected y, so each piece stays inside
+  /// one linear segment and per-vertex sampling becomes pixel-exact.
+  pub fn fill_polyline_to_base(&mut self, pts: &[(f32, f32)], base_y: f32) {
+    if pts.len() < 2 {
+      return;
+    }
+    let fill = self.state.fill.clone();
+    let xform = self.state.transform;
+    // Interior gradient stops projected onto the gradient's y-axis — the
+    // horizontal lines where the piecewise-linear gradient changes slope.
+    let kinks: Vec<f32> = match &fill {
+      Fill::Gradient(Gradient::Linear { y0, y1, stops, .. }) => {
+        let dy = y1 - y0;
+        if dy.abs() < 1e-6 {
+          Vec::new()
+        } else {
+          stops
+            .iter()
+            .filter(|s| s.t > 0.0 && s.t < 1.0)
+            .map(|s| y0 + s.t * dy)
+            .collect()
+        }
+      }
+      _ => Vec::new(),
+    };
+    for seg in pts.windows(2) {
+      let (p0, p1) = (seg[0], seg[1]);
+      // Skip degenerate segments (zero width) — matches canvas which draws
+      // nothing for a zero-area slice.
+      if (p1.0 - p0.0).abs() < 1e-9 {
+        continue;
+      }
+      if kinks.is_empty() {
+        self.push_quad(p0, p1, (p1.0, base_y), (p0.0, base_y), &fill, &xform);
+      } else {
+        self.push_strip_sliced(p0, p1, base_y, &kinks, &fill, &xform);
+      }
+    }
+  }
+
+  /// Emit one wave->base strip as the union of the strip quad clipped to each
+  /// horizontal band between consecutive split lines (wave endpoints, base,
+  /// and gradient kinks). Band-clipped pieces are convex polygons whose
+  /// y-range never crosses a gradient slope break, so per-vertex gradient
+  /// sampling reproduces canvas per-pixel sampling exactly (coverage is
+  /// unchanged — the bands tile the original quad).
+  fn push_strip_sliced(
+    &mut self,
+    p0: (f32, f32),
+    p1: (f32, f32),
+    base_y: f32,
+    kinks: &[f32],
+    fill: &Fill,
+    xform: &Transform,
+  ) {
+    let (x0, y0) = p0;
+    let (x1, y1) = p1;
+    let quad: [(f32, f32); 4] = [p0, p1, (x1, base_y), (x0, base_y)];
+    let lo = y0.min(y1).min(base_y);
+    let hi = y0.max(y1).max(base_y);
+    let mut splits: Vec<f32> = vec![lo, hi];
+    for &k in kinks {
+      if k > lo + 1e-6 && k < hi - 1e-6 {
+        splits.push(k);
+      }
+    }
+    splits.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    splits.dedup_by(|a, b| (*a - *b).abs() < 1e-6);
+    for w in splits.windows(2) {
+      let (a, b) = (w[0], w[1]);
+      if b - a < 1e-6 {
+        continue;
+      }
+      let poly = clip_polygon_hband(&quad, a, b);
+      if poly.len() >= 3 {
+        self.push_polygon_fan(&poly, fill, xform);
+      }
+    }
+  }
+
+  /// Fan-fill a convex polygon, sampling the current fill per-vertex. Convex
+  /// polygons fan correctly from `pts[0]` (no overflow). Used for the
+  /// gradient-exact band pieces of `push_strip_sliced`.
+  fn push_polygon_fan(&mut self, pts: &[(f32, f32)], fill: &Fill, xform: &Transform) {
+    let (fx, fy) = pts[0];
+    let c0 = self.vertex_color(fill, fx, fy, xform);
+    let t0 = xform.apply(fx, fy);
+    for i in 1..pts.len() - 1 {
+      let (ax, ay) = pts[i];
+      let (bx, by) = pts[i + 1];
+      let ca = self.vertex_color(fill, ax, ay, xform);
+      let cb = self.vertex_color(fill, bx, by, xform);
+      let ta = xform.apply(ax, ay);
+      let tb = xform.apply(bx, by);
       self.push_tri(Vertex::flat(t0, c0), Vertex::flat(ta, ca), Vertex::flat(tb, cb));
     }
   }
@@ -853,25 +1081,38 @@ impl GpuCanvas {
     }
   }
 
-  /// Best-effort shadow approximation: a soft radial glow behind the rect.
+  /// Best-effort shadow approximation: four edge-fade bands hugging the rect
+  /// silhouette (canvas shadowBlur). A single radial ellipse centred on the
+  /// rect dilutes the glow over tall/thin rects (spectrum bars at high
+  /// sensitivity are ~3px wide and up to ~180px tall), reading far dimmer than
+  /// Skia's blur in the dense-bar gaps. Linear-fade bands along each edge keep
+  /// the glow attached to the silhouette; overlapping bands of neighbouring
+  /// bars sum to the near-uniform wash Chrome/Skia produce, with the peak alpha
+  /// tuned so the combined gap wash matches the measured TS reference.
   fn draw_shadow(&mut self, x: f32, y: f32, w: f32, h: f32) {
     if self.state.shadow_blur <= 0.0 || self.state.shadow_color.a <= 0.0 {
       return;
     }
     let blur = self.state.shadow_blur;
-    let sc = self.state.shadow_color.with_alpha(self.state.shadow_color.a * 0.25);
-    let cx = x + w / 2.0;
-    let cy = y + h / 2.0;
-    let rx = w / 2.0 + blur;
-    let ry = h / 2.0 + blur;
-    let g = Gradient::Radial { x0: cx, y0: cy, r0: w.hypot(h) / 3.0, x1: cx, y1: cy, r1: rx.max(ry), stops: vec![
-      ColorStop { t: 0.0, color: sc },
-      ColorStop { t: 1.0, color: Color::TRANSPARENT },
-    ]};
+    // Tuned empirically against the TS reference: combined gap wash ≈ 0.30
+    // alpha of the glow colour when ~4 band edges overlap (1.5px from each
+    // edge at 9px pitch / 15px blur).
+    let peak = self.state.shadow_color.with_alpha(self.state.shadow_color.a * 0.12);
+    let fade = Color::TRANSPARENT;
     self.save();
-    self.state.fill = Fill::Gradient(g);
     self.set_shadow(Color::TRANSPARENT, 0.0);
-    self.fill_ellipse(cx, cy, rx, ry);
+    // Top edge: colour at the rect edge, fading to transparent `blur` px out.
+    self.state.fill = Fill::linear_gradient(0.0, y, 0.0, y - blur, &[(0.0, peak), (1.0, fade)]);
+    self.fill_rect(x - blur, y - blur, w + blur * 2.0, blur);
+    // Bottom edge.
+    self.state.fill = Fill::linear_gradient(0.0, y + h, 0.0, y + h + blur, &[(0.0, peak), (1.0, fade)]);
+    self.fill_rect(x - blur, y + h, w + blur * 2.0, blur);
+    // Left edge.
+    self.state.fill = Fill::linear_gradient(x, 0.0, x - blur, 0.0, &[(0.0, peak), (1.0, fade)]);
+    self.fill_rect(x - blur, y, blur, h);
+    // Right edge.
+    self.state.fill = Fill::linear_gradient(x + w, 0.0, x + w + blur, 0.0, &[(0.0, peak), (1.0, fade)]);
+    self.fill_rect(x + w, y, blur, h);
     self.restore();
   }
 
@@ -889,7 +1130,12 @@ impl GpuCanvas {
     let t1 = self.state.transform.apply(x + w, y);
     let t2 = self.state.transform.apply(x + w, y + h);
     let t3 = self.state.transform.apply(x, y + h);
-    let col = color.with_alpha(color.a * self.state.global_alpha);
+    // NOTE: `with_alpha` MULTIPLIES the existing alpha, so passing
+    // `color.a * global_alpha` through it would SQUARE the alpha (invisible
+    // for opacity 1, but catastrophic for semi-transparent textured quads:
+    // the text glow's 1/256 copies became (1/256)^2 and vanished). Build the
+    // final alpha explicitly instead.
+    let col = Color { r: color.r, g: color.g, b: color.b, a: color.a * self.state.global_alpha };
     self.push_tri(
       Vertex::textured(t0, col, [uv[0], uv[1]], layer),
       Vertex::textured(t1, col, [uv[2], uv[1]], layer),
@@ -905,7 +1151,8 @@ impl GpuCanvas {
   pub fn push_circular_textured_quad(&mut self, layer: u32, cx: f32, cy: f32, r: f32, uv_bounds: [f32; 4], color: Color) {
     if r <= 0.0 { return; }
     let segments = 48usize;
-    let col = color.with_alpha(color.a * self.state.global_alpha);
+    // Same alpha fix as push_textured_quad (with_alpha would square it).
+    let col = Color { r: color.r, g: color.g, b: color.b, a: color.a * self.state.global_alpha };
     let center_vt = self.state.transform.apply(cx, cy);
     let u_center = (uv_bounds[0] + uv_bounds[2]) * 0.5;
     let v_center = (uv_bounds[1] + uv_bounds[3]) * 0.5;
@@ -958,50 +1205,157 @@ impl GpuCanvas {
     font_size: f32,
     family: &str,
     weight: f32,
+    italic: bool,
     align: super::text::TextAlign,
     fill: Fill,
     opacity: f32,
     opts: &super::text::TextOpts,
   ) {
-    let Some(font) = super::text::select_font(family, weight) else { return };
+    // Select the font with knowledge of the actual text so Arabic (RTL) runs
+    // use the dedicated Arabic font instead of falling back to tofu glyphs;
+    // the italic style mirrors TS `c.font = italic ...`.
+    let Some(font) = super::text::select_font_for_text_style(family, weight, italic, text) else { return };
     let Some(atl) = super::text::rasterize(font, text, font_size, &fill, opts) else { return };
     let layer = self.next_text_layer;
     if layer >= super::text::TEXT_LAYERS {
       return;
     }
     self.next_text_layer += 1;
-    let dx = match align {
-      super::text::TextAlign::Left => 0.0,
-      super::text::TextAlign::Center => -atl.advance / 2.0,
-      super::text::TextAlign::Right => -atl.advance,
-    };
+    // Draw the quad first (borrows `atl`), then move the pixels into the
+    // atlas upload list — the renderer consumes both before `finish()`.
+    self.draw_text_quad(layer, &atl, x, y, align, opacity);
     self.atlases.push(AtlasUpload {
       layer,
       rgba: atl.rgba,
       width: atl.atlas_w,
       height: atl.atlas_h,
     });
+  }
+
+  /// Upload a pre-rasterized text atlas as a new texture layer and return its
+  /// layer id. The same layer can then be drawn many times via
+  /// `draw_text_quad` (e.g. a Gaussian-sampled glow) WITHOUT re-rasterizing
+  /// or re-uploading — critical because the atlas texture array has a fixed
+  /// `TEXT_LAYERS` budget (20), so the old per-call upload approach silently
+  /// dropped the 21st+ call (the main fill never rendered once a glow emitted
+  /// 28+ copies).
+  pub fn upload_text_atlas(&mut self, atl: &super::text::TextAtlas) -> Option<u32> {
+    let layer = self.next_text_layer;
+    if layer >= super::text::TEXT_LAYERS {
+      return None;
+    }
+    self.next_text_layer += 1;
+    self.atlases.push(AtlasUpload {
+      layer,
+      rgba: atl.rgba.clone(),
+      width: atl.atlas_w,
+      height: atl.atlas_h,
+    });
+    Some(layer)
+  }
+
+  /// Draw a pre-uploaded text atlas quad (same geometry rules as `draw_text`:
+  /// the run's pen start lands at `x + alignOffset`, the baseline at `y`).
+  /// `opacity` is the quad's alpha (multiplied by the baked atlas color).
+  pub fn draw_text_quad(
+    &mut self,
+    layer: u32,
+    atl: &super::text::TextAtlas,
+    x: f32,
+    y: f32,
+    align: super::text::TextAlign,
+    opacity: f32,
+  ) {
+    let dx = match align {
+      super::text::TextAlign::Left => 0.0,
+      super::text::TextAlign::Center => -atl.advance / 2.0,
+      super::text::TextAlign::Right => -atl.advance,
+    };
+    // Map the atlas to canvas 1:1 with UVs cropped to the ink region, so
+    // glyphs are never squashed — the old code stretched the FULL atlas
+    // ([0,1]^2) onto an ink-sized quad, squeezing text vertically to
+    // atlas_h/height (as low as ~48-64% of the intended size).
+    //
+    // The quad is placed so the run's PEN START sits at x + dx (canvas
+    // textAlign positions the pen) and the BASELINE sits exactly at y
+    // (canvas fillText baseline), independent of the ink box / padding:
+    //   canvas_x(pen_x) = quad_x + (pen_x - left) = x + dx
+    //   canvas_y(baseline) = quad_y + (baseline - top) = y
+    // The atlas array layer is LAYER_SIZE x LAYER_SIZE (1024) with the text
+    // atlas written to its top-left corner, so UVs must be normalized by
+    // LAYER_SIZE — NOT by atlas_w/atlas_h (that would point the quad at empty
+    // layer space, rendering a dim flat band instead of glyphs).
+    let layer_size = super::renderer::LAYER_SIZE as f32;
     self.push_textured_quad(
       layer,
-      x + dx + atl.left,
-      y - atl.ascent + atl.top,
+      x + dx + atl.left - atl.pen_x,
+      y + atl.top - atl.baseline,
       atl.width,
       atl.height,
-      [0.0, 0.0, 1.0, 1.0],
+      [
+        atl.left / layer_size,
+        atl.top / layer_size,
+        (atl.left + atl.width) / layer_size,
+        (atl.top + atl.height) / layer_size,
+      ],
       Color::rgba(1.0, 1.0, 1.0, opacity.clamp(0.0, 1.0)),
     );
   }
 
   // --- output ---
 
-  pub fn finish(self) -> Mesh {
+  pub fn finish(mut self) -> Mesh {
+    // Flush any remaining geometry into the final batch.
+    self.flush_batch();
     Mesh {
       verts: self.verts,
       idx: self.idx,
       clear: self.clear,
       atlases: self.atlases,
+      batches: self.batches,
     }
   }
+}
+
+/// Sutherland–Hodgman clip of a convex quad against the horizontal band
+/// `lo <= y <= hi`. Returns the clipped polygon (possibly empty).
+fn clip_polygon_hband(quad: &[(f32, f32); 4], lo: f32, hi: f32) -> Vec<(f32, f32)> {
+  // Clip against y >= lo.
+  let mut out: Vec<(f32, f32)> = Vec::with_capacity(8);
+  let n = quad.len();
+  for i in 0..n {
+    let (ax, ay) = quad[i];
+    let (bx, by) = quad[(i + 1) % n];
+    let ain = ay >= lo;
+    let bin = by >= lo;
+    if ain != bin {
+      let t = (lo - ay) / (by - ay);
+      out.push((ax + t * (bx - ax), lo));
+    }
+    if bin {
+      out.push((bx, by));
+    }
+  }
+  if out.len() < 3 {
+    return out;
+  }
+  // Clip against y <= hi.
+  let mut out2: Vec<(f32, f32)> = Vec::with_capacity(8);
+  let m = out.len();
+  for i in 0..m {
+    let (ax, ay) = out[i];
+    let (bx, by) = out[(i + 1) % m];
+    let ain = ay <= hi;
+    let bin = by <= hi;
+    if ain != bin {
+      let t = (hi - ay) / (by - ay);
+      out2.push((ax + t * (bx - ax), hi));
+    }
+    if bin {
+      out2.push((bx, by));
+    }
+  }
+  out2
 }
 
 pub struct Mesh {
@@ -1009,6 +1363,7 @@ pub struct Mesh {
   pub idx: Vec<u32>,
   pub clear: Color,
   pub atlases: Vec<AtlasUpload>,
+  pub batches: Vec<DrawBatch>,
 }
 
 impl Mesh {

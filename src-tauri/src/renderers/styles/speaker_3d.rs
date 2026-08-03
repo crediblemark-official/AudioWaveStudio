@@ -196,9 +196,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let min_d2 = (cone_inner * 0.9) * (cone_inner * 0.9);
   let max_d2 = (cone_outer * 0.98) * (cone_outer * 0.98);
   let mut gy = center_y - cone_outer;
-  let mut row = 0i32;
   while gy <= center_y + cone_outer {
-    let row_offset = if row % 2 == 0 { 0.0 } else { grid * 0.5 };
+    // TS: `Math.floor((gy - centerY) / gridSpacing) % 2 === 0 ? 0 : gridSpacing * 0.5`
+    // (speaker3D.ts:225). The parity comes from the absolute gy, NOT a row
+    // counter — a plain counter phase-inverts the whole dot mesh whenever
+    // `ceil(coneOuter / grid)` is odd.
+    let row_offset = if (((gy - center_y) / grid).floor() as i32) % 2 == 0 { 0.0 } else { grid * 0.5 };
     let mut gx = center_x - cone_outer;
     while gx <= center_x + cone_outer {
       let xp = gx + row_offset;
@@ -211,7 +214,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       gx += grid;
     }
     gy += grid;
-    row += 1;
   }
 
   let dust_r = cone_inner * (1.0 + be * 0.06);

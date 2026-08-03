@@ -49,11 +49,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   let mirror = ctx.config.reactivity.mirror_bars;
 
-  let mut poly: Vec<(f32, f32)> = Vec::with_capacity(curve.len() + 3);
-  poly.push((points[0].0, bottom_y));
-  poly.extend_from_slice(&curve);
-  poly.push((last.0, bottom_y));
-
   let fill_grad = Fill::linear_gradient(0.0, bottom_y - max_h, 0.0, bottom_y, &[
     (0.0, theme_primary(theme)),
     (0.5, theme_secondary(theme)),
@@ -62,20 +57,19 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.save();
   c.set_fill(fill_grad);
   c.set_shadow(theme_glow(theme), 20.0);
-  c.fill_polygon(&poly);
+  // Quad strips to the baseline (canvas fill of the closed curve polygon,
+  // non-zero winding) — the fan from the first corner in fill_polygon
+  // overflows when the curve is not star-shaped from it (high sensitivity
+  // makes bars dip/rise non-monotonically), painting fill outside the curve.
+  c.fill_polyline_to_base(&curve, bottom_y);
 
   if mirror {
     let mirror_curve: Vec<(f32, f32)> = curve
       .iter()
       .map(|&(x, y)| (x, bottom_y + (bottom_y - y)))
       .collect();
-    let mut mirror_poly: Vec<(f32, f32)> = Vec::with_capacity(mirror_curve.len() + 3);
-    mirror_poly.push((points[0].0, bottom_y));
-    mirror_poly.extend_from_slice(&mirror_curve);
-    mirror_poly.push((last.0, bottom_y));
-
     c.set_global_alpha(0.5);
-    c.fill_polygon(&mirror_poly);
+    c.fill_polyline_to_base(&mirror_curve, bottom_y);
     c.set_global_alpha(1.0);
   }
 

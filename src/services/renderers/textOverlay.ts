@@ -6,6 +6,16 @@ const FADE_MS = 0.8;
 let playStartFrame = 0;
 let wasPlaying = false;
 
+/**
+ * Reset the fade-in state so a fresh session (e.g. export) starts the fade
+ * from frame 0 instead of inheriting a stale `playStartFrame` from live
+ * playback (which would leave fadeIn text invisible for a long stretch).
+ */
+export function resetTextFadeState() {
+  playStartFrame = 0;
+  wasPlaying = false;
+}
+
 function fadeFactor(isPlaying: boolean, frameTime: number): number {
   if (isPlaying && !wasPlaying) {
     playStartFrame = frameTime;

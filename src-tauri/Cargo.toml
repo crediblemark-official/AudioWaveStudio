@@ -26,12 +26,18 @@ image = "0.25"
 wgpu = "23"
 bytemuck = { version = "1", features = ["derive"] }
 ab_glyph = "0.2"
+# HarfBuzz shaping for proper Arabic (RTL, joined letter forms).
+rustybuzz = "0.20"
 base64 = "0.22"
 pollster = "0.3"
 
 [profile.dev]
 opt-level = 1
+# Workaround for the flaky rust-lld "undefined hidden symbol" linker error
+# that appears with multiple codegen units when linking the
+# staticlib/cdylib/rlib crate into the dev binary (observed on rustc 1.97).
+codegen-units = 1
 
 [profile.dev.package."*"]
-opt-level = 3
+opt-level = 2
 

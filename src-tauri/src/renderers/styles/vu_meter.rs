@@ -97,6 +97,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     label_size,
     "monospace",
     400.0,
+    false,
     crate::gpu2d::text::TextAlign::Center,
     Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.4)),
     1.0,

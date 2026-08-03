@@ -83,12 +83,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
   c.set_shadow(Color::rgba(0.0, 0.0, 0.0, 0.4), 4.0);
-  let mut drawn = 0usize;
+  // TS draws EVERY floating note (initNotes creates 18) with a FIXED 24px
+  // font (`c.font = '24px sans-serif'` — the per-note `size` field is never
+  // used for sizing in the preview). The old `drawn >= 10` cap dropped 8
+  // notes and the per-note size made exports look busier/denser than preview.
   for i in 0..st.notes.len() {
-    if drawn >= 10 {
-      break;
-    }
-    let (x, y, rotation, symbol, size, alpha) = {
+    let (x, y, rotation, symbol, alpha) = {
       let n = &mut st.notes[i];
       n.y += n.vy - be * 1.5;
       n.x += n.vx + (n.y * 0.02).sin() * 0.5;
@@ -97,7 +97,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         n.y = height + 20.0;
         n.x = rng.next() * width;
       }
-      (n.x, n.y, n.rotation, n.symbol, n.size, n.alpha)
+      (n.x, n.y, n.rotation, n.symbol, n.alpha)
     };
     c.save();
     c.translate(x, y);
@@ -106,16 +106,16 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       &symbol.to_string(),
       0.0,
       0.0,
-      size,
+      24.0,
       "sans-serif",
       400.0,
+      false,
       TextAlign::Center,
       Fill::Solid(a.with_alpha(alpha)),
       1.0,
       &TextOpts::default(),
     );
     c.restore();
-    drawn += 1;
   }
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
@@ -134,14 +134,34 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       (1.0, Color::hex("#444444")),
     ],
     bolt_r: 3.0,
+    bolt_color: Color::hex("#DDDDDD"),
     ring_alpha: 0.08,
     ring_step: 10.0,
+    ring_start: 6.0,
+    ring_end_margin: 4.0,
+    ring_width: 1.2,
+    cone_inner_ratio: 0.32,
+    rubber_stops: &[
+      (0.0, Color::hex("#1A1A1E")),
+      (0.5, Color::hex("#3A3A40")),
+      (1.0, Color::hex("#101014")),
+    ],
+    cone_stops: &[
+      (0.0, Color::hex("#444855")),
+      (0.6, Color::hex("#22242C")),
+      (1.0, Color::hex("#111216")),
+    ],
+    dust_mid: Color::hex("#30333D"),
     shadow_blur: 18.0,
+    shadow_color: Color::rgba(0.0, 0.0, 0.0, 0.6),
+    dust_scale: 0.06,
+    dust_shadow: 10.0,
+    crescent_alpha: 0.35,
   };
 
-  draw_woofer(c, left_x, center_y, left_r, false, &trio_style);
-  draw_woofer(c, right_x, center_y, right_r, false, &trio_style);
-  draw_woofer(c, center_x, center_y, center_r, true, &trio_style);
+  draw_woofer(c, left_x, center_y, left_r, false, be, &trio_style);
+  draw_woofer(c, right_x, center_y, right_r, false, be, &trio_style);
+  draw_woofer(c, center_x, center_y, center_r, true, be, &trio_style);
 
   c.restore();
 }

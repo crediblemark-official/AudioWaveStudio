@@ -34,6 +34,14 @@ export class CanvasRenderer {
   private useRustGpuPreview: boolean = false;
   private isRenderingRustFrame: boolean = false;
 
+  public setUseRustGpuPreview(enabled: boolean) {
+    this.useRustGpuPreview = enabled;
+  }
+
+  public getUseRustGpuPreview(): boolean {
+    return this.useRustGpuPreview;
+  }
+
   private freqData: Uint8Array = new Uint8Array(512);
   private timeData: Uint8Array = new Uint8Array(512);
   private peakData: number[] = [];
@@ -188,18 +196,38 @@ export class CanvasRenderer {
         audioEngine.getFrequencyData(this.freqData);
         audioEngine.getTimeDomainData(this.timeData);
 
+        // Optimize IPC payload by matching display bounds (e.g. 960x540 max)
+        const displayW = Math.min(width, Math.max(480, Math.round(this.canvas.clientWidth || 960)));
+        const displayH = Math.min(height, Math.max(270, Math.round(this.canvas.clientHeight || 540)));
+
         rustBridge
-          .renderRustPreviewFrame(config, this.freqData, this.timeData, currentFrameTime, width, height)
+          .renderRustPreviewFrame(
+            config,
+            this.freqData,
+            this.timeData,
+            currentFrameTime,
+            displayW,
+            displayH,
+            audioEngine.getIsPlaying(),
+          )
           .then((rgbaBytes) => {
-            if (this.ctx && rgbaBytes && rgbaBytes.length === width * height * 4) {
+            if (this.ctx && rgbaBytes && rgbaBytes.length === displayW * displayH * 4) {
               const clamped = new Uint8ClampedArray(rgbaBytes.length);
               clamped.set(rgbaBytes);
-              const imgData = new ImageData(clamped, width, height);
-              this.ctx.putImageData(imgData, 0, 0);
+              const imgData = new ImageData(clamped, displayW, displayH);
+              if (displayW === width && displayH === height) {
+                this.ctx.putImageData(imgData, 0, 0);
+              } else {
+                createImageBitmap(imgData).then((bmp) => {
+                  if (this.ctx && this.canvas) {
+                    this.ctx.drawImage(bmp, 0, 0, width, height);
+                  }
+                });
+              }
             }
           })
           .catch(() => {
-            // Fallback to TS canvas 2D if GPU readback is temporarily busy
+            // Fallback
           })
           .finally(() => {
             this.isRenderingRustFrame = false;

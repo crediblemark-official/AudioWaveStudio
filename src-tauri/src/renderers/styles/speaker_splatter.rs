@@ -71,7 +71,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
   };
 
-  c.set_shadow(Color::TRANSPARENT, 0.0);
+  // TS sets `shadowBlur = 30` + a per-arc shadowColor before the arc group;
+  // the layered soft strokes then glow in that color (stroke_arc applies the
+  // shadow). Primary arc uses primary, secondary uses secondary, accent uses
+  // accent — matching `c.shadowColor = theme.*Color` in the preview.
+  c.set_shadow(p, 30.0);
   for k in 1..=4 {
     let radius = base_r * (1.0 + k as f32 * 0.35) * pulse;
     let spread = (TAU * 0.30) * wide;
@@ -89,6 +93,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     );
   }
 
+  c.set_shadow(s, 30.0);
   for k in 1..=4 {
     let radius = base_r * (1.0 + k as f32 * 0.35) * pulse;
     let spread = (TAU * 0.28) * wide;
@@ -106,6 +111,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     );
   }
 
+  c.set_shadow(a, 30.0);
   for k in 1..=3 {
     let radius = base_r * (1.1 + k as f32 * 0.38) * pulse;
     let spread = (TAU * 0.23) * wide;
@@ -124,8 +130,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
+  // TS draws the light burst with `globalCompositeOperation = 'screen'`.
   let glow_intensity = 0.3 + be * 0.25 + bs * 0.15;
   let glow_radius = base_r * 2.8 * pulse;
+  c.set_blend_screen();
   for pos in [
     (center_x, center_y),
     (center_x - base_r * 0.92, center_y + base_r * 0.06),
@@ -140,6 +148,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(grad);
     c.fill_circle(pos.0, pos.1, glow_radius);
   }
+  c.set_blend_normal();
 
   let ink_y = center_y + base_r * 0.25;
   c.set_fill(Fill::Solid(Color::hex("#14141A")));
@@ -189,14 +198,34 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       (1.0, Color::hex("#55555A")),
     ],
     bolt_r: 2.5,
+    bolt_color: Color::hex("#E5E5EA"),
     ring_alpha: 0.15,
     ring_step: 8.0,
+    ring_start: 4.0,
+    ring_end_margin: 2.0,
+    ring_width: 1.0,
+    cone_inner_ratio: 0.30,
+    rubber_stops: &[
+      (0.0, Color::hex("#1C1C20")),
+      (0.5, Color::hex("#3C3C44")),
+      (1.0, Color::hex("#0F0F12")),
+    ],
+    cone_stops: &[
+      (0.0, Color::hex("#444856")),
+      (0.6, Color::hex("#22242D")),
+      (1.0, Color::hex("#0E0F14")),
+    ],
+    dust_mid: Color::hex("#30333E"),
     shadow_blur: 18.0,
+    shadow_color: Color::rgba(0.0, 0.0, 0.0, 0.95),
+    dust_scale: 0.05,
+    dust_shadow: 8.0,
+    crescent_alpha: 0.45,
   };
 
-  draw_woofer(c, left_x, left_y, left_r, false, &splatter_style);
-  draw_woofer(c, right_x, right_y, right_r, false, &splatter_style);
-  draw_woofer(c, center_x, center_y, center_r, true, &splatter_style);
+  draw_woofer(c, left_x, left_y, left_r, false, be, &splatter_style);
+  draw_woofer(c, right_x, right_y, right_r, false, be, &splatter_style);
+  draw_woofer(c, center_x, center_y, center_r, true, be, &splatter_style);
 
   c.restore();
 }

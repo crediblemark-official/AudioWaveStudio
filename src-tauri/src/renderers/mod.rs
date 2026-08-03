@@ -3,11 +3,14 @@
 //! Phase 4/5: frequency/time-domain renderers + complex particle & 3D-style
 //! renderers. Background/screen effects are Phase 6 (structured hooks below).
 
-mod background;
+pub mod background;
 pub mod helpers;
 pub mod screen_effects;
 mod styles;
-mod text;
+
+// Re-exported so tests can verify slider parity without exposing `styles`.
+pub use styles::minimal::effective_bar_count;
+pub mod text;
 
 use crate::config::{
   AudioReactivitySettings, BackgroundEffect, BackgroundFillType, ColorTheme, VisualizerConfig,
@@ -85,6 +88,12 @@ pub struct RenderState {
   pub particles: Vec<background::Particle>,
   pub music_notes: Vec<background::MusicNote>,
   pub screen_fx: screen_effects::ScreenFxState,
+  /// Text fade-in state, mirroring the module-level `playStartFrame` /
+  /// `wasPlaying` in `src/services/renderers/textOverlay.ts`. Persisted across
+  /// preview frames (like the rest of RenderState) so `Fade In on Play` restarts
+  /// exactly when playback starts — and shows fully when paused.
+  pub text_play_start_frame: f32,
+  pub text_was_playing: bool,
 }
 
 /// A custom background image pre-uploaded into atlas layer `layer`.
@@ -119,8 +128,12 @@ impl RenderState {
       radial_center_image: None,
       stars: background::build_stars(),
       particles: background::init_particles(&mut Rng::new(seed.wrapping_add(0x1234))),
+      // Start empty like the TS renderer (notes are spawned on beats); avoids
+      // an initial batch stuck at fractional (0..1) pixel coordinates.
       music_notes: Vec::new(),
       screen_fx: screen_effects::ScreenFxState::new(),
+      text_play_start_frame: 0.0,
+      text_was_playing: false,
     }
   }
 }
@@ -199,58 +212,7 @@ pub fn bin_value(freq: &[u8], step: usize, idx: usize) -> f32 {
 // Background (Phase 4 subset: solid/gradient + overlay; effects Phase 6)
 // ---------------------------------------------------------------------------
 
-fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
-  let bg = &ctx.config.background;
-  let fill_type = bg.fill_type.as_ref().cloned().unwrap_or_else(|| {
-    if matches!(bg.mode, crate::config::BackgroundMode::Gradient) {
-      BackgroundFillType::Gradient
-    } else {
-      BackgroundFillType::Solid
-    }
-  });
-  match fill_type {
-    BackgroundFillType::Gradient => {
-      let g = Fill::linear_gradient(0.0, 0.0, ctx.width, ctx.height, &[
-        (0.0, Color::hex(&bg.gradient_start)),
-        (1.0, Color::hex(&bg.gradient_end)),
-      ]);
-      c.set_fill(g);
-      c.fill_rect(-margin, -margin, ctx.width + margin * 2.0, ctx.height + margin * 2.0);
-    }
-    BackgroundFillType::Solid => {
-      c.set_fill(Fill::Solid(Color::hex(&bg.solid_color)));
-      c.fill_rect(-margin, -margin, ctx.width + margin * 2.0, ctx.height + margin * 2.0);
-    }
-  }
-
-  // Custom background image (cover-fit, mirrors canvas drawCoverImage).
-  if let Some(img) = &ctx.state.background_image {
-    let default_opacity = if matches!(bg.mode, crate::config::BackgroundMode::CustomImage) { 1.0 } else { 0.7 };
-    let alpha = bg.image_opacity.unwrap_or(default_opacity).clamp(0.0, 1.0);
-    let (iw, ih) = (img.w as f32, img.h as f32);
-    let img_ratio = iw / ih;
-    let canvas_ratio = ctx.width / ctx.height;
-    let (mut rw, mut rh, mut ox, mut oy) = (ctx.width, ctx.height, 0.0, 0.0);
-    if img_ratio > canvas_ratio {
-      rw = ctx.height * img_ratio;
-      ox = (ctx.width - rw) / 2.0;
-    } else {
-      rh = ctx.width / img_ratio;
-      oy = (ctx.height - rh) / 2.0;
-    }
-    let layer_size = crate::gpu2d::LAYER_SIZE as f32;
-    c.push_textured_quad(
-      img.layer,
-      ox - margin,
-      oy - margin,
-      rw + margin * 2.0,
-      rh + margin * 2.0,
-      [0.0, 0.0, (img.w as f32) / layer_size, (img.h as f32) / layer_size],
-      Color::rgba(1.0, 1.0, 1.0, alpha),
-    );
-  }
-
-  // Overlay visual effects (grid/aurora/noise/...).
+pub fn get_active_effects(bg: &crate::config::BackgroundSettings) -> Vec<BackgroundEffect> {
   let mut active: Vec<BackgroundEffect> = Vec::new();
   if let Some(effects) = &bg.effects {
     if !effects.is_empty() {
@@ -280,6 +242,90 @@ fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
       active.push(effect);
     }
   }
+  active
+}
+
+fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
+  let bg = &ctx.config.background;
+  let fill_type = bg.fill_type.as_ref().cloned().unwrap_or_else(|| {
+    if matches!(bg.mode, crate::config::BackgroundMode::Gradient) {
+      BackgroundFillType::Gradient
+    } else {
+      BackgroundFillType::Solid
+    }
+  });
+  match fill_type {
+    BackgroundFillType::Gradient => {
+      let g_start = if bg.gradient_start.trim().is_empty() { "#0f0c20" } else { bg.gradient_start.as_str() };
+      let g_end = if bg.gradient_end.trim().is_empty() { "#06101e" } else { bg.gradient_end.as_str() };
+      let g = Fill::linear_gradient(0.0, 0.0, ctx.width, ctx.height, &[
+        (0.0, Color::hex(g_start)),
+        (1.0, Color::hex(g_end)),
+      ]);
+      c.set_fill(g);
+      c.fill_rect(-margin, -margin, ctx.width + margin * 2.0, ctx.height + margin * 2.0);
+    }
+    BackgroundFillType::Solid => {
+      let solid = if bg.solid_color.trim().is_empty() { "#0b0c10" } else { bg.solid_color.as_str() };
+      c.set_fill(Fill::Solid(Color::hex(solid)));
+      c.fill_rect(-margin, -margin, ctx.width + margin * 2.0, ctx.height + margin * 2.0);
+    }
+  }
+
+  // Custom background image (cover-fit, mirrors canvas drawCoverImage).
+  if let Some(img) = &ctx.state.background_image {
+    let default_opacity = if matches!(bg.mode, crate::config::BackgroundMode::CustomImage) { 1.0 } else { 0.7 };
+    let raw_op = bg.image_opacity.unwrap_or(default_opacity);
+    let alpha = (if raw_op > 1.0 { raw_op / 100.0 } else { raw_op }).clamp(0.0, 1.0);
+    let (iw, ih) = (img.w as f32, img.h as f32);
+    let img_ratio = iw / ih;
+    let canvas_ratio = ctx.width / ctx.height;
+    let (mut rw, mut rh, mut ox, mut oy) = (ctx.width, ctx.height, 0.0, 0.0);
+    if img_ratio > canvas_ratio {
+      rw = ctx.height * img_ratio;
+      ox = (ctx.width - rw) / 2.0;
+    } else {
+      rh = ctx.width / img_ratio;
+      oy = (ctx.height - rh) / 2.0;
+    }
+    let blur = bg.blur_amount.max(0.0);
+    // TS drawCoverImage adds blur*2 padding to avoid edge artifacts: pad = margin + (blur > 0 ? blur * 2 : 0)
+    let pad = margin + if blur > 0.0 { blur * 2.0 } else { 0.0 };
+    let layer_size = crate::gpu2d::LAYER_SIZE as f32;
+    if blur > 0.0 {
+      // Approximate box blur with multiple offset passes (9-sample).
+      // Each pass has alpha/9 so the sum approaches a blur of the original.
+      let blur_alpha = alpha / 9.0;
+      for dy in -1..=1 {
+        for dx in -1..=1 {
+          let ox = ox + dx as f32 * blur * 0.5;
+          let oy = oy + dy as f32 * blur * 0.5;
+          c.push_textured_quad(
+            img.layer,
+            ox - pad,
+            oy - pad,
+            rw + pad * 2.0,
+            rh + pad * 2.0,
+            [0.0, 0.0, (img.w as f32) / layer_size, (img.h as f32) / layer_size],
+            Color::rgba(1.0, 1.0, 1.0, blur_alpha),
+          );
+        }
+      }
+    } else {
+      c.push_textured_quad(
+        img.layer,
+        ox - pad,
+        oy - pad,
+        rw + pad * 2.0,
+        rh + pad * 2.0,
+        [0.0, 0.0, (img.w as f32) / layer_size, (img.h as f32) / layer_size],
+        Color::rgba(1.0, 1.0, 1.0, alpha),
+      );
+    }
+  }
+
+  // Overlay visual effects (grid/aurora/noise/...).
+  let active = get_active_effects(bg);
   for effect in active {
     match effect {
       BackgroundEffect::Grid => background::render_grid(c, ctx),
@@ -289,9 +335,7 @@ fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
       BackgroundEffect::Starfield => background::render_starfield(c, ctx, &ctx.state.stars),
       BackgroundEffect::Nebula => background::render_nebula(c, ctx),
       BackgroundEffect::Psychedelic => background::render_psychedelic(c, ctx),
-      BackgroundEffect::None => {}
-      // Particles / music notes are gated separately (showParticles etc.).
-      BackgroundEffect::Particles | BackgroundEffect::MusicNotes => {}
+      BackgroundEffect::None | BackgroundEffect::Particles | BackgroundEffect::MusicNotes => {}
     }
   }
 }
@@ -308,16 +352,29 @@ pub fn render_style(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 // Full frame (export-mode drawFrame)
 // ---------------------------------------------------------------------------
 
-pub fn draw_frame(
-  c: &mut GpuCanvas,
+/// Per-frame audio envelope + shake + fade values shared by the background
+/// and foreground passes (mirrors the local variables in canvasRenderer
+/// drawFrame). `advance_envelope` advances the state EXACTLY ONCE per frame;
+/// the passes below only read the returned values.
+pub struct FrameEnvelope {
+  pub bass_energy: f32,
+  pub beat_strength: f32,
+  pub above_floor: f32,
+  pub global_fade: f32,
+  pub shake_x: f32,
+  pub shake_y: f32,
+  pub bg_shake_x: f32,
+  pub bg_shake_y: f32,
+  pub shake_margin: f32,
+}
+
+pub fn advance_envelope(
   state: &mut RenderState,
   config: &VisualizerConfig,
   freq: &[u8],
-  time: &[u8],
   frame_time: f32,
-) {
-  let width = c.width;
-  let height = c.height;
+  is_playing: bool,
+) -> FrameEnvelope {
   let react: &AudioReactivitySettings = &config.reactivity;
 
   // --- export-mode envelope (canvasRenderer drawFrame) ---
@@ -357,6 +414,15 @@ pub fn draw_frame(
 
   state.rotation_angle += 0.003;
 
+  // Text fade factor — mirrors textOverlay.ts fadeFactor: paused → fully
+  // visible, playing → ramp from the moment playback started.
+  let global_fade = crate::renderers::text::fade_factor(
+    is_playing,
+    frame_time,
+    &mut state.text_play_start_frame,
+    &mut state.text_was_playing,
+  );
+
   // Screen-effect shake offsets (mirrors canvasRenderer drawFrame).
   let (shake_x, shake_y) = screen_effects::compute_shake_offset(
     &mut state.screen_fx,
@@ -368,61 +434,134 @@ pub fn draw_frame(
   let (bg_shake_x, bg_shake_y) = ((shake_x * 1.8).round(), (shake_y * 1.8).round());
   let shake_margin = (bg_shake_x * bg_shake_x + bg_shake_y * bg_shake_y).sqrt().ceil();
 
+  FrameEnvelope {
+    bass_energy: state.bass_energy,
+    beat_strength: state.beat_strength,
+    above_floor,
+    global_fade,
+    shake_x,
+    shake_y,
+    bg_shake_x,
+    bg_shake_y,
+    shake_margin,
+  }
+}
+
+/// Which layers of the frame to draw. The two-pass split exists so the GPU
+/// path can apply frame-sampling screen effects (glitch, chromatic, ...) to
+/// the BACKGROUND ONLY when `screenEffects.backgroundOnly` is on — mirroring
+/// canvasRenderer, which calls `applyScreenEffects` between the background
+/// and the visualizer style.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FramePass {
+  /// Everything (default).
+  All,
+  /// Background fill/image/effects + overlay screen effects + overlay-opacity
+  /// rect, with shake applied. Does NOT advance the envelope (call
+  /// [`advance_envelope`] first).
+  BackgroundOnly,
+  /// Style + particles + notes + text. Does NOT advance the envelope.
+  ForegroundOnly,
+}
+
+pub fn draw_frame_pass(
+  c: &mut GpuCanvas,
+  state: &mut RenderState,
+  config: &VisualizerConfig,
+  freq: &[u8],
+  time: &[u8],
+  frame_time: f32,
+  env: &FrameEnvelope,
+  pass: FramePass,
+) {
+  let width = c.width;
+  let height = c.height;
+
   let mut ctx = RenderContext {
     width,
     height,
     config,
     freq_data: freq,
     time_data: time,
-    bass_energy: state.bass_energy,
-    beat_strength: state.beat_strength,
+    bass_energy: env.bass_energy,
+    beat_strength: env.beat_strength,
     rotation_angle: state.rotation_angle,
     frame_time,
     state,
   };
 
-  c.save();
-  c.translate(bg_shake_x, bg_shake_y);
-  draw_background(c, &ctx, shake_margin);
-  c.restore();
+  let bg_only = config.screen_effects.background_only.unwrap_or(true);
+  let draw_bg = pass != FramePass::ForegroundOnly;
+  let draw_style = pass != FramePass::BackgroundOnly;
 
-  let overlay = config.background.overlay_opacity;
-  if overlay > 0.0 {
+  if draw_bg {
     c.save();
-    c.translate(shake_x, shake_y);
-    c.set_fill(Fill::Solid(Color::rgba(10.0 / 255.0, 10.0 / 255.0, 15.0 / 255.0, overlay)));
-    c.fill_rect(-shake_margin, -shake_margin, width + shake_margin * 2.0, height + shake_margin * 2.0);
+    c.translate(env.bg_shake_x, env.bg_shake_y);
+    draw_background(c, &ctx, env.shake_margin);
     c.restore();
+
+    let overlay = config.background.overlay_opacity;
+    if overlay > 0.0 {
+      c.save();
+      c.translate(env.shake_x, env.shake_y);
+      c.set_fill(Fill::Solid(Color::rgba(10.0 / 255.0, 10.0 / 255.0, 15.0 / 255.0, overlay)));
+      c.fill_rect(-env.shake_margin, -env.shake_margin, width + env.shake_margin * 2.0, height + env.shake_margin * 2.0);
+      c.restore();
+    }
+
+    // Overlay screen effects belong on the background layer when
+    // backgroundOnly is on (mirrors canvasRenderer: applyScreenEffects is
+    // called between the background and the style).
+    if bg_only {
+      screen_effects::apply_overlay(c, &ctx, env.above_floor);
+    }
   }
 
-  c.save();
-  c.translate(shake_x, shake_y);
-  c.translate(width / 2.0 + config.position_x, height / 2.0 + config.position_y);
-  let sx = config.scale;
-  if (sx - 1.0).abs() > 1e-6 {
-    c.scale(sx, sx);
+  if draw_style {
+    c.save();
+    c.translate(env.shake_x, env.shake_y);
+    c.translate(width / 2.0 + config.position_x, height / 2.0 + config.position_y);
+    let sx = config.scale;
+    if (sx - 1.0).abs() > 1e-6 {
+      c.scale(sx, sx);
+    }
+    c.translate(-width / 2.0, -height / 2.0);
+    render_style(c, &mut ctx);
+    c.restore();
+
+    // Particles / music notes render in screen space after the style.
+    // Matches TS canvasRenderer: only checks showParticles/showMusicNotes flags,
+    // NOT the background effects array.
+    let show_p = config.background.show_particles;
+    let show_m = config.background.show_music_notes.unwrap_or(false);
+
+    if show_p {
+      background::render_particles(c, &mut ctx);
+    }
+    if show_m {
+      background::render_music_notes(c, &mut ctx);
+    }
+
+    // Text overlay (title/artist/blocks) — Phase 6 text port.
+    text::draw_text_overlay(c, &ctx, env.global_fade);
+
+    // When backgroundOnly is off, overlay screen effects apply to the whole
+    // frame (after the text, like canvasRenderer's second applyScreenEffects).
+    if !bg_only {
+      screen_effects::apply_overlay(c, &ctx, env.above_floor);
+    }
   }
-  c.translate(-width / 2.0, -height / 2.0);
-  render_style(c, &mut ctx);
-  c.restore();
+}
 
-  // Particles / music notes render in screen space after the style.
-  let active_effects = config.background.effects.as_ref().cloned().unwrap_or_else(|| {
-    config.background.effect.clone().map(|e| vec![e]).unwrap_or_default()
-  });
-  let show_p = config.background.show_particles || active_effects.contains(&BackgroundEffect::Particles);
-  let show_m = config.background.show_music_notes.unwrap_or(false) || active_effects.contains(&BackgroundEffect::MusicNotes);
-
-  if show_p {
-    background::render_particles(c, &mut ctx);
-  }
-  if show_m {
-    background::render_music_notes(c, &mut ctx);
-  }
-
-  // Text overlay (title/artist/blocks) — Phase 6 text port.
-  text::draw_text_overlay(c, &ctx);
-
-  // Overlay-style screen effects (vignette/pulse/spotlight/strobe/scanline/hueShift).
-  screen_effects::apply_overlay(c, &ctx, above_floor);
+pub fn draw_frame(
+  c: &mut GpuCanvas,
+  state: &mut RenderState,
+  config: &VisualizerConfig,
+  freq: &[u8],
+  time: &[u8],
+  frame_time: f32,
+  is_playing: bool,
+) {
+  let env = advance_envelope(state, config, freq, frame_time, is_playing);
+  draw_frame_pass(c, state, config, freq, time, frame_time, &env, FramePass::All);
 }

@@ -70,7 +70,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       (1.0, theme_accent(theme)),
     ]);
     c.set_stroke(spike_grad);
-    c.set_line_width(((TAU * 2.0 * base_radius) / bar_count as f32 - 3.0).max(2.0));
+    // TS: `Math.max(2, (Math.PI * 2 * baseRadius) / barCount - 3)` — the
+    // per-spike width is the arc length per bar MINUS the 3px gap. TAU is
+    // already 2π, so `TAU * 2.0` doubled the width in exports.
+    c.set_line_width(((TAU * base_radius) / bar_count as f32 - 3.0).max(2.0));
     c.stroke_line(x1, y1, x2, y2);
   }
   c.restore();

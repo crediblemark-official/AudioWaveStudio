@@ -19,9 +19,12 @@ function mulberry32(seed: number) {
   };
 }
 
-function getNoisePattern(c: CanvasRenderingContext2D, frameTime: number): CanvasPattern | null {
+function getNoisePattern(c: CanvasRenderingContext2D): CanvasPattern | null {
   if (typeof document === 'undefined') return null;
-  const seed = Math.floor(frameTime * 60);
+  // Static grain: same tile every frame (parity with Rust render_noise) so the
+  // background is temporally static and the encoder can compress it instead of
+  // re-encoding per-frame random noise at ~100 Mbps.
+  const seed = 0;
   if (!noiseCanvas) {
     noiseCanvas = document.createElement('canvas');
     noiseCanvas.width = 128;
@@ -46,11 +49,11 @@ function getNoisePattern(c: CanvasRenderingContext2D, frameTime: number): Canvas
 }
 
 export function renderNoise(ctx: RenderContext) {
-  const { ctx: c, width, height, config, bassEnergy, beatStrength, frameTime } = ctx;
+  const { ctx: c, width, height, config, bassEnergy, beatStrength } = ctx;
   const bg = config.background;
   const baseGrainOpacity = bg.grainOpacity ?? 0.08;
   const alpha = Math.min(1.0, baseGrainOpacity + bassEnergy * 0.08 + beatStrength * 0.06);
-  const pattern = getNoisePattern(c, frameTime);
+  const pattern = getNoisePattern(c);
   if (pattern) {
     c.save();
     c.fillStyle = pattern;

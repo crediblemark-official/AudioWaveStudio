@@ -41,6 +41,14 @@ pub struct GpuPreviewEngine {
     pub renderer: crate::gpu2d::GpuRenderer,
     pub width: u32,
     pub height: u32,
+    pub bg_image_uri: Option<String>,
+    pub bg_image_info: Option<(u32, u32)>,
+    pub radial_image_uri: Option<String>,
+    pub radial_image_info: Option<(u32, u32)>,
+    /// Cached per-frame render state (particles, music notes, peaks, VU decay,
+    /// RNG continuity) so the live preview behaves like the canvas renderer
+    /// instead of re-seeding everything on every frame.
+    pub render_state: Option<crate::renderers::RenderState>,
 }
 
 pub struct AppState {
@@ -172,6 +180,10 @@ fn compute_spectrum_rust(
     smoothing: f32,
     _bass_multiplier: f32,
 ) -> Result<SpectrumResultRust, String> {
+    // TS audioEngine.setSmoothing clamps to [0, 0.99]; mirror that so a
+    // hand-edited config (smoothing > 1) cannot destabilize the IIR smoothing
+    // (prev*s + cur*(1-s) would go negative).
+    let smoothing = crate::gpu_export::clamp_smoothing(smoothing);
     let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
     let audio = guard
         .as_ref()
@@ -251,6 +263,8 @@ async fn precompute_spectra(
     smoothing: f32,
     _bass_multiplier: f32,
 ) -> Result<PrecomputedSpectra, String> {
+    // Same clamp as compute_spectrum_rust / TS setSmoothing.
+    let smoothing = crate::gpu_export::clamp_smoothing(smoothing);
     let audio = {
         let guard = state.audio_data.lock().map_err(|e| e.to_string())?;
         guard
@@ -355,19 +369,16 @@ async fn start_export_session(
     output_mp4_path: String,
     audio_file_path: String,
     include_audio: bool,
+    encoder_preference: String,
 ) -> Result<(), String> {
     let ffmpeg_exe = resolve_ffmpeg(&app_handle)?;
 
-    let encoder_name = hardware::detect_encoders(&ffmpeg_exe)
-        .into_iter()
-        .find(|e| e.supported && e.id != "libx264")
-        .map(|e| e.id)
-        .unwrap_or_else(|| "libx264".to_string());
+    let encoder_name = hardware::pick_encoder(&ffmpeg_exe, &encoder_preference);
 
     let mut cmd = Command::new(&ffmpeg_exe);
     cmd.arg("-y").arg("-loglevel").arg("warning");
 
-    if encoder_name == "h264_vaapi" {
+    if encoder_name.ends_with("_vaapi") {
         if let Some(dev) = hardware::pick_vaapi_device() {
             cmd.arg("-vaapi_device").arg(dev);
         }
@@ -385,8 +396,7 @@ async fn start_export_session(
         .arg(format!("{}x{}", width, height))
         .arg("-i")
         .arg("pipe:0");
-
-    let vf_filter = if encoder_name == "h264_vaapi" {
+    let vf_filter = if encoder_name.ends_with("_vaapi") {
         "format=nv12,hwupload"
     } else {
         "scale=out_color_matrix=bt709:out_range=limited,format=yuv420p"
@@ -417,17 +427,13 @@ async fn start_export_session(
             .arg("-an");
     }
 
-    if encoder_name != "h264_vaapi" {
-        let preset = if encoder_name == "libx264" {
-            "ultrafast"
-        } else {
-            "fast"
-        };
-        cmd.arg("-preset").arg(preset);
-    }
+    let px = (width * height) as f64;
+    let cap_mbps = (px / 172_800.0).clamp(4.0, 15.0);
+    let cap_kbps = (cap_mbps * 1000.0).round() as u32;
+    crate::gpu_export::apply_encoder_args(&mut cmd, &encoder_name, cap_kbps);
 
-    cmd.arg(&output_mp4_path)
-        .stdin(Stdio::piped())
+    cmd.arg("-movflags").arg("+faststart").arg(&output_mp4_path)
+      .stdin(Stdio::piped())
         .stderr(Stdio::piped());
 
     let mut child = cmd.spawn().map_err(|e| {
@@ -669,16 +675,12 @@ async fn convert_webm_to_mp4(
 ) -> Result<String, String> {
     let ffmpeg_exe = resolve_ffmpeg(&app_handle)?;
 
-    let encoder_name = hardware::detect_encoders(&ffmpeg_exe)
-        .into_iter()
-        .find(|e| e.supported && e.id != "libx264")
-        .map(|e| e.id)
-        .unwrap_or_else(|| "libx264".to_string());
+    let encoder_name = hardware::pick_encoder(&ffmpeg_exe, "auto");
 
     let mut cmd = Command::new(&ffmpeg_exe);
     cmd.arg("-y").arg("-loglevel").arg("warning");
 
-    if encoder_name == "h264_vaapi" {
+    if encoder_name.ends_with("_vaapi") {
         if let Some(dev) = hardware::pick_vaapi_device() {
             cmd.arg("-vaapi_device").arg(dev);
         }
@@ -689,7 +691,7 @@ async fn convert_webm_to_mp4(
         .arg("-i")
         .arg(&webm_path);
 
-    let vf_filter = if encoder_name == "h264_vaapi" {
+    let vf_filter = if encoder_name.ends_with("_vaapi") {
         "format=nv12,hwupload"
     } else {
         "scale=out_color_matrix=bt709:out_range=limited,format=yuv420p"
@@ -720,17 +722,11 @@ async fn convert_webm_to_mp4(
             .arg(vf_filter)
             .arg("-an");
     }
+    // Screen capture resolution is unknown here; assume 1080p-class output
+    // (~12 Mbps cap). The other export paths compute this from width/height.
+    crate::gpu_export::apply_encoder_args(&mut cmd, &encoder_name, 12_000);
 
-    if encoder_name != "h264_vaapi" {
-        let preset = if encoder_name == "libx264" {
-            "ultrafast"
-        } else {
-            "fast"
-        };
-        cmd.arg("-preset").arg(preset);
-    }
-
-    cmd.arg(&output_mp4_path);
+    cmd.arg("-movflags").arg("+faststart").arg(&output_mp4_path);
 
     let output = cmd
         .output()

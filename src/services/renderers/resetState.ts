@@ -7,8 +7,10 @@ import { resetSpeakerTrioState } from './speakerTrio';
 import { resetSpeakerSplatterState } from './speakerSplatter';
 import { resetFlameFireState } from './flameFire';
 import { resetNoiseState } from './background/noise';
+import { resetTextFadeState } from './textOverlay';
 
 export function resetVisualizerState() {
+  resetTextFadeState();
   resetScreenEffectsState();
   resetThreeDState();
   resetApi3DState();

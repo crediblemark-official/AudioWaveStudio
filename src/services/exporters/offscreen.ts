@@ -59,7 +59,7 @@ export async function exportOffscreen(
     if (isCancelled()) throw new Error('Export cancelled');
     onProgress({ status: 'rendering', progress: 0, currentFrame: 0, totalFrames, elapsedTime: 0 });
 
-    await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);
+    await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio, config.export.encoder || 'auto');
     sessionStarted = true;
 
     for (let frame = 0; frame < totalFrames; frame++) {

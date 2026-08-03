@@ -415,6 +415,8 @@ pub struct ExportSettings {
   pub resolution: ExportResolution,
   pub fps: u32,
   pub format: ExportFormat,
+  /// Codec family preference for ffmpeg: "auto" | "h264" | "hevc" | "av1".
+  pub encoder: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

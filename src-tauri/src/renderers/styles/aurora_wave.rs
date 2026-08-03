@@ -23,6 +23,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let theme = &ctx.config.theme;
   let be = ctx.bass_energy;
 
+  // TS increments the module-level `t` at the START of renderAuroraWave
+  // (auroraWave.ts:18), before any sampling. Mirror that so the wave phase
+  // (and its `>10000` wrap) lines up frame-for-frame with the preview.
+  let next_t = ctx.state.aurora_t + 0.008;
+  ctx.state.aurora_t = if next_t > 10000.0 { next_t - 10000.0 } else { next_t };
   let t = ctx.state.aurora_t;
   let bass_amp = 0.1 + be * 0.4;
 
@@ -40,8 +45,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let mut points: Vec<(f32, f32)> = Vec::new();
     let mut x = 0.0f32;
     while x <= ctx.width {
+      // TS samples ONE bin: `freqData[freqIdx] || 0` (auroraWave.ts:35). No
+      // window averaging — averaging 5 bins changed every layer's amp.
       let freq_idx = ((x / ctx.width) * ctx.freq_data.len() as f32).floor() as usize;
-      let f_val = *ctx.freq_data.get(freq_idx).unwrap_or(&0) as f32;
+      let f_val = ctx.freq_data.get(freq_idx).copied().unwrap_or(0) as f32;
+
       let wave = (x * layer.freq + t * layer.speed + layer.offset).sin();
       let wave2 = (x * layer.freq * 2.3 + t * layer.speed * 1.7 + layer.offset + 1.5).sin();
       let amp = layer.amp * (1.0 + bass_amp * 2.0) * (1.0 + (f_val / 255.0) * 0.5);
@@ -50,6 +58,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       x += 4.0;
     }
 
+    // TS connects the sampled points with straight lineTo segments — the
+    // fill polygon and the stroke use the SAME raw points (auroraWave.ts:43-47
+    // and :64-74). No quadratic smoothing.
     let mut poly: Vec<(f32, f32)> = Vec::with_capacity(points.len() + 2);
     poly.push((0.0, ctx.height));
     poly.extend_from_slice(&points);
@@ -67,34 +78,16 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(grad);
     c.fill_polygon(&poly);
     c.restore();
-  }
-
-  for layer in &layers {
-    let mut pts: Vec<(f32, f32)> = Vec::new();
-    let mut x = 0.0f32;
-    while x <= ctx.width {
-      let freq_idx = ((x / ctx.width) * ctx.freq_data.len() as f32).floor() as usize;
-      let f_val = *ctx.freq_data.get(freq_idx).unwrap_or(&0) as f32;
-      let wave = (x * layer.freq + t * layer.speed + layer.offset).sin();
-      let wave2 = (x * layer.freq * 2.3 + t * layer.speed * 1.7 + layer.offset + 1.5).sin();
-      let amp = layer.amp * (1.0 + bass_amp * 2.0) * (1.0 + (f_val / 255.0) * 0.5);
-      let y = layer.y_base + wave * amp * ctx.height + wave2 * amp * ctx.height * 0.5;
-      pts.push((x, y));
-      x += 4.0;
-    }
 
     c.save();
     c.set_stroke(Fill::Solid(layer.color));
     c.set_line_width(2.0);
     c.set_global_alpha(layer.alpha * (0.8 + be * 0.2));
     c.set_shadow(layer.color, 20.0);
-    c.stroke_polyline(&pts);
+    c.stroke_polyline(&points);
     c.restore();
   }
 
   c.set_global_alpha(1.0);
   c.set_shadow(Color::TRANSPARENT, 0.0);
-
-  let next_t = t + 0.008;
-  ctx.state.aurora_t = if next_t > 10000.0 { next_t - 10000.0 } else { next_t };
 }

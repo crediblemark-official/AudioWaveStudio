@@ -121,14 +121,15 @@ describe('getExportDimensions', () => {
 });
 
 describe('canUseGpuExport', () => {
-  it('returns true for supported style and default settings', () => {
-    const config = makeConfig({ style: 'radial' });
+  it('returns true for supported style and default settings when renderEngine is gpu', () => {
+    const config = makeConfig({ style: 'radial', export: { ...makeConfig().export, renderEngine: 'gpu' } });
     expect(canUseGpuExport(config)).toBe(true);
   });
 
   it('returns true when radialCenterImageUri is set', () => {
     const config = makeConfig({
       style: 'radial',
+      export: { ...makeConfig().export, renderEngine: 'gpu' },
       background: { ...makeConfig().background, radialCenterImageUri: 'data:image/png;base64,iVBORw0KGgo=' },
     });
     expect(canUseGpuExport(config)).toBe(true);
@@ -137,8 +138,14 @@ describe('canUseGpuExport', () => {
   it('returns true for ported screen effects like glitch, heatHaze, chromatic', () => {
     const config = makeConfig({
       style: 'spectrum',
+      export: { ...makeConfig().export, renderEngine: 'gpu' },
       screenEffects: { ...makeConfig().screenEffects, enabled: true, mainEffect: 'glitch' },
     });
     expect(canUseGpuExport(config)).toBe(true);
+  });
+
+  it('returns false when renderEngine is canvas', () => {
+    const config = makeConfig({ style: 'radial', export: { ...makeConfig().export, renderEngine: 'canvas' } });
+    expect(canUseGpuExport(config)).toBe(false);
   });
 });

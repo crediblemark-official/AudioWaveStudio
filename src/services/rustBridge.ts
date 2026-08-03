@@ -192,6 +192,7 @@ export class RustBridge {
     outputMp4Path: string,
     audioFilePath: string,
     includeAudio: boolean,
+    encoder: string,
   ): Promise<void> {
     await invoke('start_export_session', {
       fps,
@@ -200,6 +201,7 @@ export class RustBridge {
       outputMp4Path,
       audioFilePath,
       includeAudio,
+      encoderPreference: encoder,
     });
   }
 
@@ -236,6 +238,7 @@ export class RustBridge {
     frameTime: number,
     width: number,
     height: number,
+    isPlaying: boolean,
   ): Promise<Uint8Array> {
     const raw = await invoke<number[]>('render_rust_preview_frame', {
       config,
@@ -244,6 +247,7 @@ export class RustBridge {
       frameTime,
       width,
       height,
+      isPlaying,
     });
     return new Uint8Array(raw);
   }

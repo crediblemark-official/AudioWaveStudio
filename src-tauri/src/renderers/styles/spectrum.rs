@@ -15,7 +15,13 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let sensitivity = react.sensitivity;
   let mirror_bars = react.mirror_bars;
   let show_peaks = react.show_peaks;
-  let peak_color = Color::hex(&react.peak_color);
+  // TS: `config.reactivity.peakColor || theme.accentColor` — an empty peak
+  // color falls back to the accent color, never to the dark #0b0c10 default.
+  let peak_color = if react.peak_color.trim().is_empty() {
+    theme_accent(theme)
+  } else {
+    Color::hex(&react.peak_color)
+  };
 
   let available_width = ctx.width * 0.85;
   let total_gap = bar_gap * (bar_count as f32 - 1.0);
@@ -53,7 +59,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     if mirror_bars {
       c.set_global_alpha(0.6);
       if bar_rounding > 0.0 {
-        c.fill_rounded_rect(x, center_y + 2.0, bar_width, bar_height, bar_rounding);
+        c.fill_rounded_rect_bottom(x, center_y + 2.0, bar_width, bar_height, bar_rounding);
       } else {
         c.fill_rect(x, center_y + 2.0, bar_width, bar_height);
       }
@@ -67,7 +73,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       } else {
         *peak = (*peak - 2.0).max(0.0);
       }
-      if *peak > 0.0 {
+      // TS: `if (isPeaks && peakData[i] > 2)` — peaks decay by 2/frame, so
+      // values in (0, 2] are below the draw threshold in the preview.
+      if *peak > 2.0 {
         c.set_fill(Fill::Solid(peak_color));
         c.fill_rect(x, center_y - *peak - 4.0, bar_width, 3.0);
         if mirror_bars {

@@ -95,7 +95,11 @@ pub fn test_encoder(ffmpeg_exe: &str, encoder_id: &str) -> bool {
     return true;
   }
 
-  if encoder_id == "h264_vaapi" {
+  // VAAPI drivers vary wildly: some only expose CQP rate control, which
+  // silently ignores -maxrate/-bufsize (a 1080p export then balloons to
+  // ~100 Mbps). Probe with -rc_mode VBR so only drivers that can actually
+  // honor a bitrate cap are considered usable.
+  if encoder_id.ends_with("_vaapi") {
     let Some(dev) = pick_vaapi_device() else {
       return false;
     };
@@ -112,7 +116,11 @@ pub fn test_encoder(ffmpeg_exe: &str, encoder_id: &str) -> bool {
         "-vf",
         "format=nv12,hwupload",
         "-c:v",
-        "h264_vaapi",
+        encoder_id,
+        "-rc_mode",
+        "VBR",
+        "-b:v",
+        "1000k",
         "-f",
         "null",
         "-",
@@ -165,6 +173,58 @@ pub fn detect_encoders(ffmpeg_exe: &str) -> Vec<EncoderCapability> {
   }
 
   list
+}
+
+/// Ordered candidate encoders per codec family. Hardware encoders that honor a
+/// bitrate cap come first, then software encoders (CRF + VBV) as the reliable
+/// fallback that works on every machine.
+pub const ENCODER_PREFERENCES: &[(&str, &[&str])] = &[
+  (
+    "h264",
+    &[
+      "h264_qsv",
+      "h264_nvenc",
+      "h264_vaapi",
+      "h264_amf",
+      "h264_videotoolbox",
+      "libx264",
+    ],
+  ),
+  (
+    "hevc",
+    &[
+      "hevc_qsv",
+      "hevc_nvenc",
+      "hevc_vaapi",
+      "hevc_videotoolbox",
+      "libx265",
+    ],
+  ),
+  ("av1", &["av1_qsv", "av1_nvenc", "av1_vaapi", "libsvtav1"]),
+];
+
+/// Pick the first usable encoder for a codec preference ("auto", "h264",
+/// "hevc", "av1"). Unknown/unavailable preferences fall back to "h264".
+/// `test_encoder` does the actual capability probe, so a broken HW driver
+/// (e.g. VAAPI without VBR) is skipped in favor of a software encoder.
+pub fn pick_encoder(ffmpeg_exe: &str, preference: &str) -> String {
+  let pref = match preference {
+    "h264" => "h264",
+    "hevc" => "hevc",
+    "av1" => "av1",
+    _ => "h264",
+  };
+  let candidates = ENCODER_PREFERENCES
+    .iter()
+    .find(|(key, _)| *key == pref)
+    .map(|(_, list)| *list)
+    .unwrap_or(&["libx264"]);
+  candidates
+    .iter()
+    .copied()
+    .find(|id| test_encoder(ffmpeg_exe, id))
+    .unwrap_or("libx264")
+    .to_string()
 }
 
 pub fn get_system_memory() -> Option<SystemMemoryInfo> {

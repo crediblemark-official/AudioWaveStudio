@@ -63,7 +63,7 @@ export async function exportScreenRecord(
     sourceCanvas.width = width;
     sourceCanvas.height = height;
 
-    await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio);
+    await rustBridge.startExportSession(fps, width, height, outputPath, audioFilePath, includeAudio, config.export.encoder || 'auto');
     sessionStarted = true;
 
     while (!isCancelled() && frameCount < totalFrames) {
