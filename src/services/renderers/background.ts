@@ -50,7 +50,8 @@ function drawCoverImage(
 export function renderBackground(ctx: RenderContext, shakeMargin = 0) {
   const { ctx: c, width, height, config, customImgElement } = ctx;
   const bg = config.background;
-  const blur = bg.blurAmount || 0;
+  const scaleFactor = height / 1080;
+  const blur = (bg.blurAmount || 0) * scaleFactor;
 
   // Determine fill type (gradient vs solid)
   const fillType = bg.fillType ?? (bg.mode === 'gradient' ? 'gradient' : 'solid');

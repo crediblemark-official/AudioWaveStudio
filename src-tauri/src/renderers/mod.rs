@@ -291,23 +291,41 @@ fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
     let blur = bg.blur_amount.max(0.0);
     // TS drawCoverImage adds blur*2 padding to avoid edge artifacts: pad = margin + (blur > 0 ? blur * 2 : 0)
     let pad = margin + if blur > 0.0 { blur * 2.0 } else { 0.0 };
-    let layer_size = crate::gpu2d::LAYER_SIZE as f32;
+    // The image lives in a dedicated native-resolution texture (see
+    // GpuRenderer::upload_background_image), so the quad UVs span the full
+    // [0,1]^2 — NOT [0, img.w/LAYER_SIZE] which would sample only part of it.
+    let full_uv = [0.0, 0.0, 1.0, 1.0];
     if blur > 0.0 {
-      // Approximate box blur with multiple offset passes (9-sample).
-      // Each pass has alpha/9 so the sum approaches a blur of the original.
-      let blur_alpha = alpha / 9.0;
-      for dy in -1..=1 {
-        for dx in -1..=1 {
-          let ox = ox + dx as f32 * blur * 0.5;
-          let oy = oy + dy as f32 * blur * 0.5;
+      // Approximate the browser's Gaussian `blur(px)` filter (sigma = blur/2)
+      // with a 5x5 weighted offset kernel so the exported background image
+      // matches the TS preview. The old flat 3x3 box read as chunky and
+      // inconsistent with canvas filter: blur().
+      let step = (blur * 0.1).clamp(0.5, 2.5);
+      let mut total = 0.0f64;
+      let mut w = [[0.0f64; 5]; 5];
+      for dy in 0..5 {
+        for dx in 0..5 {
+          let u = dx as f64 - 2.0;
+          let v = dy as f64 - 2.0;
+          w[dy][dx] = (-(u * u + v * v) / 2.0).exp();
+          total += w[dy][dx];
+        }
+      }
+      for dy in 0..5 {
+        for dx in 0..5 {
+          let k = w[dy][dx] / total;
+          let effective_alpha = (alpha as f64).clamp(0.0001, 0.9999);
+          let quad_alpha = (1.0 - (1.0 - effective_alpha).powf(k)).clamp(0.0, 1.0) as f32;
+          let ox = ox + (dx as f32 - 2.0) * step;
+          let oy = oy + (dy as f32 - 2.0) * step;
           c.push_textured_quad(
             img.layer,
             ox - pad,
             oy - pad,
             rw + pad * 2.0,
             rh + pad * 2.0,
-            [0.0, 0.0, (img.w as f32) / layer_size, (img.h as f32) / layer_size],
-            Color::rgba(1.0, 1.0, 1.0, blur_alpha),
+            full_uv,
+            Color::rgba(1.0, 1.0, 1.0, quad_alpha),
           );
         }
       }
@@ -318,7 +336,7 @@ fn draw_background(c: &mut GpuCanvas, ctx: &RenderContext, margin: f32) {
         oy - pad,
         rw + pad * 2.0,
         rh + pad * 2.0,
-        [0.0, 0.0, (img.w as f32) / layer_size, (img.h as f32) / layer_size],
+        full_uv,
         Color::rgba(1.0, 1.0, 1.0, alpha),
       );
     }

@@ -1,12 +1,12 @@
 //! Screen effects port (Phase 6). Mirrors `src/services/renderers/screenEffects.ts`.
 //!
-//! Only effects reproducible with the single-pass mesh pipeline are ported:
-//! shake, vignette, pulse, spotlight, strobe, scanline, hueShift.
-//! Frame-snapshot / per-pixel effects (glitch, chromatic, zoom, bars,
-//! shockwave, pixelate, tilt, heatHaze, invert) need post-processing passes
-//! and stay canvas-only (`is_gpu_supported` returns false for them).
+//! Overlay effects drawn with the single-pass mesh pipeline: shake (a frame
+//! translate), vignette, pulse, spotlight, strobe, scanline.
+//! Frame-snapshot / per-pixel effects (glitch, chromatic, zoom, invert, bars,
+//! shockwave, pixelate, tilt, heatHaze, hueShift) are emitted as `PostFx`
+//! modes and rendered by the GPU post-processing pipeline (`gpu2d/postfx.wgsl`).
 
-use super::{hsl_to_color, RenderContext};
+use super::RenderContext;
 use crate::config::{ScreenEffect, ScreenEffectsSettings};
 use crate::gpu2d::renderer::PostFx;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
@@ -96,6 +96,7 @@ pub fn post_fx(
   use_be: f32,
   beat: f32,
   frame_time: f32,
+  fps: f32,
 ) -> Option<PostFx> {
   if !settings.enabled {
     return None;
@@ -110,6 +111,7 @@ pub fn post_fx(
     ScreenEffect::Pixelate => 7,
     ScreenEffect::Tilt => 8,
     ScreenEffect::HeatHaze => 9,
+    ScreenEffect::HueShift => 10,
     _ => return None,
   };
   let eff_beat = |v: f32| if beat > 0.15 { v * beat } else { 0.0 };
@@ -119,7 +121,7 @@ pub fn post_fx(
     ScreenEffect::Zoom => settings.zoom_intensity * use_be * 0.5 + eff_beat(settings.zoom_intensity),
     ScreenEffect::Invert => {
       let amount = (settings.invert_intensity * use_be * 0.4 + eff_beat(settings.invert_intensity)) * 2.0;
-      return if amount < 0.05 { None } else { Some(PostFx { mode, intensity: amount.min(1.0), time: frame_time, beat }) };
+      return if amount < 0.05 { None } else { Some(PostFx { mode, intensity: amount.min(1.0), time: frame_time, beat, fps }) };
     }
     ScreenEffect::Bars => (settings.bars_amount * use_be * 0.3 + eff_beat(settings.bars_amount)).min(0.5),
     ScreenEffect::Shockwave => {
@@ -137,6 +139,9 @@ pub fn post_fx(
     ScreenEffect::Pixelate => settings.pixelate_intensity * use_be * 0.4 + eff_beat(settings.pixelate_intensity),
     ScreenEffect::Tilt => settings.tilt_intensity * use_be * 0.4 + eff_beat(settings.tilt_intensity),
     ScreenEffect::HeatHaze => settings.heat_haze_intensity * use_be * 0.3 + eff_beat(settings.heat_haze_intensity),
+    ScreenEffect::HueShift => {
+      (settings.hue_shift_intensity * use_be * 0.3 + eff_beat(settings.hue_shift_intensity)).min(0.9)
+    }
     _ => return None,
   };
   let threshold = match mode {
@@ -149,7 +154,7 @@ pub fn post_fx(
   if intensity < threshold {
     return None;
   }
-  Some(PostFx { mode, intensity, time: frame_time, beat })
+  Some(PostFx { mode, intensity, time: frame_time, beat, fps })
 }
 
 /// Draws the overlay-style screen effects (applied after text, mirroring
@@ -170,8 +175,8 @@ pub fn apply_overlay(c: &mut GpuCanvas, ctx: &RenderContext, above_floor: f32) {
     ScreenEffect::Spotlight => spotlight(c, w, h, settings, use_be, beat),
     ScreenEffect::Strobe => strobe(c, w, h, settings, use_be, beat, frame_time),
     ScreenEffect::Scanline => scanline(c, w, h, settings, use_be, beat),
-    ScreenEffect::HueShift => hue_shift(c, w, h, settings, use_be, beat, frame_time),
-    // Shake is a translate (draw_frame); remaining effects need snapshots.
+    // Shake is a translate (draw_frame); HueShift needs a snapshot (post_fx);
+    // remaining effects need snapshots too.
     _ => {}
   }
 }
@@ -321,33 +326,5 @@ fn scanline(
   }
 }
 
-fn hue_shift(
-  c: &mut GpuCanvas,
-  w: f32,
-  h: f32,
-  settings: &ScreenEffectsSettings,
-  use_be: f32,
-  beat: f32,
-  frame_time: f32,
-) {
-  let b = if beat > 0.15 { settings.hue_shift_intensity * beat } else { 0.0 };
-  let smooth = settings.hue_shift_intensity * use_be * 0.3;
-  let amount = (smooth + b).min(0.9);
-  if amount < 0.02 {
-    return;
-  }
-  let hue = (frame_time * 25.0) % 360.0;
-  let reduced = amount * 0.3;
-  let fill = Fill::linear_gradient(
-    0.0,
-    0.0,
-    w,
-    h,
-    &[
-      (0.0, hsl_to_color(hue, 0.85, 0.5, reduced)),
-      (1.0, hsl_to_color((hue + 180.0) % 360.0, 0.85, 0.5, reduced)),
-    ],
-  );
-  c.set_fill(fill);
-  c.fill_rect(0.0, 0.0, w, h);
-}
+// HueShift is rendered as post-fx mode 10 (gpu2d/postfx.wgsl): a 'hue'
+// composite of a diagonal hue->hue+180 gradient, matching canvas applyHueShift.

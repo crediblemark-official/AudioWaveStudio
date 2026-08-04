@@ -134,6 +134,10 @@ async function exportCanvasPath(
   const renderer = new CanvasRenderer();
   renderer.init(exportCanvas);
   resetVisualizerState();
+
+  if (config.background.customImageUri) renderer.setCustomBackgroundImage(config.background.customImageUri);
+  if (config.background.radialCenterImageUri) renderer.setRadialCenterImage(config.background.radialCenterImageUri);
+
   await renderer.preloadImages();
 
   const barCount = config.reactivity.barCount;

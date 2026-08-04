@@ -5,6 +5,7 @@ struct FxParams {
   beat: f32,
   width: f32,
   height: f32,
+  fps: f32,
   _pad: vec2<f32>,
 }
 
@@ -29,9 +30,46 @@ fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
   return out;
 }
 
-fn hash1(n: f32) -> f32 {
-  let x = sin(n * 127.1 + 311.7) * 43758.5453;
-  return x - floor(x);
+// Bit-identical port of the mulberry32 PRNG from screenEffects.ts.
+fn mulberry32(state: ptr<function, u32>) -> f32 {
+  *state = *state + 0x6D2B79F5u;
+  let a = *state;
+  var t = a ^ (a >> 15u);
+  t = t * (a | 1u);
+  t = (t + (t ^ (t >> 7u)) * (t | 61u)) ^ t;
+  return f32(t ^ (t >> 14u)) / 4294967296.0;
+}
+
+// W3C compositing helpers (compositing-1: hue blend).
+fn lum3(c: vec3<f32>) -> f32 { return dot(c, vec3(0.3, 0.59, 0.11)); }
+fn sat3(c: vec3<f32>) -> f32 { return max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b); }
+fn mid3(c: vec3<f32>) -> f32 { return max(min(c.r, c.g), min(max(c.r, c.g), c.b)); }
+fn setSat(c: vec3<f32>, s: f32) -> vec3<f32> {
+  let d = max(max(c.r, c.g), c.b) - min(min(c.r, c.g), c.b);
+  if (d < 1e-6) { return vec3(0.0); }
+  let m = mid3(c);
+  return clamp(m + (c - m) * (s / d), vec3(0.0), vec3(1.0));
+}
+fn setLum(c: vec3<f32>, l: f32) -> vec3<f32> { return c + vec3(l - lum3(c)); }
+fn hueBlend(cb: vec3<f32>, cs: vec3<f32>) -> vec3<f32> {
+  return setLum(setSat(cs, sat3(cb)), lum3(cb));
+}
+
+fn hueComponent(n: f32, h: f32, l: f32, a: f32) -> f32 {
+  let k = (n + h * 12.0) - floor((n + h * 12.0) / 12.0) * 12.0;
+  return l - a * max(-1.0, min(min(k - 3.0, 9.0 - k), 1.0));
+}
+
+fn hsl_to_rgb(hsl: vec3<f32>) -> vec3<f32> {
+  let h = hsl.x / 360.0;
+  let s = hsl.y;
+  let l = hsl.z;
+  let a = s * min(l, 1.0 - l);
+  return vec3(
+    hueComponent(0.0, h, l, a),
+    hueComponent(8.0, h, l, a),
+    hueComponent(4.0, h, l, a),
+  );
 }
 
 @fragment
@@ -43,33 +81,76 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
   var col: vec4<f32> = textureSample(src, samp, uv);
 
   if (p.mode == 1u) {
-    // glitch: row-band horizontal displacement + RGB split + bar flashes
-    let seed = floor(p.time * 1000.0);
-    let row = floor(uv.y * h);
-    let band = floor(row / (2.0 + hash1(seed + 3.7) * 8.0 * amount));
-    let inSlice = hash1(seed + band * 1.7) < min(1.0, 0.05 + amount * 0.5);
-    let off = (hash1(seed + band * 2.3) - 0.5) * 40.0 * amount;
-    var u2 = uv;
-    if (inSlice) { u2.x += off / w; }
-    col.r = textureSample(src, samp, u2 + vec2(2.0 / w, 0.0)).r;
-    col.g = textureSample(src, samp, u2).g;
-    col.b = textureSample(src, samp, u2 - vec2(2.0 / w, 0.0)).b;
-    let barY = hash1(seed + 4.2) * h;
-    if (abs(uv.y * h - barY) < 1.0 + hash1(seed + 5.1) * 3.0 * amount &&
-        hash1(seed + 6.3) < amount) {
-      let c = hash1(seed + row);
-      col = vec4(select(0.0, 1.0, c > 0.5),
-                 select(0.0, 1.0, c < 0.25),
-                 select(0.0, 1.0, c > 0.25 && c < 0.5),
-                 1.0);
+    // glitch — mirrors applyGlitch (screenEffects.ts): N random horizontal
+    // slices displaced by ±(0..20)px at 0.6 alpha, plus a color bar that
+    // opens periodically when intensity > 0.3.
+    let now = floor(p.time * 1000.0);
+    var seed = u32(now);
+    let sliceCount = 3u + u32(amount * 12.0);
+    let y = uv.y * h;
+    var off = 0.0;
+    var inSlice = false;
+    for (var i = 0u; i < sliceCount; i++) {
+      let r0 = mulberry32(&seed);
+      let r1 = mulberry32(&seed);
+      let r2 = mulberry32(&seed);
+      let sliceY = r0 * h;
+      let sliceH = 2.0 + r1 * 8.0 * amount;
+      if (y >= sliceY && y < sliceY + sliceH) {
+        off = (r2 - 0.5) * 40.0 * amount;
+        inSlice = true;
+      }
+    }
+    // A slice is only painted where its shifted destination overlaps the
+    // canvas (drawImage clips the dest rect); elsewhere the original shows.
+    let shifted = uv.x - off / w;
+    if (inSlice && shifted >= 0.0 && shifted <= 1.0) {
+      col = mix(textureSample(src, samp, uv), textureSample(src, samp, vec2(shifted, uv.y)), 0.6);
+    }
+    if (amount > 0.3) {
+      // The color bar is drawn on the first frame where now - lastGlitchTime
+      // > 200 (applyGlitch). lastGlitchTime = now of the previous bar, so with
+      // a fixed fps the bar fires on frames k = N, 2N, ... where
+      // N = floor(0.2 * fps) + 1 (k0 = N since the first fire needs now > 200).
+      let k = round(p.time * p.fps);
+      let n = floor(0.2 * p.fps) + 1.0;
+      if (k >= n && k - n * floor(k / n) == 0.0) {
+        let gH = 1.0 + mulberry32(&seed) * 4.0 * amount;
+        let gY = mulberry32(&seed) * h;
+        let gX = mulberry32(&seed) * w * 0.3;
+        let gW = w * (0.3 + mulberry32(&seed) * 0.7);
+        let cr = mulberry32(&seed);
+        let cg = mulberry32(&seed);
+        let cb = mulberry32(&seed);
+        let ba = 0.3 + mulberry32(&seed) * 0.4;
+        let x = uv.x * w;
+        if (x >= gX && x < gX + gW && y >= gY && y < gY + gH) {
+          let bc = vec3<f32>(
+            select(0.0, 1.0, cr > 0.5),
+            select(0.0, 1.0, cg > 0.5),
+            select(0.0, 1.0, cb > 0.5));
+          col = mix(col, vec4(bc, 1.0), ba);
+        }
+      }
     }
   } else if (p.mode == 2u) {
-    // chromatic: RGB channel offsets
-    let offset = max(2.0, amount * 14.0) / w;
-    col.r = textureSample(src, samp, uv + vec2(offset, 0.0)).r;
-    col.g = textureSample(src, samp, uv).g;
-    col.b = textureSample(src, samp, uv - vec2(offset, 0.0)).b;
-    col.a = 1.0;
+    // chromatic — mirrors applyChromatic: two shifted snapshot ghosts drawn
+    // with the canvas 'screen' composite at alpha min(0.7, amount).
+    let offset = max(2.0, amount * 14.0);
+    let a = min(0.7, amount);
+    let ox = offset / w;
+    var acc = textureSample(src, samp, uv);
+    // Each ghost is only painted where its shifted dest rect overlaps the
+    // canvas (drawImage clips); elsewhere the frame shows through.
+    if (uv.x <= 1.0 - ox) {
+      let cL = textureSample(src, samp, uv + vec2(ox, 0.0));
+      acc = 1.0 - (1.0 - a * cL) * (1.0 - acc);
+    }
+    if (uv.x >= ox) {
+      let cR = textureSample(src, samp, uv - vec2(ox, 0.0));
+      acc = 1.0 - (1.0 - a * cR) * (1.0 - acc);
+    }
+    col = vec4(acc.rgb, 1.0);
   } else if (p.mode == 3u) {
     // zoom: pull the image toward the viewer around the center
     let scale = 1.0 + amount;
@@ -80,42 +161,74 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     col = mix(c0, vec4(1.0) - c0, amount);
     col.a = 1.0;
   } else if (p.mode == 5u) {
-    // bars: slightly zoomed snapshot with black letterbox bands
+    // bars: slightly zoomed snapshot with black letterbox bands at 0.96 alpha
+    // (mirrors applyBars: rgba(0,0,0,0.96) drawn over the zoomed snapshot).
     let scale = 1.0 + amount * 0.12;
     let barH = (amount * h * 0.22) / h;
     col = textureSample(src, samp, vec2(0.5) + (uv - vec2(0.5)) / scale);
     if (uv.y < barH || uv.y > 1.0 - barH) {
-      col = vec4(0.0, 0.0, 0.0, 1.0);
+      col = mix(col, vec4(0.0, 0.0, 0.0, 1.0), 0.96);
     }
   } else if (p.mode == 6u) {
-    // shockwave: radial ripple pull
+    // shockwave: radial ripple. TS warps a 0.25-scale snapshot then upscales:
+    // phase and pull live on the small-canvas grid (so the ring frequency
+    // matches), and shifted samples wrap like the TS `%` indexing.
     let c = vec2(w, h) * 0.5;
     let d = uv * vec2(w, h) - c;
     let dist = length(d);
     let maxDist = max(length(c), 1.0);
-    let phase = dist * 0.13 - p.time * 7.0;
+    let sw = max(2.0, round(w * 0.25));
+    let sh = max(2.0, round(h * 0.25));
+    let ds = dist * sw / w;
+    let phase = ds * 0.13 - p.time * 7.0;
     let pull = amount * 5.0 * (dist / maxDist) * sin(phase * 6.2831853);
     let dir = select(vec2(0.0), d / max(dist, 0.0001), dist > 0.0001);
-    col = textureSample(src, samp, uv + dir * pull / vec2(w, h));
+    let uv2 = uv + dir * pull / vec2(sw, sh);
+    col = textureSample(src, samp, uv2 - floor(uv2));
   } else if (p.mode == 7u) {
-    // pixelate: block-snapped sampling
+    // pixelate: replicate applyPixelate's two-step nearest scaling (downsample
+    // to ceil(w/block), upsample back). Each output block shows the source
+    // pixel at floor(floor(x*sw/w) * w/sw), not the block center.
     let block = max(2.0, round(4.0 + amount * 44.0));
-    let px = floor(uv * vec2(w, h) / block) * block + block * 0.5;
-    col = textureSample(src, samp, px / vec2(w, h));
+    let sw = max(1.0, ceil(w / block));
+    let sh = max(1.0, ceil(h / block));
+    let sx = floor(floor(uv.x * sw) * w / sw);
+    let sy = floor(floor(uv.y * sh) * h / sh);
+    col = textureSample(src, samp, vec2(sx, sy) / vec2(w, h));
   } else if (p.mode == 8u) {
-    // tilt: rotate around the center
-    let seed = floor(p.time * 1000.0);
-    let angle = (hash1(seed) - 0.5) * amount * 0.08;
+    // tilt: rotate around the center (mirrors applyTilt: mulberry32 angle,
+    // cleared canvas outside the rotated frame -> black).
+    var randState = u32(floor(p.time * 1000.0));
+    let angle = (mulberry32(&randState) - 0.5) * amount * 0.08;
     let d = uv - vec2(0.5);
     let ca = cos(angle);
     let sa = sin(angle);
     let u2 = vec2(d.x * ca - d.y * sa, d.x * sa + d.y * ca) + vec2(0.5);
-    col = textureSample(src, samp, u2);
+    if (u2.x < 0.0 || u2.x > 1.0 || u2.y < 0.0 || u2.y > 1.0) {
+      col = vec4(0.0, 0.0, 0.0, 1.0);
+    } else {
+      col = textureSample(src, samp, u2);
+    }
   } else if (p.mode == 9u) {
-    // heat haze: horizontal strips shifted by a slow sine
+    // heat haze: horizontal strips shifted by a slow sine; the shifted
+    // destination leaves cleared (black) edges (mirrors applyHeatHaze).
     let y = uv.y * h;
     let xOff = sin((y + p.time * 1000.0 / 28.0) * 0.05) * amount * 18.0;
-    col = textureSample(src, samp, uv + vec2(xOff / w, 0.0));
+    let u = uv.x - xOff / w;
+    if (u < 0.0 || u > 1.0) {
+      col = vec4(0.0, 0.0, 0.0, 1.0);
+    } else {
+      col = textureSample(src, samp, vec2(u, uv.y));
+    }
+  } else if (p.mode == 10u) {
+    // hue shift — mirrors applyHueShift: canvas 'hue' composite of a diagonal
+    // hue->hue+180 gradient (hsl 0.85/0.5) at alpha `amount` over the frame.
+    let hue = p.time * 25.0 - floor(p.time * 25.0 / 360.0) * 360.0;
+    let t = clamp((uv.x * w * w + uv.y * h * h) / (w * w + h * h), 0.0, 1.0);
+    let hue2 = hue + 180.0 * t;
+    let cs = hsl_to_rgb(vec3(hue2 - floor(hue2 / 360.0) * 360.0, 0.85, 0.5));
+    let cb = textureSample(src, samp, uv).rgb;
+    col = vec4(mix(cb, hueBlend(cb, cs), p.intensity), 1.0);
   }
 
   return col;

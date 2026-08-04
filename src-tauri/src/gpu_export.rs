@@ -18,19 +18,63 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use tauri::Emitter;
 
-/// Decode a custom background image from a data URL (`data:...;base64,`),
-/// `file://` URI, or plain file path into RGBA pixels.
+fn decode_uri_to_path(s: &str) -> String {
+  let clean = if let Some(p) = s.strip_prefix("file://") {
+    p
+  } else if let Some(p) = s.strip_prefix("http://asset.localhost/") {
+    p
+  } else if let Some(p) = s.strip_prefix("https://asset.localhost/") {
+    p
+  } else if let Some(p) = s.strip_prefix("asset://") {
+    p
+  } else {
+    s
+  };
+
+  let mut out = String::with_capacity(clean.len());
+  let bytes = clean.as_bytes();
+  let mut i = 0;
+  while i < bytes.len() {
+    if bytes[i] == b'%' && i + 2 < bytes.len() {
+      if let Ok(val) = u8::from_str_radix(&clean[i + 1..i + 3], 16) {
+        out.push(val as char);
+        i += 3;
+        continue;
+      }
+    }
+    out.push(bytes[i] as char);
+    i += 1;
+  }
+  out
+}
+
 fn decode_background_image(uri: Option<&str>) -> Option<(Vec<u8>, u32, u32)> {
   let uri = uri?;
-  let bytes: Vec<u8> = if let Some((_, b64)) = uri.split_once("base64,") {
-    general_purpose::STANDARD.decode(b64).ok()?
-  } else if let Some(path) = uri.strip_prefix("file://") {
-    std::fs::read(path).ok()?
-  } else if std::path::Path::new(uri).exists() {
-    std::fs::read(uri).ok()?
-  } else {
+  if uri.trim().is_empty() {
     return None;
+  }
+
+  let bytes: Vec<u8> = if let Some((_, b64)) = uri.split_once("base64,") {
+    let clean = b64.split(&['?', '#'][..]).next().unwrap_or(b64).trim();
+    let sanitized: String = clean.chars().filter(|c| !c.is_whitespace()).collect();
+    general_purpose::STANDARD
+      .decode(&sanitized)
+      .or_else(|_| general_purpose::URL_SAFE.decode(&sanitized))
+      .or_else(|_| general_purpose::STANDARD_NO_PAD.decode(&sanitized))
+      .or_else(|_| general_purpose::URL_SAFE_NO_PAD.decode(&sanitized))
+      .ok()?
+  } else {
+    let file_path = decode_uri_to_path(uri);
+    if let Ok(b) = std::fs::read(&file_path) {
+      b
+    } else if let Ok(b) = std::fs::read(uri) {
+      b
+    } else {
+      eprintln!("[Rust GPU Export] Background image not found: '{}'", uri);
+      return None;
+    }
   };
+
   let img = image::load_from_memory(&bytes).ok()?;
   let rgba = img.to_rgba8();
   let (w, h) = (rgba.width(), rgba.height());
@@ -288,14 +332,14 @@ pub async fn export_gpu(
 
     // Custom background image: decode once, upload to a persistent atlas layer.
     if let Some((rgba, w, h)) = decode_background_image(config.background.custom_image_uri.as_deref()) {
-      if let Some((tw, th)) = gpu.upload_image_layer(IMAGE_LAYER, &rgba, w, h) {
+      if let Some((tw, th)) = gpu.upload_background_image(IMAGE_LAYER, &rgba, w, h) {
         rstate.background_image = Some(BackgroundImage { layer: IMAGE_LAYER, w: tw, h: th });
       }
     }
 
     // Radial center image: decode once, upload to a persistent atlas layer.
     if let Some((rgba, w, h)) = decode_background_image(config.background.radial_center_image_uri.as_deref()) {
-      if let Some((tw, th)) = gpu.upload_image_layer(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
+      if let Some((tw, th)) = gpu.upload_background_image(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
         rstate.radial_center_image = Some(BackgroundImage { layer: RADIAL_CENTER_IMAGE_LAYER, w: tw, h: th });
       }
     }
@@ -357,6 +401,7 @@ pub async fn export_gpu(
         env.above_floor,
         rstate.beat_strength,
         frame_time,
+        config.export.fps.max(1) as f32,
       );
       let bg_only = config.screen_effects.background_only.unwrap_or(true);
 
@@ -557,7 +602,7 @@ pub fn render_preview_frame_inner(
   if engine.bg_image_uri != cur_bg_uri {
     engine.bg_image_uri = cur_bg_uri.clone();
     if let Some((rgba, w, h)) = decode_background_image(cur_bg_uri.as_deref()) {
-      if let Some((tw, th)) = engine.renderer.upload_image_layer(IMAGE_LAYER, &rgba, w, h) {
+      if let Some((tw, th)) = engine.renderer.upload_background_image(IMAGE_LAYER, &rgba, w, h) {
         engine.bg_image_info = Some((tw, th));
       } else {
         engine.bg_image_info = None;
@@ -574,7 +619,7 @@ pub fn render_preview_frame_inner(
   if engine.radial_image_uri != cur_radial_uri {
     engine.radial_image_uri = cur_radial_uri.clone();
     if let Some((rgba, w, h)) = decode_background_image(cur_radial_uri.as_deref()) {
-      if let Some((tw, th)) = engine.renderer.upload_image_layer(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
+      if let Some((tw, th)) = engine.renderer.upload_background_image(RADIAL_CENTER_IMAGE_LAYER, &rgba, w, h) {
         engine.radial_image_info = Some((tw, th));
       } else {
         engine.radial_image_info = None;
@@ -595,6 +640,7 @@ pub fn render_preview_frame_inner(
     env.above_floor,
     rstate.beat_strength,
     frame_time,
+    config.export.fps.max(1) as f32,
   );
   let bg_only = config.screen_effects.background_only.unwrap_or(true);
 

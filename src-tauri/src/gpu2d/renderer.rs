@@ -4,7 +4,11 @@ use super::scene::{Mesh, Vertex};
 use bytemuck::{Pod, Zeroable};
 
 pub const TEXTURE_LAYERS: u32 = 24;
-pub const LAYER_SIZE: u32 = 1024;
+/// Atlas array-layer size. 2048 keeps a >1080p background photo near 1:1 for
+/// 1080p/1440p exports (a 1024 cap visibly softened photos vs the TS preview,
+/// which draws the full-resolution image via the browser's high-quality
+/// drawImage). Costs ~384 MB GPU memory (24 layers × 2048² × 4).
+pub const LAYER_SIZE: u32 = 2048;
 #[allow(dead_code)]
 pub const GLYPH_LAYER: u32 = 0;
 /// Persistent layer used for the custom background image (above per-frame text layers 0..19).
@@ -29,13 +33,16 @@ enum SceneTarget {
 #[derive(Clone, Copy, Debug)]
 pub struct PostFx {
   /// Effect id: 1 = glitch, 2 = chromatic, 3 = zoom, 4 = invert,
-  /// 5 = bars, 6 = shockwave, 7 = pixelate, 8 = tilt, 9 = heat haze.
+  /// 5 = bars, 6 = shockwave, 7 = pixelate, 8 = tilt, 9 = heat haze,
+  /// 10 = hue shift.
   pub mode: u32,
   pub intensity: f32,
   /// Seconds since export start.
   pub time: f32,
   /// 0..=1 energy of the current beat, decays between beats.
   pub beat: f32,
+  /// Render frames per second (glitch color-bar timing).
+  pub fps: f32,
 }
 
 #[derive(Clone, Copy, Debug, Pod, Zeroable)]
@@ -47,6 +54,7 @@ struct RawFxParams {
   beat: f32,
   width: f32,
   height: f32,
+  fps: f32,
   pad: [f32; 3],
 }
 
@@ -98,6 +106,19 @@ pub struct GpuRenderer {
   #[allow(dead_code)]
   atlas_view: wgpu::TextureView,
   bind_group: wgpu::BindGroup,
+  bind_group_layout: wgpu::BindGroupLayout,
+  sampler: wgpu::Sampler,
+  /// Dedicated native-resolution 2D textures for the custom background image
+  /// and the radial-center image. Freed from the fixed-size atlas, so large
+  /// photos keep full detail instead of being capped at LAYER_SIZE (the old
+  /// cap visibly softened exports vs the TS preview's high-quality drawImage).
+  bg_image_tex: wgpu::Texture,
+  bg_image_view: wgpu::TextureView,
+  radial_image_tex: wgpu::Texture,
+  radial_image_view: wgpu::TextureView,
+  /// Hard cap for background image textures (~8K, covers virtually all photos);
+  /// larger sources are area-averaged down to this.
+  max_img_dim: u32,
   pipeline: wgpu::RenderPipeline,
   /// Additive blend pipeline for glow composite mode.
   additive_pipeline: wgpu::RenderPipeline,
@@ -196,6 +217,25 @@ impl GpuRenderer {
       ..Default::default()
     });
 
+    // Dummy 1x1 textures so the bind group always has valid views; replaced on
+    // the first real `upload_background_image`.
+    let dummy_tex = |device: &wgpu::Device, label: &str| {
+      let tex = device.create_texture(&wgpu::TextureDescriptor {
+        label: Some(label),
+        size: wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8Unorm,
+        usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+        view_formats: &[],
+      });
+      let view = tex.create_view(&Default::default());
+      (tex, view)
+    };
+    let (bg_image_tex, bg_image_view) = dummy_tex(&device, "Background Image (dummy)");
+    let (radial_image_tex, radial_image_view) = dummy_tex(&device, "Radial Center Image (dummy)");
+
     let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
       label: Some("BGL"),
       entries: &[
@@ -215,6 +255,26 @@ impl GpuRenderer {
           ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
           count: None,
         },
+        wgpu::BindGroupLayoutEntry {
+          binding: 2,
+          visibility: wgpu::ShaderStages::FRAGMENT,
+          ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+          },
+          count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+          binding: 3,
+          visibility: wgpu::ShaderStages::FRAGMENT,
+          ty: wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+          },
+          count: None,
+        },
       ],
     });
 
@@ -224,6 +284,8 @@ impl GpuRenderer {
       entries: &[
         wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&atlas_view) },
         wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&sampler) },
+        wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&bg_image_view) },
+        wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&radial_image_view) },
       ],
     });
 
@@ -488,6 +550,8 @@ impl GpuRenderer {
       ],
     });
 
+    let max_img_dim = device.limits().max_texture_dimension_2d.min(8192);
+
     Ok(Self {
       device,
       queue,
@@ -501,6 +565,13 @@ impl GpuRenderer {
       atlas_texture,
       atlas_view,
       bind_group,
+      bind_group_layout,
+      sampler,
+      bg_image_tex,
+      bg_image_view,
+      radial_image_tex,
+      radial_image_view,
+      max_img_dim,
       pipeline,
       additive_pipeline,
       screen_pipeline,
@@ -548,185 +619,141 @@ impl GpuRenderer {
   }
 
   /// Upload an image into a layer, scaled to fit LAYER_SIZE while preserving aspect.
-  /// Returns the scaled layer-space dimensions so callers can compute UVs.
+  /// Downscaling uses a CPU area-average (box) resample — a single bilinear
+  /// sample would alias and soften large photos, unlike the browser's
+  /// high-quality drawImage used by the TS preview. Returns the scaled
+  /// layer-space dimensions so callers can compute UVs.
   #[allow(dead_code)]
   pub fn upload_image_layer(&self, layer: u32, rgba: &[u8], w: u32, h: u32) -> Option<(u32, u32)> {
     if layer >= TEXTURE_LAYERS || w == 0 || h == 0 || layer == GLYPH_LAYER {
       return None;
     }
-    let scale = (LAYER_SIZE as f32 / w.max(h) as f32).min(1.0);
+    if w <= LAYER_SIZE && h <= LAYER_SIZE {
+      self.upload_layer(layer, rgba, w, h);
+      return Some((w, h));
+    }
+    let scale = LAYER_SIZE as f32 / w.max(h) as f32;
     let tw = ((w as f32 * scale) as u32).max(1).min(LAYER_SIZE);
     let th = ((h as f32 * scale) as u32).max(1).min(LAYER_SIZE);
-    let src = wgpu::TextureDescriptor {
-      label: Some("tmp"),
-      size: wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
-      mip_level_count: 1,
-      sample_count: 1,
-      dimension: wgpu::TextureDimension::D2,
-      format: wgpu::TextureFormat::Rgba8Unorm,
-      usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST | wgpu::TextureUsages::COPY_SRC,
-      view_formats: &[],
-    };
-    let tmp = self.device.create_texture(&src);
-    self.queue.write_texture(
-      wgpu::ImageCopyTexture {
-        texture: &tmp,
-        mip_level: 0,
-        origin: wgpu::Origin3d::ZERO,
-        aspect: wgpu::TextureAspect::All,
-      },
-      rgba,
-      wgpu::ImageDataLayout { offset: 0, bytes_per_row: Some(w * 4), rows_per_image: Some(h) },
-      wgpu::Extent3d { width: w, height: h, depth_or_array_layers: 1 },
-    );
-    let tmp_view = tmp.create_view(&Default::default());
-    let sampler = self.device.create_sampler(&wgpu::SamplerDescriptor {
-      label: Some("img"),
-      address_mode_u: wgpu::AddressMode::ClampToEdge,
-      address_mode_v: wgpu::AddressMode::ClampToEdge,
-      address_mode_w: wgpu::AddressMode::ClampToEdge,
-      mag_filter: wgpu::FilterMode::Linear,
-      min_filter: wgpu::FilterMode::Linear,
-      mipmap_filter: wgpu::FilterMode::Nearest,
-      ..Default::default()
-    });
-    let bgl = self.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-      label: Some("scBGL"),
-      entries: &[
-        wgpu::BindGroupLayoutEntry {
-          binding: 0,
-          visibility: wgpu::ShaderStages::FRAGMENT,
-          ty: wgpu::BindingType::Texture {
-            sample_type: wgpu::TextureSampleType::Float { filterable: true },
-            view_dimension: wgpu::TextureViewDimension::D2,
-            multisampled: false,
-          },
-          count: None,
-        },
-        wgpu::BindGroupLayoutEntry {
-          binding: 1,
-          visibility: wgpu::ShaderStages::FRAGMENT,
-          ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-          count: None,
-        },
-      ],
-    });
-    let bg = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-      label: Some("scBG"),
-      layout: &bgl,
-      entries: &[
-        wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&tmp_view) },
-        wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&sampler) },
-      ],
-    });
-    let pipeline_layout = self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-      label: Some("scPL"),
-      bind_group_layouts: &[&bgl],
-      push_constant_ranges: &[],
-    });
-    let pipeline = self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-      label: Some("scale"),
-      layout: Some(&pipeline_layout),
-      vertex: wgpu::VertexState {
-        module: &self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-          label: Some("scale shader"),
-          source: wgpu::ShaderSource::Wgsl(SCALE_SHADER.into()),
-        }),
-        entry_point: Some("vs_main"),
-        buffers: &[],
-        compilation_options: Default::default(),
-      },
-      fragment: Some(wgpu::FragmentState {
-        module: &self.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-          label: Some("scale fs"),
-          source: wgpu::ShaderSource::Wgsl(SCALE_SHADER.into()),
-        }),
-        entry_point: Some("fs_main"),
-        targets: &[Some(wgpu::ColorTargetState {
-          format: wgpu::TextureFormat::Rgba8Unorm,
-          blend: None,
-          write_mask: wgpu::ColorWrites::ALL,
-        })],
-        compilation_options: Default::default(),
-      }),
-      primitive: wgpu::PrimitiveState::default(),
-      depth_stencil: None,
-      multisample: wgpu::MultisampleState::default(),
-      multiview: None,
-      cache: None,
-    });
+    let resized = Self::area_average_resize(rgba, w, h, tw, th);
+    self.upload_layer(layer, &resized, tw, th);
+    Some((tw, th))
+  }
 
-    let tmp_target = self.device.create_texture(&wgpu::TextureDescriptor {
-      label: Some("scaled"),
+  /// Upload a background image (custom background or radial-center) into a
+  /// dedicated native-resolution 2D texture — NOT the fixed-size atlas — so
+  /// large photos keep their full detail, matching the TS preview's
+  /// high-quality `drawImage`. Rebuilds the bind group so the new texture view
+  /// is sampled. Returns the uploaded dimensions for cover-fit UV mapping.
+  pub fn upload_background_image(&mut self, layer: u32, rgba: &[u8], w: u32, h: u32) -> Option<(u32, u32)> {
+    if (layer != IMAGE_LAYER && layer != RADIAL_CENTER_IMAGE_LAYER) || w == 0 || h == 0 {
+      return None;
+    }
+    let max_dim = self.max_img_dim;
+    let (tw, th, data) = if w > max_dim || h > max_dim {
+      let scale = max_dim as f32 / w.max(h) as f32;
+      let tw = ((w as f32 * scale) as u32).max(1).min(max_dim);
+      let th = ((h as f32 * scale) as u32).max(1).min(max_dim);
+      (tw, th, Self::area_average_resize(rgba, w, h, tw, th))
+    } else {
+      (w, h, rgba.to_vec())
+    };
+    let tex = self.device.create_texture(&wgpu::TextureDescriptor {
+      label: Some(if layer == IMAGE_LAYER { "Background Image" } else { "Radial Center Image" }),
       size: wgpu::Extent3d { width: tw, height: th, depth_or_array_layers: 1 },
       mip_level_count: 1,
       sample_count: 1,
       dimension: wgpu::TextureDimension::D2,
       format: wgpu::TextureFormat::Rgba8Unorm,
-      usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
+      usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
       view_formats: &[],
     });
-    let target_view = tmp_target.create_view(&Default::default());
-
-    let mut enc = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-      label: Some("scale enc"),
-    });
-    {
-      let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
-        label: Some("scale pass"),
-        color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-          view: &target_view,
-          resolve_target: None,
-          ops: wgpu::Operations { load: wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT), store: wgpu::StoreOp::Store },
-        })],
-        depth_stencil_attachment: None,
-        ..Default::default()
-      });
-      pass.set_pipeline(&pipeline);
-      pass.set_bind_group(0, &bg, &[]);
-      pass.draw(0..3, 0..1);
-    }
-    let mut tmp_buf = Vec::new();
-    tmp_buf.resize((tw as usize) * (th as usize) * 4, 0);
-    // copy target -> staging for readback
-    let tmp_staging = self.device.create_buffer(&wgpu::BufferDescriptor {
-      label: Some("sc staging"),
-      size: Self::staging_size(tw, th),
-      usage: wgpu::BufferUsages::MAP_READ | wgpu::BufferUsages::COPY_DST,
-      mapped_at_creation: false,
-    });
-    enc.copy_texture_to_buffer(
+    let view = tex.create_view(&Default::default());
+    self.queue.write_texture(
       wgpu::ImageCopyTexture {
-        texture: &tmp_target,
+        texture: &tex,
         mip_level: 0,
         origin: wgpu::Origin3d::ZERO,
         aspect: wgpu::TextureAspect::All,
       },
-      wgpu::ImageCopyBuffer {
-        buffer: &tmp_staging,
-        layout: wgpu::ImageDataLayout {
-          offset: 0,
-          bytes_per_row: Some(Self::row_bytes(tw)),
-          rows_per_image: Some(th),
-        },
+      &data,
+      wgpu::ImageDataLayout {
+        offset: 0,
+        bytes_per_row: Some(tw * 4),
+        rows_per_image: Some(th),
       },
       wgpu::Extent3d { width: tw, height: th, depth_or_array_layers: 1 },
     );
-    self.queue.submit(std::iter::once(enc.finish()));
-    let slice = tmp_staging.slice(..);
-    let (tx, rx) = std::sync::mpsc::sync_channel(1);
-    slice.map_async(wgpu::MapMode::Read, move |r| {
-      let _ = tx.send(r);
-    });
-    self.device.poll(wgpu::Maintain::Wait);
-    rx.recv().ok();
-    {
-      let data = slice.get_mapped_range();
-      tmp_buf.copy_from_slice(&Self::deinterleave_rows(&data, tw, th));
+    if layer == IMAGE_LAYER {
+      self.bg_image_tex = tex;
+      self.bg_image_view = view;
+    } else {
+      self.radial_image_tex = tex;
+      self.radial_image_view = view;
     }
-    tmp_staging.unmap();
-    self.upload_layer(layer, &tmp_buf, tw, th);
+    self.rebuild_bind_group();
     Some((tw, th))
+  }
+
+  /// Rebuild the scene bind group against the current background-image texture
+  /// views (textures are replaced whenever `upload_background_image` is called).
+  fn rebuild_bind_group(&mut self) {
+    let new_bg = self.device.create_bind_group(&wgpu::BindGroupDescriptor {
+      label: Some("BG"),
+      layout: &self.bind_group_layout,
+      entries: &[
+        wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(&self.atlas_view) },
+        wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::Sampler(&self.sampler) },
+        wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::TextureView(&self.bg_image_view) },
+        wgpu::BindGroupEntry { binding: 3, resource: wgpu::BindingResource::TextureView(&self.radial_image_view) },
+      ],
+    });
+    self.bind_group = new_bg;
+  }
+
+  /// Separable area-average (box) resample. Downscale only; 1:1 maps to an
+  /// exact copy. Produces smooth, alias-free output comparable to the
+  /// browser's high-quality image downscale.
+  pub fn area_average_resize(src: &[u8], sw: u32, sh: u32, dw: u32, dh: u32) -> Vec<u8> {
+    let mut tmp = vec![0u8; (dw as usize) * (sh as usize) * 4];
+    for y in 0..sh {
+      let row = (y as usize) * (sw as usize) * 4;
+      let out = (y as usize) * (dw as usize) * 4;
+      for x in 0..dw {
+        let sx0 = ((x as u64) * (sw as u64) / (dw as u64)) as usize;
+        let sx1 = (((x + 1) as u64) * (sw as u64)).div_ceil(dw as u64) as usize;
+        let n = (sx1 - sx0).max(1);
+        let mut acc = [0u32; 4];
+        for sx in sx0..sx1 {
+          let o = row + sx * 4;
+          for c in 0..4 {
+            acc[c] += src[o + c] as u32;
+          }
+        }
+        for c in 0..4 {
+          tmp[out + (x as usize) * 4 + c] = (acc[c] / n as u32) as u8;
+        }
+      }
+    }
+    let mut dst = vec![0u8; (dw as usize) * (dh as usize) * 4];
+    for x in 0..dw {
+      for y in 0..dh {
+        let sy0 = ((y as u64) * (sh as u64) / (dh as u64)) as usize;
+        let sy1 = (((y + 1) as u64) * (sh as u64)).div_ceil(dh as u64) as usize;
+        let n = (sy1 - sy0).max(1);
+        let mut acc = [0u32; 4];
+        for sy in sy0..sy1 {
+          let o = ((sy as usize) * (dw as usize) + x as usize) * 4;
+          for c in 0..4 {
+            acc[c] += tmp[o + c] as u32;
+          }
+        }
+        for c in 0..4 {
+          dst[((y as usize) * (dw as usize) + x as usize) * 4 + c] = (acc[c] / n as u32) as u8;
+        }
+      }
+    }
+    dst
   }
 
   /// Grow the persistent vertex/index buffers to fit `mesh` and upload the
@@ -897,6 +924,7 @@ impl GpuRenderer {
       width: self.width as f32,
       height: self.height as f32,
       pad: [0.0, 0.0, 0.0],
+      fps: fx.fps,
     };
     self
       .queue
@@ -955,6 +983,7 @@ impl GpuRenderer {
       width: self.width as f32,
       height: self.height as f32,
       pad: [0.0, 0.0, 0.0],
+      fps: fx.fps,
     };
     self
       .queue
@@ -1063,30 +1092,3 @@ impl GpuRenderer {
   }
 }
 
-#[allow(dead_code)]
-const SCALE_SHADER: &str = r#"
-@group(0) @binding(0) var tex: texture_2d<f32>;
-@group(0) @binding(1) var samp: sampler;
-
-struct VsOut {
-    @builtin(position) pos: vec4<f32>,
-    @location(0) uv: vec2<f32>,
-};
-
-@vertex
-fn vs_main(@builtin(vertex_index) vi: u32) -> VsOut {
-    var p = array<vec2<f32>, 3>(
-        vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0)
-    );
-    var o: VsOut;
-    o.pos = vec4(p[vi], 0.0, 1.0);
-    o.uv = p[vi] * 0.5 + 0.5;
-    o.uv.y = 1.0 - o.uv.y;
-    return o;
-}
-
-@fragment
-fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
-    return textureSample(tex, samp, in.uv);
-}
-"#;

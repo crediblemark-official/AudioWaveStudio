@@ -554,6 +554,16 @@ impl GpuCanvas {
     if r <= 0.0 {
       return;
     }
+    if (a1 - a0).abs() >= std::f32::consts::TAU - 1e-4 {
+      if let Fill::Gradient(Gradient::Radial { x0, y0, r0, x1, y1, r1, stops }) = &self.state.fill {
+        if (x0 - x1).abs() < 1e-6 && (y0 - y1).abs() < 1e-6 {
+          let (r0, r1) = (*r0, *r1);
+          let stops = stops.clone();
+          self.fill_radial_circle(cx, cy, r, r0, r1, &stops);
+          return;
+        }
+      }
+    }
     let n = self.segments.max(8);
     let mut a1 = a1;
     while a1 < a0 {
@@ -952,6 +962,19 @@ impl GpuCanvas {
     if self.state.shadow_blur > 0.0 && self.state.shadow_color.a > 0.0 {
       self.draw_ellipse_glow(cx, cy, rx, ry);
     }
+    if rx <= 0.0 || ry <= 0.0 {
+      return;
+    }
+    if rx == ry {
+      if let Fill::Gradient(Gradient::Radial { x0, y0, r0, x1, y1, r1, stops }) = &self.state.fill {
+        if (x0 - x1).abs() < 1e-6 && (y0 - y1).abs() < 1e-6 {
+          let (r0, r1) = (*r0, *r1);
+          let stops = stops.clone();
+          self.fill_radial_circle(cx, cy, rx, r0, r1, &stops);
+          return;
+        }
+      }
+    }
     let n = self.segments.max(8);
     let center = self.state.transform.apply(cx, cy);
     let c = self.vertex_color(&self.state.fill, cx, cy, &self.state.transform);
@@ -969,6 +992,91 @@ impl GpuCanvas {
         Vertex::flat(tp, cp),
         Vertex::flat(tq, cq),
       );
+    }
+  }
+
+  /// Disc fill with a centered radial gradient, sliced into concentric rings
+  /// at every gradient stop boundary so the piecewise-linear gradient is
+  /// reproduced exactly. A plain center->rim fan only samples the gradient at
+  /// t=0 and t=1, so multi-stop fills (e.g. the nebula blob's 3-stop gradient)
+  /// lose their middle stops and render soft/blurred vs the canvas preview;
+  /// with per-ring sampling each annulus spans exactly one linear segment.
+  fn fill_radial_circle(
+    &mut self,
+    cx: f32,
+    cy: f32,
+    radius: f32,
+    r0: f32,
+    r1: f32,
+    stops: &[ColorStop],
+  ) {
+    if radius <= 0.0 {
+      return;
+    }
+    let n = self.segments.max(8);
+    let mut radii: Vec<f32> = Vec::with_capacity(stops.len() + 2);
+    radii.push(0.0);
+    for s in stops {
+      let u = s.t.clamp(0.0, 1.0);
+      let rho = r0 + u * (r1 - r0);
+      if rho > 0.0 && rho < radius {
+        radii.push(rho);
+      }
+    }
+    if *radii.last().unwrap() != radius {
+      radii.push(radius);
+    }
+    radii.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    radii.dedup_by(|a, b| (*a - *b).abs() < 1e-3);
+
+    let center = self.state.transform.apply(cx, cy);
+    for pair in radii.windows(2) {
+      let (ra, rb) = (pair[0], pair[1]);
+      if ra == 0.0 {
+        let cc = self.vertex_color(&self.state.fill, cx, cy, &self.state.transform);
+        for i in 0..n {
+          let t0 = std::f32::consts::TAU * (i as f32 / n as f32);
+          let t1 = std::f32::consts::TAU * ((i + 1) as f32 / n as f32);
+          let (px, py) = (cx + rb * t0.cos(), cy + rb * t0.sin());
+          let (qx, qy) = (cx + rb * t1.cos(), cy + rb * t1.sin());
+          let cp = self.vertex_color(&self.state.fill, px, py, &self.state.transform);
+          let cq = self.vertex_color(&self.state.fill, qx, qy, &self.state.transform);
+          let tp = self.state.transform.apply(px, py);
+          let tq = self.state.transform.apply(qx, qy);
+          self.push_tri(
+            Vertex::flat(center, cc),
+            Vertex::flat(tp, cp),
+            Vertex::flat(tq, cq),
+          );
+        }
+      } else {
+        for i in 0..n {
+          let t0 = std::f32::consts::TAU * (i as f32 / n as f32);
+          let t1 = std::f32::consts::TAU * ((i + 1) as f32 / n as f32);
+          let (a0x, a0y) = (cx + ra * t0.cos(), cy + ra * t0.sin());
+          let (a1x, a1y) = (cx + ra * t1.cos(), cy + ra * t1.sin());
+          let (b0x, b0y) = (cx + rb * t0.cos(), cy + rb * t0.sin());
+          let (b1x, b1y) = (cx + rb * t1.cos(), cy + rb * t1.sin());
+          let ca0 = self.vertex_color(&self.state.fill, a0x, a0y, &self.state.transform);
+          let ca1 = self.vertex_color(&self.state.fill, a1x, a1y, &self.state.transform);
+          let cb0 = self.vertex_color(&self.state.fill, b0x, b0y, &self.state.transform);
+          let cb1 = self.vertex_color(&self.state.fill, b1x, b1y, &self.state.transform);
+          let ta0 = self.state.transform.apply(a0x, a0y);
+          let ta1 = self.state.transform.apply(a1x, a1y);
+          let tb0 = self.state.transform.apply(b0x, b0y);
+          let tb1 = self.state.transform.apply(b1x, b1y);
+          self.push_tri(
+            Vertex::flat(ta0, ca0),
+            Vertex::flat(ta1, ca1),
+            Vertex::flat(tb0, cb0),
+          );
+          self.push_tri(
+            Vertex::flat(ta1, ca1),
+            Vertex::flat(tb1, cb1),
+            Vertex::flat(tb0, cb0),
+          );
+        }
+      }
     }
   }
 
@@ -1281,7 +1389,7 @@ impl GpuCanvas {
     // (canvas fillText baseline), independent of the ink box / padding:
     //   canvas_x(pen_x) = quad_x + (pen_x - left) = x + dx
     //   canvas_y(baseline) = quad_y + (baseline - top) = y
-    // The atlas array layer is LAYER_SIZE x LAYER_SIZE (1024) with the text
+    // The atlas array layer is LAYER_SIZE x LAYER_SIZE (2048) with the text
     // atlas written to its top-left corner, so UVs must be normalized by
     // LAYER_SIZE — NOT by atlas_w/atlas_h (that would point the quad at empty
     // layer space, rendering a dim flat band instead of glyphs).

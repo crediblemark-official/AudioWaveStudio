@@ -263,6 +263,7 @@ fn gpu_postfx_readback_matches() {
     intensity: 1.0,
     time: 1.0,
     beat: 0.0,
+    fps: 30.0,
   };
   gpu.render_into_fx(&mesh, &invert, 1);
   let fx = gpu.readback(1);
@@ -278,11 +279,48 @@ fn gpu_postfx_readback_matches() {
     intensity: 0.3,
     time: 1.0,
     beat: 0.0,
+    fps: 30.0,
   };
   gpu.render_into_fx(&mesh, &zoom, 0);
   let zx = gpu.readback(0);
   assert_eq!(zx.len(), 320 * 240 * 4, "zoom readback should be full RGBA");
   assert!(zx.iter().any(|&b| b > 0), "zoom readback should not be empty");
+}
+
+#[test]
+fn gpu_postfx_snapshot_modes_render() {
+  // Exercises the snapshot-based post-fx modes (glitch/chromatic/tilt/
+  // heatHaze/hueShift) through render_into_fx so the WGSL compiles and the
+  // new TS-parity algorithms produce full-frame output.
+  let mut gpu = pollster::block_on(GpuRenderer::new(320, 240)).expect("GPU init failed");
+
+  let mut canvas = GpuCanvas::new(320, 240);
+  canvas.set_fill(Fill::Solid(Color::rgba(0.5, 0.2, 0.8, 1.0)));
+  canvas.fill_rect(0.0, 0.0, 320.0, 240.0);
+  let mesh = canvas.finish();
+
+  let cases = [
+    (1, 0.8, "glitch"),
+    (2, 0.8, "chromatic"),
+    (5, 0.4, "bars"),
+    (6, 0.5, "shockwave"),
+    (8, 0.5, "tilt"),
+    (9, 0.6, "heatHaze"),
+    (10, 0.6, "hueShift"),
+  ];
+  for (i, (mode, intensity, name)) in cases.iter().enumerate() {
+    let fx = audiowave_studio_lib::gpu2d::renderer::PostFx {
+      mode: *mode,
+      intensity: *intensity,
+      time: 1.37,
+      beat: 0.0,
+      fps: 30.0,
+    };
+    gpu.render_into_fx(&mesh, &fx, i % 2);
+    let rgba = gpu.readback(i % 2);
+    assert_eq!(rgba.len(), 320 * 240 * 4, "{name}: expected full RGBA");
+    assert!(rgba.iter().any(|&b| b > 0), "{name}: readback should not be empty");
+  }
 }
 
 #[test]
@@ -335,7 +373,7 @@ fn gpu_background_image_renders() {
     }
   }
   let (tw, th) = gpu
-    .upload_image_layer(audiowave_studio_lib::gpu2d::IMAGE_LAYER, &rgba, 200, 100)
+    .upload_background_image(audiowave_studio_lib::gpu2d::IMAGE_LAYER, &rgba, 200, 100)
     .expect("upload failed");
 
   let mut rstate = RenderState::new(config.reactivity.bar_count, 3);
@@ -377,7 +415,7 @@ fn gpu_radial_center_image_renders() {
   let mut gpu = pollster::block_on(GpuRenderer::new(640, 360)).expect("GPU init failed");
   let rgba = vec![255, 0, 128, 255].repeat(100 * 100);
   let (tw, th) = gpu
-    .upload_image_layer(audiowave_studio_lib::gpu2d::RADIAL_CENTER_IMAGE_LAYER, &rgba, 100, 100)
+    .upload_background_image(audiowave_studio_lib::gpu2d::RADIAL_CENTER_IMAGE_LAYER, &rgba, 100, 100)
     .expect("upload failed");
 
   let mut rstate = RenderState::new(config.reactivity.bar_count, 3);
@@ -908,6 +946,59 @@ fn nebula_formula_matches_ts() {
     assert!((hue - gh).abs() < 1e-2, "nebula[{i}] hue: rust {hue} != ts {gh}");
   }
 }
+
+#[test]
+fn radial_gradient_circle_slices_at_stop_boundaries() {
+  // Regression: a plain center->rim fan only samples a radial gradient at
+  // t=0 and t=1, dropping the middle stops (the nebula blob's 3-stop gradient
+  // lost its hue+30 band and rendered soft/blurred vs the canvas preview).
+  // fill_ellipse must slice the disc into rings at every stop boundary so the
+  // middle-stop color actually reaches the mesh.
+  let mut canvas = GpuCanvas::new(320, 240);
+  let g = Fill::radial_gradient(
+    160.0,
+    120.0,
+    0.0,
+    160.0,
+    120.0,
+    100.0,
+    &[
+      (0.0, Color::rgba(1.0, 0.0, 0.0, 1.0)),
+      (0.5, Color::rgba(0.0, 1.0, 0.0, 1.0)),
+      (1.0, Color::rgba(0.0, 0.0, 1.0, 0.0)),
+    ],
+  );
+  canvas.set_fill(g);
+  canvas.fill_circle(160.0, 120.0, 100.0);
+  let mesh = canvas.finish();
+
+  let mut rim = 0usize;
+  let mut mid = 0usize;
+  let mut center = 0usize;
+  let mut mid_is_green = true;
+  for v in &mesh.verts {
+    let px = (v.position[0] + 1.0) / 2.0 * 320.0;
+    let py = (1.0 - v.position[1]) / 2.0 * 240.0;
+    let dx = px - 160.0;
+    let dy = py - 120.0;
+    let d = (dx * dx + dy * dy).sqrt();
+    if d < 1.0 {
+      center += 1;
+    } else if (d - 100.0).abs() < 0.5 {
+      rim += 1;
+    } else if (d - 50.0).abs() < 0.5 {
+      mid += 1;
+      if v.color[0] > 0.05 || v.color[1] < 0.95 || v.color[2] > 0.05 {
+        mid_is_green = false;
+      }
+    }
+  }
+  assert!(center > 0, "expected center vertices, got none");
+  assert!(rim >= 64, "expected rim ring, got {rim}");
+  assert!(mid >= 64, "expected a ring at the 0.5 stop boundary, got {mid}");
+  assert!(mid_is_green, "middle ring must sample the exact 0.5-stop color");
+}
+
 
 // ---------------------------------------------------------------------------
 // Minimal style slider parity with minimalWave.ts
@@ -1693,7 +1784,7 @@ fn text_quad_places_baseline_at_y_and_renders_1to1() {
 
   // The UVs must be cropped to the ink region (not [0,1]^2): the top-left
   // texture coordinate equals (left/layer_size, top/layer_size) because the
-  // atlas is uploaded into a LAYER_SIZE×LAYER_SIZE (1024) texture layer, so
+  // atlas is uploaded into a LAYER_SIZE×LAYER_SIZE (2048) texture layer, so
   // UVs are normalized by LAYER_SIZE — NOT by atlas_w/atlas_h (which would
   // point the quad at empty layer space).
   let layer_size = audiowave_studio_lib::gpu2d::renderer::LAYER_SIZE as f32;
@@ -2054,7 +2145,7 @@ fn gpu_two_pass_bg_fx_then_over_composites_correctly() {
   let fg_mesh = fg.finish();
 
   // Invert fx (mode 4), full intensity: col = 1 - c0.
-  let fx = PostFx { mode: 4, intensity: 1.0, time: 1.0, beat: 0.0 };
+  let fx = PostFx { mode: 4, intensity: 1.0, time: 1.0, beat: 0.0, fps: 30.0 };
   gpu.render_bg_fx_then_over(&bg_mesh, &fg_mesh, &fx, 0);
   let rgba = gpu.readback(0);
   assert_eq!(rgba.len(), 64 * 64 * 4, "readback must be a full RGBA frame");

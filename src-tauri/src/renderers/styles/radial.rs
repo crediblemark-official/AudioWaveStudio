@@ -19,13 +19,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let radius = (base_radius - 5.0).max(0.0);
     let (iw, ih) = (img.w as f32, img.h as f32);
     if iw > 0.0 && ih > 0.0 {
-      let layer_size = crate::gpu2d::LAYER_SIZE as f32;
+      // The image is a dedicated native-resolution texture, so the disc's UVs
+      // span the full [0,1]^2 (see GpuRenderer::upload_background_image).
       c.push_circular_textured_quad(
         img.layer,
         center_x,
         center_y,
         radius,
-        [0.0, 0.0, iw / layer_size, ih / layer_size],
+        [0.0, 0.0, 1.0, 1.0],
         Color::rgba(1.0, 1.0, 1.0, 1.0),
       );
     }
