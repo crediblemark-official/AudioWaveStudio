@@ -89,13 +89,23 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let br = (center_x + board_w_bot * 0.5, b_bot_y);
   let bl = (center_x - board_w_bot * 0.5, b_bot_y);
 
-  // Dark Metallic Plinth Base
+  // Dark Metallic Plinth Base (Exact 3D Trapezoid Fill)
   c.set_fill(Fill::Solid(Color::rgba(0.06, 0.05, 0.08, 0.98)));
   c.set_shadow(Color::rgba(0.0, 0.0, 0.0, 0.85), 30.0);
-  c.fill_rounded_rect(center_x - board_w_bot * 0.5, b_top_y, board_w_bot, board_h, 12.0);
 
-  c.set_stroke(Fill::Solid(Color::rgba(0.3, 0.28, 0.4, 0.8)));
-  c.set_line_width(2.0);
+  let num_slices = 50usize;
+  let slice_h = board_h / num_slices as f32;
+  for s in 0..num_slices {
+    let s_ratio = s as f32 / num_slices as f32;
+    let cur_w = board_w_top + (board_w_bot - board_w_top) * s_ratio;
+    let cur_y = b_top_y + s as f32 * slice_h;
+    let cur_x = center_x - cur_w * 0.5;
+    c.fill_rect(cur_x, cur_y, cur_w + 0.5, slice_h + 0.5);
+  }
+
+  // 3D Perspective Metallic Border Outline
+  c.set_stroke(Fill::Solid(Color::rgba(0.35, 0.3, 0.45, 0.95)));
+  c.set_line_width(2.5);
   c.stroke_polyline(&[tl, tr, br, bl, tl]);
 
   // Front lip highlight
