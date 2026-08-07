@@ -51,6 +51,8 @@ pub enum VisualizerStyle {
   VinylRecord,
   #[serde(rename = "turntable")]
   Turntable,
+  #[serde(rename = "retroRadio")]
+  RetroRadio,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
