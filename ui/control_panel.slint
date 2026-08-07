@@ -920,6 +920,28 @@ export component ControlPanel inherits Rectangle {
                             selected(val) => { root.main-effect = val; root.config-changed(); }
                         }
 
+                        Text {
+                            text: root.main-effect == "Shake" ? "Canvas vibrates with the beat (background parallax depth)"
+                                : root.main-effect == "Glitch" ? "Random slice displacement & color artifacts"
+                                : root.main-effect == "Vignette" ? "Edges darken dynamically on bass hits"
+                                : root.main-effect == "Pulse" ? "Bright flash on each beat"
+                                : root.main-effect == "Spotlight" ? "Concert light beams from above"
+                                : root.main-effect == "Strobe" ? "Rapid white flashes synced to the music"
+                                : root.main-effect == "Scanline" ? "Retro TV scanlines that darken with the beat"
+                                : root.main-effect == "Chromatic Aberration" ? "RGB color-split ghosting on bass"
+                                : root.main-effect == "Zoom" ? "Canvas zooms in on each beat"
+                                : root.main-effect == "Invert" ? "Colors briefly invert on bass hits"
+                                : root.main-effect == "Bars" ? "Letterbox bars push in on bass"
+                                : root.main-effect == "Shockwave" ? "Radial ripple distortion from the center on each beat"
+                                : root.main-effect == "Pixelate" ? "Frame drops to chunky blocks on bass"
+                                : root.main-effect == "Tilt" ? "Canvas tilts back & forth with the music"
+                                : root.main-effect == "Heat Haze" ? "Wavy air distortion shimmering on bass"
+                                : root.main-effect == "Hue Shift" ? "Colors drift continuously through the spectrum"
+                                : "No active screen effect";
+                            color: #737373;
+                            font-size: 11px;
+                        }
+
                         if (root.main-effect == "Shake") : VerticalLayout {
                             spacing: 10px;
                             SliderRow {
