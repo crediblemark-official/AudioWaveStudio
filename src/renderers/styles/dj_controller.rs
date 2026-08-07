@@ -18,7 +18,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let rot = ctx.rotation_angle;
 
   let center_x = width * 0.5;
-  let center_y = height * 0.52;
+  let center_y = height * 0.44;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
