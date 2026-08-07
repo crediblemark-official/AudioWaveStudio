@@ -1,8 +1,8 @@
 //! Speaker Explosion style renderer (`speakerExplosion`).
 //!
 //! Renders an explosive audio subwoofer speaker complete with pumping bass cone,
-//! golden dust cap, 360-degree needle-sharp radial spectrum ray burst, paint drips,
-//! and floating paint splatter droplets.
+//! chrome mounting chassis with 6 hex bolts, rubber surround roll, golden dust cap,
+//! 360-degree needle-sharp radial spectrum ray burst, paint drips, and floating splatter droplets.
 
 use std::f32::consts::TAU;
 
@@ -133,34 +133,111 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   // -------------------------------------------------------------------------
-  // 4. SUBWOOFER SPEAKER CONE & METALLIC RIM
+  // 4. HYPER-REALISTIC HIGH-FIDELITY SUBWOOFER ASSEMBLY
   // -------------------------------------------------------------------------
-  // Outer Cyan/Chrome Metallic Frame Ring
-  c.set_fill(Fill::Solid(Color::rgba(0.12, 0.14, 0.18, 0.98)));
-  c.set_stroke(Fill::Solid(electric_cyan));
-  c.set_line_width(4.0);
-  c.set_shadow(electric_cyan.with_alpha(0.85), 20.0);
+  // A. Outer Chrome / Cyan Metallic Chassis Frame Ring
+  let rim_grad = Fill::radial_gradient(
+    center_x,
+    center_y,
+    woofer_r * 0.85,
+    center_x,
+    center_y,
+    woofer_r,
+    &[
+      (0.0, Color::rgba(0.1, 0.12, 0.16, 0.98)),
+      (0.5, Color::rgba(0.85, 0.9, 0.95, 0.95)),
+      (0.85, Color::rgba(0.2, 0.85, 1.0, 0.95)),
+      (1.0, Color::rgba(0.08, 0.1, 0.14, 0.98)),
+    ],
+  );
+
+  c.set_fill(rim_grad);
+  c.set_shadow(electric_cyan.with_alpha(0.85), 22.0);
   c.fill_ellipse(center_x, center_y, woofer_r, woofer_r);
+
+  c.set_stroke(Fill::Solid(electric_cyan));
+  c.set_line_width(2.5);
   c.stroke_circle(center_x, center_y, woofer_r);
 
-  // Inner Dark Woofer Cone
-  let cone_r = woofer_r * 0.76;
-  c.set_fill(Fill::Solid(Color::rgba(0.04, 0.03, 0.06, 0.98)));
-  c.set_stroke(Fill::Solid(Color::rgba(0.3, 0.28, 0.38, 0.7)));
-  c.set_line_width(2.0);
+  // 6 Silver Hex Mounting Screws/Bolts on Rim
+  let bolt_r = (woofer_r * 0.04).clamp(3.0, 8.0);
+  let bolt_dist = woofer_r * 0.91;
+  c.set_shadow(Color::rgba(0.0, 0.0, 0.0, 0.6), 4.0);
+
+  for b_idx in 0..6 {
+    let b_angle = (b_idx as f32 / 6.0) * TAU;
+    let bx = center_x + b_angle.cos() * bolt_dist;
+    let by = center_y + b_angle.sin() * bolt_dist;
+
+    c.set_fill(Fill::Solid(Color::rgba(0.88, 0.88, 0.92, 0.98)));
+    c.fill_ellipse(bx, by, bolt_r, bolt_r);
+    c.set_fill(Fill::Solid(Color::rgba(0.2, 0.2, 0.25, 0.95)));
+    c.fill_ellipse(bx, by, bolt_r * 0.45, bolt_r * 0.45);
+  }
+
+  // B. Corrugated Rubber Surround Suspension Ring
+  let surround_r = woofer_r * 0.82;
+  c.set_fill(Fill::Solid(Color::rgba(0.08, 0.07, 0.1, 0.98)));
+  c.set_stroke(Fill::Solid(Color::rgba(0.25, 0.22, 0.32, 0.8)));
+  c.set_line_width(3.0);
+  c.fill_ellipse(center_x, center_y, surround_r, surround_r);
+  c.stroke_circle(center_x, center_y, surround_r);
+
+  // C. Deep Carbon / Paper Pulp Speaker Cone
+  let cone_r = woofer_r * 0.66;
+  let cone_grad = Fill::radial_gradient(
+    center_x,
+    center_y,
+    0.0,
+    center_x,
+    center_y,
+    cone_r,
+    &[
+      (0.0, Color::rgba(0.04, 0.03, 0.06, 0.98)),
+      (0.65, Color::rgba(0.12, 0.1, 0.16, 0.98)),
+      (1.0, Color::rgba(0.06, 0.05, 0.08, 0.98)),
+    ],
+  );
+
+  c.set_fill(cone_grad);
   c.fill_ellipse(center_x, center_y, cone_r, cone_r);
-  c.stroke_circle(center_x, center_y, cone_r);
 
-  // Golden / Copper Center Dust Cap (Pumping with Bass!)
-  let cap_r = cone_r * (0.34 + be * 0.08);
-  let gold_col = Color::rgba(1.0, 0.72, 0.2, 0.98);
+  // Concentric cone texture rings
+  c.set_stroke(Fill::Solid(Color::rgba(0.25, 0.22, 0.32, 0.3)));
+  c.set_line_width(1.0);
+  for &cr in &[0.3f32, 0.5, 0.7, 0.9] {
+    c.stroke_circle(center_x, center_y, cone_r * cr);
+  }
 
-  c.set_fill(Fill::Solid(gold_col));
-  c.set_stroke(Fill::Solid(Color::WHITE));
+  // D. Golden Copper Metallic Dust Cap Dome (Pumping with Bass!)
+  let cap_r = cone_r * (0.36 + be * 0.08);
+
+  let cap_grad = Fill::radial_gradient(
+    center_x - cap_r * 0.25,
+    center_y - cap_r * 0.25,
+    0.0,
+    center_x,
+    center_y,
+    cap_r,
+    &[
+      (0.0, Color::rgba(1.0, 0.92, 0.55, 0.98)),
+      (0.4, Color::rgba(1.0, 0.7, 0.15, 0.98)),
+      (0.85, Color::rgba(0.75, 0.42, 0.08, 0.98)),
+      (1.0, Color::rgba(0.45, 0.2, 0.04, 0.98)),
+    ],
+  );
+
+  c.set_fill(cap_grad);
+  c.set_stroke(Fill::Solid(Color::rgba(1.0, 0.85, 0.4, 0.9)));
   c.set_line_width(2.0);
-  c.set_shadow(gold_col.with_alpha(0.9), 16.0);
+  c.set_shadow(Color::rgba(1.0, 0.65, 0.1, 0.9), 18.0);
   c.fill_ellipse(center_x, center_y, cap_r, cap_r);
   c.stroke_circle(center_x, center_y, cap_r);
+
+  // 3D Specular Highlight Reflection Spot
+  c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.65)));
+  c.set_shadow(Color::TRANSPARENT, 0.0);
+  c.fill_ellipse(center_x - cap_r * 0.3, center_y - cap_r * 0.3, cap_r * 0.22, cap_r * 0.15);
 
   c.restore();
 }
