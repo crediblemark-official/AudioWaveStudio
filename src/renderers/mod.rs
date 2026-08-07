@@ -562,8 +562,11 @@ pub fn draw_frame_pass(
       background::render_music_notes(c, &mut ctx);
     }
 
-    // Text overlay (title/artist/blocks) — Phase 6 text port.
-    text::draw_text_overlay(c, &ctx, env.global_fade);
+    // Text overlay (title/artist/blocks) — skipped when CassetteTape is active
+    // because CassetteTape renders track title and time inside its own vector label.
+    if config.style != crate::config::VisualizerStyle::CassetteTape {
+      text::draw_text_overlay(c, &ctx, env.global_fade);
+    }
 
     // When backgroundOnly is off, overlay screen effects apply to the whole
     // frame (after the text, like canvasRenderer's second applyScreenEffects).
