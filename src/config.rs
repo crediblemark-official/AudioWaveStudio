@@ -63,6 +63,10 @@ pub enum VisualizerStyle {
   CyberRing3D,
   #[serde(rename = "hologramStage")]
   HologramStage,
+  #[serde(rename = "dualPortalBridge")]
+  DualPortalBridge,
+  #[serde(rename = "dualWaveHorizon")]
+  DualWaveHorizon,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

@@ -23,6 +23,8 @@ pub mod speaker_explosion;
 pub mod orbit_spike;
 pub mod cyber_ring_3d;
 pub mod hologram_stage;
+pub mod dual_portal_bridge;
+pub mod dual_wave_horizon;
 pub mod speaker_splatter;
 pub mod speaker_trio;
 pub mod spectrum;
@@ -68,5 +70,7 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::OrbitSpike => orbit_spike::render(c, ctx),
     VisualizerStyle::CyberRing3D => cyber_ring_3d::render(c, ctx),
     VisualizerStyle::HologramStage => hologram_stage::render(c, ctx),
+    VisualizerStyle::DualPortalBridge => dual_portal_bridge::render(c, ctx),
+    VisualizerStyle::DualWaveHorizon => dual_wave_horizon::render(c, ctx),
   }
 }
