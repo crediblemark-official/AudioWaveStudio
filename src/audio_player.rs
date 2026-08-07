@@ -153,7 +153,30 @@ impl AudioPlayer {
     }
 
     pub fn set_volume(&mut self, vol: f32) {
-        self.volume = vol.max(0.0).min(1.0);
+        let v = vol.max(0.0).min(1.0);
+        self.volume = v;
+
+        // Apply volume dynamically to system audio output (PipeWire / PulseAudio / ALSA)
+        let vol_float = format!("{:.2}", v);
+        let vol_pct = format!("{}%", (v * 100.0).round() as u32);
+
+        // Try wpctl (PipeWire default on Linux)
+        let _ = Command::new("wpctl")
+            .arg("set-volume")
+            .arg("@DEFAULT_AUDIO_SINK@")
+            .arg(&vol_float)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
+
+        // Try pactl (PulseAudio fallback)
+        let _ = Command::new("pactl")
+            .arg("set-sink-volume")
+            .arg("@DEFAULT_SINK@")
+            .arg(&vol_pct)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn();
     }
 
     pub fn get_volume(&self) -> f32 {

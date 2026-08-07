@@ -405,6 +405,7 @@ pub fn bind_app_callbacks(
         s.prev_volume = if vol > 0.001 { vol } else { s.prev_volume };
         if let Some(w) = window_handle.upgrade() {
             w.set_is_muted(vol <= 0.001);
+            w.set_volume(vol);
         }
     });
 
