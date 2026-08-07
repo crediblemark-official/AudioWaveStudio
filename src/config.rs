@@ -59,6 +59,8 @@ pub enum VisualizerStyle {
   SpeakerExplosion,
   #[serde(rename = "orbitSpike")]
   OrbitSpike,
+  #[serde(rename = "cyberRing3D")]
+  CyberRing3D,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
