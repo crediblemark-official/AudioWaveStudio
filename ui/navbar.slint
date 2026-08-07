@@ -144,9 +144,9 @@ export component Navbar inherits Rectangle {
         alignment: space-between;
         cross-axis-alignment: center;
 
-        // ============ LEFT CLUSTER ============
+        // ============ LEFT / CENTER TOOLBAR CLUSTER ============
         left-cluster := HorizontalLayout {
-            spacing: 12px;
+            spacing: 10px;
             cross-axis-alignment: center;
 
             // BRAND — logo + AudioWave + Studio badge
@@ -211,58 +211,87 @@ export component Navbar inherits Rectangle {
                     else { root.listen-clicked(); }
                 }
             }
-        }
 
-        // ============ CENTER PROMO TICKER ============
-        Rectangle {
-            horizontal-stretch: 1;
-            max-width: 320px;
-            min-width: 140px;
-            height: 28px;
-            border-radius: 6px;
-            background: ticker-ta.has-hover ? #ffd70029 : #ffd70014;
-            clip: true;
+            Rectangle {
+                width: 1px;
+                height: 20px;
+                background: #ffffff1f;
+            }
 
-            ticker-ta := TouchArea {
-                width: parent.width;
-                height: parent.height;
-                mouse-cursor: pointer;
-                clicked => { root.ticker-clicked(); }
+            // PROMO TICKER with smooth gradient fade/blur edges
+            Rectangle {
+                width: 340px;
+                height: 28px;
+                border-radius: 6px;
+                background: ticker-ta.has-hover ? #ffd70024 : #ffd70010;
+                border-width: 1px;
+                border-color: #ffd70025;
+                clip: true;
 
-                ticker-scroll := Rectangle {
-                    x: -1 * root.ticker-progress * measure.width;
-                    y: 0;
-                    width: 2 * measure.width;
+                ticker-ta := TouchArea {
+                    width: parent.width;
                     height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => { root.ticker-clicked(); }
 
-                    HorizontalLayout {
-                        spacing: 0;
-                        Text {
-                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                            color: #ffd700;
-                            font-size: 11px;
-                            font-weight: 500;
-                            vertical-alignment: center;
-                        }
-                        Text {
-                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                            color: #ffd700;
-                            font-size: 11px;
-                            font-weight: 500;
-                            vertical-alignment: center;
+                    ticker-scroll := Rectangle {
+                        x: -1 * root.ticker-progress * measure.width;
+                        y: 0;
+                        width: 2 * measure.width;
+                        height: parent.height;
+
+                        HorizontalLayout {
+                            spacing: 0;
+                            Text {
+                                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                                color: #ffd700;
+                                font-size: 11px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                                color: #ffd700;
+                                font-size: 11px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                 }
-            }
 
-            measure := Text {
-                x: -10000px;
-                y: -10000px;
-                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                color: transparent;
-                font-size: 11px;
-                font-weight: 500;
+                // Left Edge Fade Blur Overlay
+                Rectangle {
+                    x: 0;
+                    y: 0;
+                    width: 20px;
+                    height: parent.height;
+                    background: @linear-gradient(90deg, #0d0d0d 0%, #0d0d0d00 100%);
+                }
+
+                // Right Edge Fade Blur Overlay
+                Rectangle {
+                    x: parent.width - 20px;
+                    y: 0;
+                    width: 20px;
+                    height: parent.height;
+                    background: @linear-gradient(270deg, #0d0d0d 0%, #0d0d0d00 100%);
+                }
+
+                measure := Text {
+                    x: -10000px;
+                    y: -10000px;
+                    text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                    color: transparent;
+                    font-size: 11px;
+                    font-weight: 500;
+                }
             }
+        }
+
+        // SPACER — absorbs extra width cleanly between toolbar and right tools
+        Rectangle {
+            horizontal-stretch: 1;
         }
 
         Timer {
@@ -279,19 +308,19 @@ export component Navbar inherits Rectangle {
             cross-axis-alignment: center;
 
             IconBtn {
-                icon: "⬚";
+                icon: "🖼";
                 tip: "Custom Background Image";
                 clicked => { root.open-custom-image-clicked(); }
             }
 
             IconBtn {
-                icon: "⤓";
+                icon: "💾";
                 tip: "Save Preset";
                 clicked => { root.save-preset-clicked(); }
             }
 
             IconBtn {
-                icon: "⤒";
+                icon: "📂";
                 tip: "Load Preset";
                 clicked => { root.load-preset-clicked(); }
             }
