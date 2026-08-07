@@ -1,0 +1,28 @@
+{
+  "id": "custom_cyber_ring",
+  "name": "Custom Cyber Ring",
+  "icon": "⚡",
+  "description": "User uploaded style with dual neon glowing rings and radial spectrum rays",
+  "layers": [
+    {
+      "type": "glowing_ring",
+      "radius_ratio": 0.28,
+      "color": "#00f0ff",
+      "glow_intensity": 18.0
+    },
+    {
+      "type": "spectrum_radial",
+      "bar_count": 72,
+      "inner_ratio": 0.28,
+      "max_bar_height": 90.0,
+      "color_primary": "#ff007f",
+      "color_secondary": "#00f0ff"
+    },
+    {
+      "type": "glowing_ring",
+      "radius_ratio": 0.12,
+      "color": "#ff007f",
+      "glow_intensity": 14.0
+    }
+  ]
+}
