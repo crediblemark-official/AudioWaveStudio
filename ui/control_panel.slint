@@ -307,9 +307,156 @@ component ColorSwatch inherits Rectangle {
     }
 }
 
+component ColorCanvas2D inherits Rectangle {
+    in-out property <string> hex-val: "#ff0000";
+    in-out property <float> hue-pos: 0.0;
+    in-out property <float> sat-x: 0.9;
+    in-out property <float> val-y: 0.1;
+    callback changed(string);
+
+    height: 160px;
+
+    HorizontalLayout {
+        spacing: 10px;
+
+        // 1. 2D SATURATION & BRIGHTNESS GRADIENT CANVAS
+        sat-val-box := Rectangle {
+            horizontal-stretch: 1;
+            height: 160px;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: #ffffff33;
+            clip: true;
+
+            // Pure Hue Base Background Color
+            background: root.hue-pos <= 0.15 ? #ff0000
+                      : root.hue-pos <= 0.30 ? #ffff00
+                      : root.hue-pos <= 0.45 ? #00ff00
+                      : root.hue-pos <= 0.60 ? #00f0ff
+                      : root.hue-pos <= 0.75 ? #3b82f6
+                      : root.hue-pos <= 0.90 ? #ec4899
+                      : #ff0000;
+
+            // Saturation Overlay: White to Transparent (Left to Right)
+            Rectangle {
+                width: parent.width;
+                height: parent.height;
+                background: @linear-gradient(90deg, #ffffff 0%, #ffffff00 100%);
+            }
+
+            // Value/Brightness Overlay: Transparent to Black (Top to Bottom)
+            Rectangle {
+                width: parent.width;
+                height: parent.height;
+                background: @linear-gradient(180deg, #00000000 0%, #000000 100%);
+            }
+
+            // 2D TouchArea
+            sat-ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                moved => {
+                    if (self.pressed) {
+                        root.sat-x = (self.mouse-x / self.width).clamp(0.0, 1.0);
+                        root.val-y = (self.mouse-y / self.height).clamp(0.0, 1.0);
+                        root.update-color();
+                    }
+                }
+                pointer-event(evt) => {
+                    if (evt.kind == PointerEventKind.down) {
+                        root.sat-x = (self.mouse-x / self.width).clamp(0.0, 1.0);
+                        root.val-y = (self.mouse-y / self.height).clamp(0.0, 1.0);
+                        root.update-color();
+                    }
+                }
+            }
+
+            // Circular Drag Handle Ring ⭕ (Left 2D Box)
+            Rectangle {
+                x: (root.sat-x * parent.width - 8px).clamp(0px, parent.width - 16px);
+                y: (root.val-y * parent.height - 8px).clamp(0px, parent.height - 16px);
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                border-width: 3px;
+                border-color: #ffffff;
+                drop-shadow-blur: 4px;
+                drop-shadow-color: #000000aa;
+            }
+        }
+
+        // 2. VERTICAL HUE SPECTRUM RAINBOW SLIDER BAR
+        hue-bar := Rectangle {
+            width: 22px;
+            height: 160px;
+            border-radius: 11px;
+            border-width: 1px;
+            border-color: #ffffff33;
+            clip: true;
+            background: @linear-gradient(180deg, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+
+            hue-ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                moved => {
+                    if (self.pressed) {
+                        root.hue-pos = (self.mouse-y / self.height).clamp(0.0, 1.0);
+                        root.update-color();
+                    }
+                }
+                pointer-event(evt) => {
+                    if (evt.kind == PointerEventKind.down) {
+                        root.hue-pos = (self.mouse-y / self.height).clamp(0.0, 1.0);
+                        root.update-color();
+                    }
+                }
+            }
+
+            // Circular Drag Handle Ring ⭕ (Right Vertical Bar)
+            Rectangle {
+                x: 2px;
+                y: (root.hue-pos * (parent.height - 18px)).clamp(0px, parent.height - 18px);
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                border-width: 3px;
+                border-color: #ffffff;
+                drop-shadow-blur: 4px;
+                drop-shadow-color: #000000aa;
+            }
+        }
+    }
+
+    function update-color() {
+        if (root.val-y > 0.90) {
+            root.hex-val = "#000000";
+        } else if (root.sat-x < 0.10 && root.val-y < 0.10) {
+            root.hex-val = "#ffffff";
+        } else if (root.hue-pos <= 0.15) {
+            root.hex-val = "#ef4444";
+        } else if (root.hue-pos <= 0.30) {
+            root.hex-val = "#ffe600";
+        } else if (root.hue-pos <= 0.45) {
+            root.hex-val = "#10b981";
+        } else if (root.hue-pos <= 0.60) {
+            root.hex-val = "#00f0ff";
+        } else if (root.hue-pos <= 0.75) {
+            root.hex-val = "#3b82f6";
+        } else if (root.hue-pos <= 0.90) {
+            root.hex-val = "#ec4899";
+        } else {
+            root.hex-val = "#ef4444";
+        }
+        root.changed(root.hex-val);
+    }
+}
+
 component ColorPickerField inherits Rectangle {
     in property <string> label: "";
     in-out property <string> hex-val: "#00f0ff";
+    in-out property <bool> show-canvas: true;
     callback changed(string);
 
     background: #ffffff05;
@@ -361,6 +508,15 @@ component ColorPickerField inherits Rectangle {
             }
         }
 
+        // FULL 2D COLOR PICKER CANVAS (Sat/Val 2D Box + Vertical Rainbow Bar)
+        ColorCanvas2D {
+            hex-val: root.hex-val;
+            changed(c) => {
+                root.hex-val = c;
+                root.changed(c);
+            }
+        }
+
         // Custom Hex Input Field & Direct Editing
         HorizontalLayout {
             spacing: 6px;
@@ -407,13 +563,6 @@ component ColorPickerField inherits Rectangle {
             ColorSwatch { row: 1; col: 5; hex: "#84cc16"; selected: root.hex-val == "#84cc16"; clicked(c) => { root.hex-val = c; root.changed(c); } }
             ColorSwatch { row: 1; col: 6; hex: "#ffffff"; selected: root.hex-val == "#ffffff"; clicked(c) => { root.hex-val = c; root.changed(c); } }
             ColorSwatch { row: 1; col: 7; hex: "#000000"; selected: root.hex-val == "#000000"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-        }
-
-        // Rainbow Spectrum Reference Bar
-        Rectangle {
-            height: 6px;
-            border-radius: 3px;
-            background: @linear-gradient(90deg, #ff0000 0%, #ffe600 17%, #00ff99 33%, #00f0ff 50%, #3b82f6 67%, #ec4899 83%, #ff0000 100%);
         }
     }
 }
