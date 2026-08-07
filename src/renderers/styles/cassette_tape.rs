@@ -352,9 +352,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_shadow(electric_cyan.with_alpha(0.4), 8.0);
   c.stroke_rect(trap_x, trap_y, trap_w, trap_h);
 
-  // Volume text inside trapezoid (matching Photo 1: "ENVATO VOLUME #2")
+  // Volume text inside trapezoid (dynamically configured via settings!)
+  let cassette_sub_str = if !ctx.config.text.cassette_label.trim().is_empty() {
+    ctx.config.text.cassette_label.to_uppercase()
+  } else {
+    "AUDIOWAVE VOLUME #1".to_string()
+  };
+
   c.draw_text(
-    "AUDIOWAVE VOLUME #1",
+    &cassette_sub_str,
     center_x,
     trap_y + trap_h * 0.65,
     (trap_h * 0.45).clamp(8.0, 13.0),

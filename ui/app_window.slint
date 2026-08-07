@@ -238,6 +238,7 @@ export component AppWindow inherits Window {
     // Text Overlay & Typography
     in-out property <bool> show-title: true;
     in-out property <bool> show-artist: true;
+    in-out property <string> cassette-label: "AUDIOWAVE VOLUME #1";
     in-out property <string> text-preset: "Bottom Center";
     in-out property <float> title-pos-x: 50.0;
     in-out property <float> title-pos-y: 78.0;
@@ -594,6 +595,7 @@ export component AppWindow inherits Window {
 
                     track-title <=> root.track-title;
                     track-artist <=> root.track-artist;
+                    cassette-label <=> root.cassette-label;
                     show-title <=> root.show-title;
                     show-artist <=> root.show-artist;
                     text-preset <=> root.text-preset;

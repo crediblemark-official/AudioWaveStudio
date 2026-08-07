@@ -896,6 +896,7 @@ pub fn bind_app_callbacks(
 
             s.config.text.song_title = w.get_track_title().to_string();
             s.config.text.artist_name = w.get_track_artist().to_string();
+            s.config.text.cassette_label = w.get_cassette_label().to_string();
             s.config.text.title.text = w.get_track_title().to_string();
             s.config.text.artist.text = w.get_track_artist().to_string();
             s.config.text.show_title = w.get_show_title();

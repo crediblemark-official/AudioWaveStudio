@@ -590,6 +590,7 @@ export component ControlPanel inherits Rectangle {
 
     in-out property <string> track-title: "";
     in-out property <string> track-artist: "";
+    in-out property <string> cassette-label: "AUDIOWAVE VOLUME #1";
     in-out property <bool> show-title: true;
     in-out property <bool> show-artist: true;
     in-out property <string> text-preset: "Bottom Center";
@@ -1476,6 +1477,13 @@ export component ControlPanel inherits Rectangle {
                         text: root.track-artist;
                         placeholder-text: "Artist Name";
                         edited(val) => { root.track-artist = val; root.config-changed(); }
+                    }
+
+                    SectionTitle { text: "CASSETTE SUBTITLE / VOLUME"; }
+                    LineEdit {
+                        text: root.cassette-label;
+                        placeholder-text: "Cassette Label (e.g. VOLUME #1, ENVATO #2)";
+                        edited(val) => { root.cassette-label = val; root.config-changed(); }
                     }
 
                     SectionTitle { text: "QUICK POSITION PRESET"; }

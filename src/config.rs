@@ -406,6 +406,7 @@ impl Default for TextBlock {
 pub struct TextSettings {
   pub song_title: String,
   pub artist_name: String,
+  pub cassette_label: String,
   pub show_title: bool,
   pub show_artist: bool,
   pub font_family: String,
@@ -419,6 +420,7 @@ impl Default for TextSettings {
     Self {
       song_title: "AudioWave Visualizer".to_string(),
       artist_name: "CredibleMark Studio".to_string(),
+      cassette_label: "AUDIOWAVE VOLUME #1".to_string(),
       show_title: true,
       show_artist: true,
       font_family: "Outfit".to_string(),
