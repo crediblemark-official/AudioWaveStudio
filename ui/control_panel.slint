@@ -577,6 +577,7 @@ export component ControlPanel inherits Rectangle {
     callback theme-preset-selected(string);
     callback open-radial-image-clicked();
     callback remove-radial-image-clicked();
+    callback open-custom-image-clicked();
 
     VerticalLayout {
         padding: 10px;
@@ -847,6 +848,12 @@ export component ControlPanel inherits Rectangle {
                         model: ["Solid", "Gradient", "Custom Image", "Grid", "Aurora", "Noise", "Bokeh", "Starfield", "Nebula", "Psychedelic"];
                         current-value: root.bg-mode;
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
+                    }
+
+                    SectionTitle { text: "CUSTOM BACKGROUND IMAGE"; }
+                    Button {
+                        text: "🖼 Choose Custom Background Image";
+                        clicked => { root.open-custom-image-clicked(); }
                     }
 
                     SectionTitle { text: "BACKGROUND COLORS"; }
