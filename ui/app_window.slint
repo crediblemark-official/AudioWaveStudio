@@ -438,7 +438,7 @@ export component AppWindow inherits Window {
                         height: 100%;
                         // Safety net: never stretch a frame into a distorted
                         // aspect (legacy objectFit: contain) — rounds stay round.
-                        image-fit: contain;
+                        image-fit: fill;
                     }
 
                     canvas-ta := TouchArea {
