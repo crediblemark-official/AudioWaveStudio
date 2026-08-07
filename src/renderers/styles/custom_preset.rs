@@ -3,7 +3,7 @@
 //! Scans and renders user-created JSON visualizer presets from `./custom_styles/*.json`.
 //! Supports complex multi-layered compositions: radial spectrums, equalizer bars,
 //! glowing neon rings, oscilloscope waveforms, particle bursts, 3D wireframe tunnels,
-//! dual studio speakers, and raw SVG vector code paths (`svg_path`)!
+//! dual studio speakers, SVG vector code paths (`svg_path`), and 2D pixel art arrays (`pixel_matrix`)!
 
 use std::f32::consts::TAU;
 use std::fs;
@@ -76,6 +76,15 @@ pub enum LayerConfig {
     #[serde(default = "default_motion")]
     motion: String,
   },
+  PixelMatrix {
+    cols: usize,
+    rows: usize,
+    pixels: Vec<String>,
+    #[serde(default = "default_pixel_size")]
+    pixel_size: f32,
+    #[serde(default = "default_motion")]
+    motion: String,
+  },
 }
 
 fn default_bar_count() -> usize {
@@ -98,6 +107,9 @@ fn default_glow() -> f32 {
 }
 fn default_scale() -> f32 {
   1.0
+}
+fn default_pixel_size() -> f32 {
+  8.0
 }
 fn default_motion() -> String {
   "pulse".to_string()
@@ -157,6 +169,41 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   if let Some(p_data) = preset {
     for layer in &p_data.layers {
       match layer {
+        LayerConfig::PixelMatrix {
+          cols,
+          rows,
+          pixels,
+          pixel_size,
+          motion,
+        } => {
+          let p_scale = match motion.as_str() {
+            "pulse" | "bounce" => 1.0 + be * 0.25,
+            _ => 1.0,
+          };
+          let cur_px_size = pixel_size * p_scale;
+
+          let mat_w = *cols as f32 * cur_px_size;
+          let mat_h = *rows as f32 * cur_px_size;
+          let start_x = center_x - mat_w * 0.5;
+          let start_y = center_y - mat_h * 0.5;
+
+          for r in 0..*rows {
+            for col in 0..*cols {
+              let idx = r * cols + col;
+              if let Some(hex_code) = pixels.get(idx) {
+                if hex_code != "0" && !hex_code.is_empty() {
+                  let px = start_x + col as f32 * cur_px_size;
+                  let py = start_y + r as f32 * cur_px_size;
+                  let px_col = Color::hex(hex_code);
+
+                  c.set_fill(Fill::Solid(px_col));
+                  c.set_shadow(px_col, 6.0);
+                  c.fill_rect(px + 1.0, py + 1.0, cur_px_size - 1.0, cur_px_size - 1.0);
+                }
+              }
+            }
+          }
+        }
         LayerConfig::SvgPath {
           path_data,
           color,
@@ -174,7 +221,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
           };
           let m_angle = if motion == "spin" { rot } else { 0.0 };
 
-          // Parse SVG path coordinates M x y L x y Z
           let tokens: Vec<&str> = path_data.split_whitespace().collect();
           let mut pts: Vec<(f32, f32)> = Vec::new();
           let mut idx = 0;
@@ -216,7 +262,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             c.stroke_rect(fx, fy, fw, fh);
           }
 
-          // Corner vanishing lines to center
           for &(cx_sign, cy_sign) in &[(-1.0f32, -1.0f32), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
             c.stroke_line(center_x, center_y, center_x + cx_sign * width * 0.5, center_y + cy_sign * height * 0.5);
           }
@@ -343,7 +388,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
           let right_spk_x = center_x + spk_w * 0.15;
 
           for &sx in &[left_spk_x, right_spk_x] {
-            // Speaker Box Cabinet Body
             c.set_fill(Fill::Solid(Color::rgba(0.08, 0.07, 0.11, 0.98)));
             c.set_stroke(Fill::Solid(spk_col.with_alpha(0.85)));
             c.set_line_width(2.5);
@@ -351,7 +395,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             c.fill_rounded_rect(sx, spk_y, spk_w, spk_h, 8.0);
             c.stroke_rect(sx, spk_y, spk_w, spk_h);
 
-            // Upper Tweeter Circle
             let tw_cx = sx + spk_w * 0.5;
             let tw_cy = spk_y + spk_h * 0.25;
             let tw_r = spk_w * 0.15;
@@ -361,7 +404,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             c.fill_ellipse(tw_cx, tw_cy, tw_r, tw_r);
             c.stroke_circle(tw_cx, tw_cy, tw_r);
 
-            // Main Lower Woofer Cone (Pumping on Bass!)
             let woo_cx = sx + spk_w * 0.5;
             let woo_cy = spk_y + spk_h * 0.68;
             let woo_r = spk_w * (0.34 + be * 0.05);
@@ -373,7 +415,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             c.fill_ellipse(woo_cx, woo_cy, woo_r, woo_r);
             c.stroke_circle(woo_cx, woo_cy, woo_r);
 
-            // Gold Dust Cap
             let cap_r = woo_r * 0.35;
             c.set_fill(Fill::Solid(Color::rgba(1.0, 0.7, 0.2, 0.98)));
             c.fill_ellipse(woo_cx, woo_cy, cap_r, cap_r);
@@ -382,7 +423,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       }
     }
   } else {
-    // Fallback indicator when no custom preset file exists
     let cyan = Color::rgba(0.0, 0.85, 1.0, 0.9);
     c.set_stroke(Fill::Solid(cyan));
     c.set_line_width(2.0);
