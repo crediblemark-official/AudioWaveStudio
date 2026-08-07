@@ -217,43 +217,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_fill(Fill::Solid(Color::rgba(0.12, 0.06, 0.22, 0.9)));
   c.stroke_rect(hdr_x, hdr_y, hdr_w, hdr_h);
 
-  // Cassette Label Title & Subtitle (rendered only if show_title / show_artist toggles are enabled!)
-  let title_size = (hdr_h * 0.38).clamp(10.0, 17.0);
-
-  if ctx.config.text.show_title && !ctx.config.text.song_title.trim().is_empty() {
-    let title_str = ctx.config.text.song_title.to_uppercase();
-    c.draw_text(
-      &title_str,
-      hdr_x + hdr_w * 0.04,
-      hdr_y + hdr_h * 0.24,
-      title_size,
-      "sans-serif",
-      700.0,
-      false,
-      TextAlign::Left,
-      Fill::Solid(Color::WHITE),
-      1.0,
-      &Default::default(),
-    );
-  }
-
-  if ctx.config.text.show_artist && !ctx.config.text.artist_name.trim().is_empty() {
-    let artist_str = ctx.config.text.artist_name.clone();
-    c.draw_text(
-      &artist_str,
-      hdr_x + hdr_w * 0.04,
-      hdr_y + hdr_h * 0.70,
-      title_size * 0.65,
-      "sans-serif",
-      400.0,
-      false,
-      TextAlign::Left,
-      Fill::Solid(Color::rgba(0.8, 0.8, 0.9, 0.8)),
-      1.0,
-      &Default::default(),
-    );
-  }
-
   // -------------------------------------------------------------------------
   // 6. TAPE WINDOW & DUAL SPINNING REELS (BELOW HEADER - NO OVERLAP!)
   // -------------------------------------------------------------------------
