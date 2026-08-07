@@ -319,7 +319,7 @@ pub enum TextAlign {
   Right,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct TextBlock {
   pub id: String,
@@ -355,7 +355,45 @@ pub struct TextBlock {
   pub fade_in: bool,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+impl Default for TextBlock {
+  fn default() -> Self {
+    Self {
+      id: "block_default".to_string(),
+      text: String::new(),
+      enabled: true,
+      font_family: "Outfit".to_string(),
+      font_size: 36.0,
+      font_weight: 700.0,
+      italic: false,
+      color: "#ffffff".to_string(),
+      use_gradient: false,
+      gradient_start: "#ffffff".to_string(),
+      gradient_end: "#00f0ff".to_string(),
+      gradient_angle: 90.0,
+      opacity: 1.0,
+      letter_spacing: 0.0,
+      transform: TextTransform::None,
+      position_x: 50.0,
+      position_y: 78.0,
+      align: TextAlign::Center,
+      line_height: 1.2,
+      max_width: 0.0,
+      shadow: false,
+      shadow_blur: 0.0,
+      shadow_offset_x: 0.0,
+      shadow_offset_y: 0.0,
+      glow_intensity: 0.0,
+      outline: false,
+      outline_color: "#000000".to_string(),
+      outline_width: 0.0,
+      reactive_scale: 0.0,
+      wave_effect: false,
+      fade_in: false,
+    }
+  }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct TextSettings {
   pub song_title: String,
@@ -366,6 +404,43 @@ pub struct TextSettings {
   pub title: TextBlock,
   pub artist: TextBlock,
   pub blocks: Vec<TextBlock>,
+}
+
+impl Default for TextSettings {
+  fn default() -> Self {
+    Self {
+      song_title: "AudioWave Visualizer".to_string(),
+      artist_name: "CredibleMark Studio".to_string(),
+      show_title: true,
+      show_artist: true,
+      font_family: "Outfit".to_string(),
+      title: TextBlock {
+        id: "title_block".to_string(),
+        text: "AudioWave Visualizer".to_string(),
+        font_size: 36.0,
+        font_weight: 700.0,
+        position_x: 50.0,
+        position_y: 78.0,
+        color: "#ffffff".to_string(),
+        opacity: 1.0,
+        enabled: true,
+        ..Default::default()
+      },
+      artist: TextBlock {
+        id: "artist_block".to_string(),
+        text: "CredibleMark Studio".to_string(),
+        font_size: 20.0,
+        font_weight: 400.0,
+        position_x: 50.0,
+        position_y: 86.0,
+        color: "#a3a3a3".to_string(),
+        opacity: 1.0,
+        enabled: true,
+        ..Default::default()
+      },
+      blocks: Vec::new(),
+    }
+  }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

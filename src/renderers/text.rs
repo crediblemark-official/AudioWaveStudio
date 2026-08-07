@@ -416,11 +416,9 @@ pub fn draw_text_overlay(c: &mut GpuCanvas, ctx: &RenderContext, global_fade: f3
     } else if !txt.title.text.trim().is_empty() {
       txt.title.text.as_str()
     } else {
-      ""
+      "Song Title"
     };
-    if !t.trim().is_empty() {
-      items.push(Item { block: &txt.title, text: t.to_string() });
-    }
+    items.push(Item { block: &txt.title, text: t.to_string() });
   }
 
   if txt.show_artist {
@@ -429,11 +427,9 @@ pub fn draw_text_overlay(c: &mut GpuCanvas, ctx: &RenderContext, global_fade: f3
     } else if !txt.artist.text.trim().is_empty() {
       txt.artist.text.as_str()
     } else {
-      ""
+      "Artist Name"
     };
-    if !a.trim().is_empty() {
-      items.push(Item { block: &txt.artist, text: a.to_string() });
-    }
+    items.push(Item { block: &txt.artist, text: a.to_string() });
   }
 
   for b in &txt.blocks {

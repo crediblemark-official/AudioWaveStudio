@@ -811,11 +811,15 @@ pub fn bind_app_callbacks(
             s.config.text.show_title = w.get_show_title();
             s.config.text.show_artist = w.get_show_artist();
 
+            s.config.text.title.enabled = true;
+            s.config.text.title.opacity = 1.0;
             s.config.text.title.position_x = w.get_title_pos_x();
             s.config.text.title.position_y = w.get_title_pos_y();
             s.config.text.title.font_size = w.get_title_font_size();
             s.config.text.title.color = w.get_title_color().to_string();
 
+            s.config.text.artist.enabled = true;
+            s.config.text.artist.opacity = 1.0;
             s.config.text.artist.position_x = w.get_artist_pos_x();
             s.config.text.artist.position_y = w.get_artist_pos_y();
             s.config.text.artist.font_size = w.get_artist_font_size();
