@@ -408,6 +408,7 @@ dependencies = [
  "slint-build",
  "symphonia",
  "three-d",
+ "three-d-asset",
  "wgpu",
 ]
 
