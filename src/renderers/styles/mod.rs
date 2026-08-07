@@ -1,4 +1,4 @@
-//! Dedicated submodules for each of the 19 Visualizer Styles.
+//! Dedicated submodules for each of the Visualizer Styles.
 
 pub mod api_3d;
 pub mod aurora_wave;
