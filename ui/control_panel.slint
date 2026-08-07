@@ -1,24 +1,26 @@
 import { Button, Slider, ComboBox, LineEdit, ScrollView, CheckBox } from "std-widgets.slint";
 
-component StyleVisualIcon {
+component StyleVisualIcon inherits Rectangle {
     in property <string> style-id: "";
     in property <color> icon-color: #ffd700;
 
-    Rectangle {
-        width: 24px;
-        height: 18px;
+    width: 24px;
+    height: 18px;
 
-        if root.style-id == "spectrum" || root.style-id == "smoothSpectrum" : HorizontalLayout {
-            spacing: 2px;
-            alignment: center;
-            cross-axis-alignment: end;
-            Rectangle { width: 3px; height: 10px; border-radius: 1px; background: root.icon-color; }
-            Rectangle { width: 3px; height: 16px; border-radius: 1px; background: root.icon-color; }
-            Rectangle { width: 3px; height: 8px; border-radius: 1px; background: root.icon-color; }
-            Rectangle { width: 3px; height: 14px; border-radius: 1px; background: root.icon-color; }
-        }
+    if root.style-id == "spectrum" || root.style-id == "smoothSpectrum" : HorizontalLayout {
+        spacing: 2px;
+        alignment: center;
+        cross-axis-alignment: end;
+        Rectangle { width: 3px; height: 10px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { width: 3px; height: 16px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { width: 3px; height: 8px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { width: 3px; height: 14px; border-radius: 1px; background: root.icon-color; }
+    }
 
-        if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" : Rectangle {
+    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" : HorizontalLayout {
+        alignment: center;
+        cross-axis-alignment: center;
+        Rectangle {
             width: 16px;
             height: 16px;
             border-radius: 8px;
@@ -31,19 +33,23 @@ component StyleVisualIcon {
                 background: root.icon-color;
             }
         }
+    }
 
-        if root.style-id == "oscilloscope" || root.style-id == "minimal" || root.style-id == "auroraWave" : HorizontalLayout {
-            spacing: 1px;
-            alignment: center;
-            cross-axis-alignment: center;
-            Rectangle { width: 4px; height: 2px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 8px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 14px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 6px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 2px; background: root.icon-color; }
-        }
+    if root.style-id == "oscilloscope" || root.style-id == "minimal" || root.style-id == "auroraWave" : HorizontalLayout {
+        spacing: 1px;
+        alignment: center;
+        cross-axis-alignment: center;
+        Rectangle { width: 4px; height: 2px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 8px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 14px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 6px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 2px; background: root.icon-color; }
+    }
 
-        if root.style-id == "equalizer" || root.style-id == "vuMeter" : GridLayout {
+    if root.style-id == "equalizer" || root.style-id == "vuMeter" : HorizontalLayout {
+        alignment: center;
+        cross-axis-alignment: center;
+        GridLayout {
             spacing: 2px;
             Row {
                 Rectangle { width: 4px; height: 4px; border-radius: 1px; background: root.icon-color; }
@@ -56,25 +62,25 @@ component StyleVisualIcon {
                 Rectangle { width: 4px; height: 4px; border-radius: 1px; background: root.icon-color; }
             }
         }
+    }
 
-        if root.style-id == "waveformFill" || root.style-id == "flameFire" || root.style-id == "api3D" : HorizontalLayout {
-            spacing: 2px;
-            alignment: center;
-            cross-axis-alignment: end;
-            Rectangle { width: 4px; height: 6px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 12px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 18px; background: root.icon-color; }
-            Rectangle { width: 4px; height: 10px; background: root.icon-color; }
-        }
+    if root.style-id == "waveformFill" || root.style-id == "flameFire" || root.style-id == "api3D" : HorizontalLayout {
+        spacing: 2px;
+        alignment: center;
+        cross-axis-alignment: end;
+        Rectangle { width: 4px; height: 6px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 12px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 18px; background: root.icon-color; }
+        Rectangle { width: 4px; height: 10px; background: root.icon-color; }
+    }
 
-        if root.style-id == "spiralGalaxy" || root.style-id == "threeD" || root.style-id == "neonCity3D" || root.style-id == "speaker3D" || root.style-id == "speakerTrio" || root.style-id == "speakerSplatter" : HorizontalLayout {
-            spacing: 3px;
-            alignment: center;
-            cross-axis-alignment: center;
-            Rectangle { width: 5px; height: 12px; border-radius: 1px; background: root.icon-color; }
-            Rectangle { width: 5px; height: 16px; border-radius: 1px; background: root.icon-color; }
-            Rectangle { width: 5px; height: 10px; border-radius: 1px; background: root.icon-color; }
-        }
+    if root.style-id == "spiralGalaxy" || root.style-id == "threeD" || root.style-id == "neonCity3D" || root.style-id == "speaker3D" || root.style-id == "speakerTrio" || root.style-id == "speakerSplatter" : HorizontalLayout {
+        spacing: 3px;
+        alignment: center;
+        cross-axis-alignment: center;
+        Rectangle { width: 5px; height: 12px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { width: 5px; height: 16px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { width: 5px; height: 10px; border-radius: 1px; background: root.icon-color; }
     }
 }
 
@@ -117,12 +123,16 @@ component StyleCard inherits Rectangle {
             animate drop-shadow-blur { duration: 150ms; easing: ease-out; }
 
             VerticalLayout {
-                spacing: 3px;
+                padding: 4px;
+                spacing: 4px;
                 alignment: center;
 
-                StyleVisualIcon {
-                    style-id: root.style-id;
-                    icon-color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #f8fafc : #a3a3a3);
+                HorizontalLayout {
+                    alignment: center;
+                    StyleVisualIcon {
+                        style-id: root.style-id;
+                        icon-color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #f8fafc : #a3a3a3);
+                    }
                 }
 
                 Text {
