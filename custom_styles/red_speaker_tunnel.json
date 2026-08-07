@@ -1,0 +1,36 @@
+{
+  "id": "red_speaker_tunnel",
+  "name": "Red Speaker Tunnel",
+  "icon": "🔊",
+  "description": "Fiery burgundy red 3D speaker tunnel with glowing neon rings, horizontal waveform streaks, and bright lens flares",
+  "layers": [
+    {
+      "type": "glowing_disc",
+      "radius_ratio": 0.14,
+      "color": "#ff3300"
+    },
+    {
+      "type": "glowing_ring",
+      "radius_ratio": 0.26,
+      "color": "#ff6600",
+      "glow_intensity": 22.0
+    },
+    {
+      "type": "spectrum_radial",
+      "bar_count": 80,
+      "inner_ratio": 0.26,
+      "max_bar_height": 110.0,
+      "color_primary": "#ff0055",
+      "color_secondary": "#ffaa00"
+    },
+    {
+      "type": "waveform_line",
+      "color": "#ff3300"
+    },
+    {
+      "type": "particles_burst",
+      "count": 42,
+      "color": "#ffffff"
+    }
+  ]
+}
