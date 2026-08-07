@@ -3,89 +3,83 @@ import { Button } from "std-widgets.slint";
 // Compact icon button — legacy `.btn-icon` (32×32) with white hover tint (legacy
 // `rgba(255,255,255,0.12)`) and a native tooltip, so secondary actions stay out
 // of the way of the primary text buttons and the navbar stays tidy.
-component IconBtn {
+component IconBtn inherits Rectangle {
     in property <string> icon: "";
     in property <string> tip: "";
     callback clicked();
 
-    Rectangle {
-        width: 32px;
-        height: 32px;
-        border-radius: 6px;
-        background: ta.has-hover ? #ffffff1f : #ffffff08;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    background: ta.has-hover ? #ffffff1f : #ffffff08;
 
-        // Micro-interaction: subtle lift + gold glow on hover, matching the
-        // StyleCard/TabBtn polish (legacy `.btn-icon:hover` had a brighten +
-        // translateY). `transform-scale-*` is the reserved builtin property.
-        // 1.07 stays consistent with the 1.04–1.05 used on cards/tabs.
-        transform-scale-x: ta.has-hover ? 1.07 : 1.0;
-        transform-scale-y: ta.has-hover ? 1.07 : 1.0;
-        transform-origin: { x: self.width / 2, y: self.height / 2 };
-        drop-shadow-blur: ta.has-hover ? 6px : 0px;
-        drop-shadow-color: #ffd70055;
-        animate transform-scale-x { duration: 120ms; easing: ease-out; }
-        animate transform-scale-y { duration: 120ms; easing: ease-out; }
-        animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+    transform-scale-x: ta.has-hover ? 1.07 : 1.0;
+    transform-scale-y: ta.has-hover ? 1.07 : 1.0;
+    transform-origin: { x: self.width / 2, y: self.height / 2 };
+    drop-shadow-blur: ta.has-hover ? 6px : 0px;
+    drop-shadow-color: #ffd70055;
+    animate transform-scale-x { duration: 120ms; easing: ease-out; }
+    animate transform-scale-y { duration: 120ms; easing: ease-out; }
+    animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-        ta := TouchArea {
-            width: parent.width;
-            height: parent.height;
-            mouse-cursor: pointer;
-            clicked => { root.clicked(); }
-        }
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
 
-        Text {
-            text: root.icon;
-            font-size: 15px;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
+    Text {
+        text: root.icon;
+        color: ta.has-hover ? #ffffff : #cbd5e1;
+        font-size: 14px;
+        font-weight: 600;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
 
-        Tooltip {
-            Text { text: root.tip; font-size: 11px; color: #f8fafc; }
-        }
+    Tooltip {
+        Text { text: root.tip; font-size: 11px; color: #f8fafc; }
     }
 }
 
-component NavPrimaryBtn {
+component NavPrimaryBtn inherits Rectangle {
     in property <string> text: "";
     in property <bool> active: false;
     callback clicked();
 
-    Rectangle {
-        height: 32px;
-        border-radius: 6px;
-        background: root.active ? @linear-gradient(135deg, #00f0ff, #0099ff)
-                                : @linear-gradient(135deg, #ffd700, #d4af37);
-        drop-shadow-blur: ta.has-hover ? 10px : 2px;
-        drop-shadow-color: root.active ? #00f0ff66 : #ffd70066;
+    height: 32px;
+    border-radius: 6px;
+    background: root.active ? @linear-gradient(135deg, #00f0ff, #0099ff)
+                            : @linear-gradient(135deg, #ffd700, #d4af37);
+    drop-shadow-blur: ta.has-hover ? 10px : 2px;
+    drop-shadow-color: root.active ? #00f0ff66 : #ffd70066;
 
-        transform-scale-x: ta.has-hover ? 1.04 : 1.0;
-        transform-scale-y: ta.has-hover ? 1.04 : 1.0;
-        transform-origin: { x: self.width / 2, y: self.height / 2 };
-        animate transform-scale-x { duration: 120ms; easing: ease-out; }
-        animate transform-scale-y { duration: 120ms; easing: ease-out; }
-        animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+    transform-scale-x: ta.has-hover ? 1.04 : 1.0;
+    transform-scale-y: ta.has-hover ? 1.04 : 1.0;
+    transform-origin: { x: self.width / 2, y: self.height / 2 };
+    animate transform-scale-x { duration: 120ms; easing: ease-out; }
+    animate transform-scale-y { duration: 120ms; easing: ease-out; }
+    animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-        ta := TouchArea {
-            width: parent.width;
-            height: parent.height;
-            mouse-cursor: pointer;
-            clicked => { root.clicked(); }
-        }
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
 
-        HorizontalLayout {
-            padding-left: 14px;
-            padding-right: 14px;
-            alignment: center;
-            cross-axis-alignment: center;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        alignment: center;
+        cross-axis-alignment: center;
 
-            Text {
-                text: root.text;
-                color: #000000;
-                font-size: 12px;
-                font-weight: 700;
-            }
+        Text {
+            text: root.text;
+            color: #000000;
+            font-size: 12px;
+            font-weight: 700;
         }
     }
 }
@@ -154,18 +148,19 @@ export component Navbar inherits Rectangle {
             spacing: 12px;
             cross-axis-alignment: center;
 
-            // BRAND — legacy .brand (gold icon box + name + "Studio" gold badge)
+            // BRAND — logo + AudioWave + Studio badge
             HorizontalLayout {
-                spacing: 10px;
+                spacing: 8px;
+                cross-axis-alignment: center;
 
                 Rectangle {
-                    width: 36px;
-                    height: 36px;
-                    border-radius: 10px;
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
                     background: @linear-gradient(135deg, #ffd70040 0%, #d4af3726 100%);
                     Text {
                         text: "⚡";
-                        font-size: 19px;
+                        font-size: 16px;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -174,15 +169,15 @@ export component Navbar inherits Rectangle {
                 Text {
                     text: "AudioWave";
                     color: #ffffff;
-                    font-size: 16px;
+                    font-size: 15px;
                     font-weight: 700;
                     vertical-alignment: center;
                 }
 
                 Rectangle {
-                    width: 56px;
-                    height: 22px;
-                    border-radius: 6px;
+                    width: 50px;
+                    height: 20px;
+                    border-radius: 5px;
                     background: @linear-gradient(135deg, #ffd700, #d4af37);
                     Text {
                         text: "Studio";
@@ -195,66 +190,10 @@ export component Navbar inherits Rectangle {
                 }
             }
 
-            // CENTER PROMO TICKER — CredibleMark (legacy .crediblemark-ticker-container)
             Rectangle {
-                horizontal-stretch: 1;
-                max-width: 380px;
-                min-width: 24px;
-                height: 32px;
-                border-radius: 8px;
-                background: ticker-ta.has-hover ? #ffd70029 : #ffd70014;
-                clip: true;
-
-                ticker-ta := TouchArea {
-                    width: parent.width;
-                    height: parent.height;
-                    mouse-cursor: pointer;
-                    clicked => { root.ticker-clicked(); }
-
-                    ticker-scroll := Rectangle {
-                        x: -1 * root.ticker-progress * measure.width;
-                        y: 0;
-                        width: 2 * measure.width;
-                        height: parent.height;
-
-                        HorizontalLayout {
-                            spacing: 0;
-                            Text {
-                                text: "🚀 Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                                color: #ffd700;
-                                font-size: 11px;
-                                font-weight: 500;
-                                vertical-alignment: center;
-                            }
-                            Text {
-                                text: "🚀 Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                                color: #ffd700;
-                                font-size: 11px;
-                                font-weight: 500;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-                }
-
-                // Hidden measure text: gives the intrinsic content width so the 2-copy
-                // marquee loop is seamless (translate by exactly one copy width).
-                measure := Text {
-                    x: -10000px;
-                    y: -10000px;
-                    text: "🚀 Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                    color: transparent;
-                    font-size: 11px;
-                    font-weight: 500;
-                }
-            }
-
-            Timer {
-                interval: 16ms;
-                running: true;
-                triggered() => {
-                    root.ticker-progress = Math.mod(root.ticker-progress + 1.0 / 1125.0, 1.0);
-                }
+                width: 1px;
+                height: 20px;
+                background: #ffffff1f;
             }
 
             NavPrimaryBtn {
@@ -270,6 +209,66 @@ export component Navbar inherits Rectangle {
                     else if (root.mic-devices.length > 1) { root.show-mic-picker = !root.show-mic-picker; }
                     else { root.listen-clicked(); }
                 }
+            }
+        }
+
+        // ============ CENTER PROMO TICKER ============
+        Rectangle {
+            horizontal-stretch: 1;
+            max-width: 320px;
+            min-width: 140px;
+            height: 28px;
+            border-radius: 6px;
+            background: ticker-ta.has-hover ? #ffd70029 : #ffd70014;
+            clip: true;
+
+            ticker-ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                clicked => { root.ticker-clicked(); }
+
+                ticker-scroll := Rectangle {
+                    x: -1 * root.ticker-progress * measure.width;
+                    y: 0;
+                    width: 2 * measure.width;
+                    height: parent.height;
+
+                    HorizontalLayout {
+                        spacing: 0;
+                        Text {
+                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                            color: #ffd700;
+                            font-size: 11px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                            color: #ffd700;
+                            font-size: 11px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            measure := Text {
+                x: -10000px;
+                y: -10000px;
+                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                color: transparent;
+                font-size: 11px;
+                font-weight: 500;
+            }
+        }
+
+        Timer {
+            interval: 16ms;
+            running: true;
+            triggered() => {
+                root.ticker-progress = Math.mod(root.ticker-progress + 1.0 / 1125.0, 1.0);
             }
         }
 
