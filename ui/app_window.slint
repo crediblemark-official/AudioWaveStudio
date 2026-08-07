@@ -1,0 +1,736 @@
+import { Navbar } from "navbar.slint";
+import { AudioBar } from "audio_bar.slint";
+import { ControlPanel } from "control_panel.slint";
+import { ExportModal } from "export_modal.slint";
+import { HardwareModal } from "hardware_modal.slint";
+import { AboutModal } from "about_modal.slint";
+import { ToastItem, ToastHost } from "toast.slint";
+import { ModalBtn } from "export_modal.slint";
+
+// ONBOARDING EMPTY STATE — shown over the canvas while no track is loaded:
+// a message + drop hint + Browse button (legacy App.tsx empty/drag-drop
+// onboarding). The demo wave still animates behind it; the overlay is
+// transparent so the visualizer shows through around the centered content.
+component EmptyStateOverlay {
+    callback browse-clicked();
+
+    private property <bool> _pulse: false;
+
+    width: 100%;
+    height: 100%;
+
+    Rectangle {
+        width: parent.width;
+        height: parent.height;
+        background: transparent;
+
+        HorizontalLayout {
+            alignment: center;
+            VerticalLayout {
+                alignment: center;
+
+                Rectangle {
+                    width: 480px;
+                    border-radius: 16px;
+                    background: #0b0f19b0;
+                    border-width: 1px;
+                    border-color: #ffd70038;
+                    drop-shadow-blur: 24px;
+                    drop-shadow-color: #000000cc;
+
+                    VerticalLayout {
+                        padding: 32px;
+                        spacing: 14px;
+                        alignment: center;
+
+                        HorizontalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 76px;
+                                height: 76px;
+                                border-radius: 38px;
+                                background: #ffd70010;
+                                border-width: 1px;
+                                border-color: #ffd70050;
+                                drop-shadow-blur: root._pulse ? 24px : 12px;
+                                drop-shadow-color: #ffd70066;
+                                animate drop-shadow-blur { duration: 900ms; easing: ease-in-out; }
+
+                                Text {
+                                    text: "♪";
+                                    color: #ffd700;
+                                    font-size: 36px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Drop your music here";
+                            color: #f8fafc;
+                            font-size: 22px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "MP3 · WAV · FLAC · OGG · AAC — drag a song onto the canvas";
+                            color: #94a3b8;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                        }
+
+                        Text {
+                            text: "or click Browse to pick a file from your computer";
+                            color: #64748b;
+                            font-size: 12px;
+                            horizontal-alignment: center;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            ModalBtn {
+                                primary: true;
+                                text: "📂 Browse Files";
+                                clicked => { root.browse-clicked(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Timer {
+        interval: 1100ms;
+        running: true;
+        triggered() => { root._pulse = !root._pulse; }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "AudioWave Studio - Native Pure Rust & Slint UI";
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    min-width: 1024px;
+    min-height: 640px;
+    background: #000000;
+
+    // Frameless window (legacy Tauri `decorations: false`) with custom window
+    // controls in the navbar; the resize border keeps edges resizable (winit).
+    no-frame: true;
+    resize-border-width: 6px;
+
+    // State Properties (Rust Bindings)
+    in-out property <image> preview-frame;
+    in-out property <string> track-title: "No Audio Loaded";
+    in-out property <string> track-artist: "Select an audio file to start visualizer";
+    in-out property <string> current-time-str: "00:00";
+    in-out property <string> duration-str: "00:00";
+    in-out property <float> playback-progress: 0.0;
+    in-out property <bool> is-playing: false;
+    in-out property <bool> is-muted: false;
+    in-out property <float> volume: 0.8;
+    // Track length in seconds (0 when nothing is loaded); used by the
+    // Left/Right arrow seek shortcuts to convert ±5s into a 0..1 fraction.
+    in-out property <float> duration-sec: 0.0;
+    // True once an audio file has been loaded; drives the onboarding empty
+    // state overlay (message + drop hint + Browse button) on the canvas.
+    in-out property <bool> has-track: false;
+    // True while the user drags a file over the window (winit HoveredFile);
+    // shows the gold "Release to load track" highlight over the canvas.
+    in-out property <bool> drop-hover: false;
+    // Control-panel visibility: collapsed for presentation mode so the canvas
+    // gets the full window width (toggled by the floating chevron button).
+    in-out property <bool> panel-open: true;
+    in-out property <string> active-tab: "style";
+    // One-shot flag so the startup keyboard-focus timer below only fires once:
+    // it must never steal focus back from a control the user interacts with.
+    private property <bool> _initial-focus-given: false;
+
+    // Configuration Properties
+    in-out property <string> style-val: "spectrum";
+    in-out property <int> bar-count: 64;
+    in-out property <float> bar-gap: 2.0;
+    in-out property <float> bar-width: 6.0;
+    in-out property <float> bar-rounding: 2.0;
+    in-out property <bool> mirror-bars: false;
+    in-out property <float> sensitivity: 1.2;
+    in-out property <float> smoothing: 0.8;
+    in-out property <float> bass-multiplier: 1.5;
+    in-out property <float> fire-width-ratio: 0.94;
+    in-out property <float> fire-height-scale: 1.0;
+    in-out property <string> radial-center-image-uri: "";
+    in-out property <float> visualizer-scale: 1.0;
+    in-out property <float> position-x: 0.0;
+    in-out property <float> position-y: 0.0;
+    in-out property <string> theme-name: "Cyberpunk";
+    in-out property <string> primary-color: "#00f0ff";
+    in-out property <string> secondary-color: "#ff007f";
+    in-out property <string> accent-color: "#ffe600";
+    in-out property <string> glow-color: "#00f0ff";
+    in-out property <bool> show-peaks: false;
+    in-out property <string> peak-color: "#ffffff";
+    
+    // Background Settings
+    in-out property <string> bg-mode: "Gradient";
+    in-out property <string> solid-color: "#090a0f";
+    in-out property <string> gradient-start: "#0f0c20";
+    in-out property <string> gradient-end: "#06101e";
+    in-out property <float> blur-amount: 0.0;
+    in-out property <float> overlay-opacity: 0.3;
+    in-out property <bool> show-particles: true;
+    in-out property <bool> show-music-notes: false;
+
+    // Screen Effects
+    in-out property <string> main-effect: "None";
+    in-out property <bool> effects-enabled: true;
+    in-out property <float> shake-intensity: 1.0;
+    in-out property <float> shake-frequency: 0.5;
+    in-out property <float> shake-max-offset: 40.0;
+    in-out property <bool> shake-on-beat: false;
+    in-out property <float> glitch-intensity: 0.5;
+    in-out property <float> pulse-intensity: 0.7;
+    in-out property <float> strobe-intensity: 0.8;
+    in-out property <float> scanline-opacity: 0.2;
+    in-out property <float> chromatic-intensity: 0.5;
+    in-out property <float> zoom-intensity: 0.2;
+    in-out property <float> invert-intensity: 0.5;
+    in-out property <float> bars-amount: 0.6;
+    in-out property <float> shockwave-intensity: 0.6;
+    in-out property <float> pixelate-intensity: 0.6;
+    in-out property <float> tilt-intensity: 0.6;
+    in-out property <float> heat-haze-intensity: 0.6;
+    in-out property <float> hue-shift-intensity: 0.6;
+    in-out property <bool> bg-only-effect: true;
+
+    // Text Overlay
+    in-out property <bool> show-title: true;
+    in-out property <bool> show-artist: true;
+    in-out property <float> title-font-size: 32.0;
+
+    // Export Settings
+    in-out property <string> export-aspect-ratio: "16:9";
+    in-out property <string> export-resolution: "1080p";
+    in-out property <int> export-fps: 60;
+    in-out property <string> export-format: "mp4";
+    in-out property <string> export-encoder: "Auto";
+    in-out property <int> export-fft-size: 1024;
+    in-out property <bool> include-audio: true;
+
+    // Modals Visibility State
+    in-out property <bool> show-export-modal: false;
+    in-out property <bool> show-hardware-modal: false;
+    in-out property <bool> show-about-modal: false;
+
+    // Toast Notifications (backing model owned by SlintAppState.toasts; the
+    // Rust side mutates the same VecModel in place).
+    in-out property <[ToastItem]> toast-list: [];
+
+    // Live canvas viewport size (logical px). The Rust render loop reads these
+    // every frame and renders the visualizer at the ACTUAL canvas aspect ratio
+    // so circles stay round (a fixed 16:9 buffer stretched into a wider canvas
+    // would squish them into ovals — legacy used objectFit: contain for this).
+    // Bound to the viewport Rectangle below (layout-driven).
+    in-out property <float> canvas-viewport-w: viewport.width / 1px;
+    in-out property <float> canvas-viewport-h: viewport.height / 1px;
+
+    // Listen (mic) state
+    in-out property <bool> is-listening: false;
+    in-out property <string> listen-status: "";
+    in-out property <[string]> mic-devices: [];
+    in-out property <string> mic-device-label: "Default (System)";
+    in-out property <bool> show-mic-picker: false;
+
+    // Hardware Info Data
+    in-out property <string> ram-info-text: "16 GB System Memory";
+    in-out property <string> gpu-info-text: "Hardware GPU Accelerated";
+    in-out property <string> ffmpeg-status-text: "FFmpeg Ready";
+    in-out property <string> hardware-detail-text: "";
+
+    // Export Modal State
+    in-out property <float> export-progress-percent: 0.0;
+    in-out property <string> export-status-text: "Ready to render MP4 video";
+    in-out property <bool> is-exporting: false;
+
+    // Callbacks
+    callback open-file-clicked();
+    callback open-custom-image-clicked();
+    callback open-radial-image-clicked();
+    callback remove-radial-image-clicked();
+    callback toggle-play-clicked();
+    callback stop-clicked();
+    callback seek-position(float);
+    callback volume-changed(float);
+    callback mute-toggle-clicked();
+    callback config-changed();
+    callback theme-preset-selected(string);
+    callback save-preset-clicked();
+    callback load-preset-clicked();
+    callback start-export-clicked();
+    callback cancel-export-clicked();
+    callback rescan-hardware-clicked();
+    callback ticker-clicked();
+    callback listen-clicked();
+    callback stop-listen-clicked();
+    callback mic-device-selected(string);
+    callback toggle-preview-clicked();
+    callback audio-file-dropped(string);
+    callback minimize-clicked();
+    callback maximize-clicked();
+    callback close-clicked();
+    callback drag-pressed(float, float);
+    callback drag-moved(float, float);
+    callback drag-released();
+    callback toast-dismissed(int);
+
+    // KEYBOARD SHORTCUTS — legacy App.tsx: F11 toggles fullscreen, Escape
+    // exits. `capture-key-pressed` intercepts before the focused element so the
+    // shortcuts work even while a modal/input has focus. `reject` lets all
+    // other keys pass through normally.
+    window-fs := FocusScope {
+        width: parent.width;
+        height: parent.height;
+        // Ensure this scope owns the initial keyboard focus (and is reachable
+        // via Tab) so the playback shortcuts work from the moment the window
+        // opens, before the user has clicked anything.
+        focus-on-tab-navigation: true;
+        capture-key-pressed(event) => {
+            if (event.text == Key.F11) {
+                root.full-screen = !root.full-screen;
+                accept
+            } else if (event.text == Key.Escape && root.full-screen) {
+                root.full-screen = false;
+                accept
+            } else {
+                reject
+            }
+        }
+
+        // PLAYBACK SHORTCUTS — legacy App.tsx keyboard handling: Space =
+        // play/pause, S = stop, M = mute, Left/Right = seek ±5s, Up/Down =
+        // volume. These live in `key-pressed` (NOT `capture-key-pressed`) so a
+        // focused text field, slider or button keeps consuming its own keys:
+        // the event only reaches this scope when nothing else accepted it, so
+        // typing "s"/"m"/space in a hex/name field never triggers Stop/Mute/
+        // Play (Ctrl/Alt combos are left untouched for OS/window-manager use).
+        key-pressed(event) => {
+            // meta excluded too: ⌘/Super+key combos must stay with the OS/window
+            // manager (legacy didn't check modifiers at all — this is stricter).
+            if (!event.modifiers.control && !event.modifiers.alt && !event.modifiers.meta) {
+                if (event.text == " ") {
+                    root.toggle-play-clicked();
+                    accept
+                } else if (event.text == "s" || event.text == "S") {
+                    root.stop-clicked();
+                    accept
+                } else if (event.text == "m" || event.text == "M") {
+                    root.mute-toggle-clicked();
+                    accept
+                } else if (event.text == Key.LeftArrow && root.duration-sec > 0.0) {
+                    root.seek-position(Math.max(root.playback-progress - 5.0 / root.duration-sec, 0.0));
+                    accept
+                } else if (event.text == Key.RightArrow && root.duration-sec > 0.0) {
+                    root.seek-position(Math.min(root.playback-progress + 5.0 / root.duration-sec, 1.0));
+                    accept
+                } else if (event.text == Key.UpArrow) {
+                    root.volume = Math.min(root.volume + 0.05, 1.0);
+                    root.volume-changed(root.volume);
+                    accept
+                } else if (event.text == Key.DownArrow) {
+                    root.volume = Math.max(root.volume - 0.05, 0.0);
+                    root.volume-changed(root.volume);
+                    accept
+                } else {
+                    reject
+                }
+            } else {
+                reject
+            }
+        }
+
+        VerticalLayout {
+            padding: 0;
+            spacing: 0;
+
+            // TOP NAVBAR — hidden in fullscreen mode (legacy CSS
+            // `.app-layout.fullscreen .navbar { display: none }`); F11 / Escape /
+            // canvas double-click still toggle it.
+            if (!root.full-screen) : Navbar {
+                open-file-clicked => { root.open-file-clicked(); }
+                open-custom-image-clicked => { root.open-custom-image-clicked(); }
+                open-hardware-clicked => { root.show-hardware-modal = true; }
+                open-about-clicked => { root.show-about-modal = true; }
+                open-export-clicked => { root.show-export-modal = true; }
+                save-preset-clicked => { root.save-preset-clicked(); }
+                load-preset-clicked => { root.load-preset-clicked(); }
+                ticker-clicked => { root.show-about-modal = true; }
+                is-listening: root.is-listening;
+                listen-status: root.listen-status;
+                mic-devices <=> root.mic-devices;
+                mic-device-label <=> root.mic-device-label;
+                show-mic-picker <=> root.show-mic-picker;
+                listen-clicked => { root.listen-clicked(); }
+                stop-listen-clicked => { root.stop-listen-clicked(); }
+                mic-device-selected(dev) => { root.mic-device-selected(dev); }
+                toggle-preview-clicked => { root.toggle-preview-clicked(); }
+                minimize-clicked => { root.minimize-clicked(); }
+                maximize-clicked => { root.maximize-clicked(); }
+                close-clicked => { root.close-clicked(); }
+                drag-pressed(x, y) => { root.drag-pressed(x, y); }
+                drag-moved(x, y) => { root.drag-moved(x, y); }
+                drag-released => { root.drag-released(); }
+            }
+
+            // MAIN WORKSPACE (CANVAS + CONTROL PANEL)
+            HorizontalLayout {
+                vertical-stretch: 1;
+                spacing: 0;
+
+                // CANVAS VIEWPORT — double-click toggles fullscreen (legacy App.tsx)
+                viewport := Rectangle {
+                    horizontal-stretch: 1;
+                    background: #000000;
+
+                    Image {
+                        source: root.preview-frame;
+                        width: 100%;
+                        height: 100%;
+                        // Safety net: never stretch a frame into a distorted
+                        // aspect (legacy objectFit: contain) — rounds stay round.
+                        image-fit: contain;
+                    }
+
+                    canvas-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: default;
+                        // Re-focus the window keyboard scope when the (non-
+                        // focusable) canvas is clicked: Slint only delivers key
+                        // events to a focused scope, and without this, clicking
+                        // the canvas could drop focus and silently kill the
+                        // Space/arrows/M/S shortcuts until a control is focused.
+                        clicked => { window-fs.focus(); }
+                        double-clicked => { root.full-screen = !root.full-screen; }
+                    }
+
+                    // ONBOARDING EMPTY STATE — no track loaded yet (no TouchArea
+                    // of its own, so canvas double-click/fullscreen still works;
+                    // only the Browse button is interactive).
+                    if (!root.has-track) : EmptyStateOverlay {
+                        browse-clicked => { root.open-file-clicked(); }
+                    }
+
+                    // DROP HIGHLIGHT — a file is being dragged over the window.
+                    // Drawn on top of everything (including the empty state):
+                    // gold ring + dim so the user knows dropping loads the track.
+                    if (root.drop-hover) : Rectangle {
+                        width: parent.width;
+                        height: parent.height;
+                        background: #000000aa;
+                        border-width: 2px;
+                        border-color: #ffd700;
+                        border-radius: 4px;
+
+                        VerticalLayout {
+                            width: 100%;
+                            height: 100%;
+                            alignment: center;
+                            spacing: 10px;
+
+                            Text {
+                                text: "🎵 Release to load track";
+                                color: #ffd700;
+                                font-size: 20px;
+                                font-weight: 700;
+                            }
+
+                            Text {
+                                text: root.has-track
+                                    ? "This will replace the current track"
+                                    : "MP3 · WAV · FLAC · OGG · AAC";
+                                color: #cbd5e1;
+                                font-size: 13px;
+                            }
+                        }
+                    }
+                }
+
+                // RIGHT CONTROL PANEL — wrapped in a width-animated clip shell so
+                // collapsing animates smoothly (380px -> 0) while the canvas
+                // stretches to take the freed space. The panel itself keeps its
+                // fixed 380px width; the shell clips it during the collapse so
+                // the inner layout never reflows/squishes.
+                panel-shell := Rectangle {
+                    width: root.panel-open ? 380px : 0px;
+                    clip: true;
+                    animate width { duration: 220ms; easing: ease-in-out; }
+
+                    ControlPanel {
+                        width: 380px;
+                        active-tab <=> root.active-tab;
+                    style-val <=> root.style-val;
+                    bar-count <=> root.bar-count;
+                    bar-gap <=> root.bar-gap;
+                    bar-width <=> root.bar-width;
+                    bar-rounding <=> root.bar-rounding;
+                    mirror-bars <=> root.mirror-bars;
+                    sensitivity <=> root.sensitivity;
+                    smoothing <=> root.smoothing;
+                    bass-multiplier <=> root.bass-multiplier;
+                    fire-width-ratio <=> root.fire-width-ratio;
+                    fire-height-scale <=> root.fire-height-scale;
+                    radial-center-image-uri <=> root.radial-center-image-uri;
+                    visualizer-scale <=> root.visualizer-scale;
+                    position-x <=> root.position-x;
+                    position-y <=> root.position-y;
+
+                    theme-name <=> root.theme-name;
+                    primary-color <=> root.primary-color;
+                    secondary-color <=> root.secondary-color;
+                    accent-color <=> root.accent-color;
+                    glow-color <=> root.glow-color;
+                    show-peaks <=> root.show-peaks;
+                    peak-color <=> root.peak-color;
+
+                    bg-mode <=> root.bg-mode;
+                    solid-color <=> root.solid-color;
+                    gradient-start <=> root.gradient-start;
+                    gradient-end <=> root.gradient-end;
+                    blur-amount <=> root.blur-amount;
+                    overlay-opacity <=> root.overlay-opacity;
+                    show-particles <=> root.show-particles;
+                    show-music-notes <=> root.show-music-notes;
+
+                    main-effect <=> root.main-effect;
+                    effects-enabled <=> root.effects-enabled;
+                    shake-intensity <=> root.shake-intensity;
+                    shake-frequency <=> root.shake-frequency;
+                    shake-max-offset <=> root.shake-max-offset;
+                    shake-on-beat <=> root.shake-on-beat;
+                    glitch-intensity <=> root.glitch-intensity;
+                    pulse-intensity <=> root.pulse-intensity;
+                    strobe-intensity <=> root.strobe-intensity;
+                    scanline-opacity <=> root.scanline-opacity;
+                    chromatic-intensity <=> root.chromatic-intensity;
+                    zoom-intensity <=> root.zoom-intensity;
+                    invert-intensity <=> root.invert-intensity;
+                    bars-amount <=> root.bars-amount;
+                    shockwave-intensity <=> root.shockwave-intensity;
+                    pixelate-intensity <=> root.pixelate-intensity;
+                    tilt-intensity <=> root.tilt-intensity;
+                    heat-haze-intensity <=> root.heat-haze-intensity;
+                    hue-shift-intensity <=> root.hue-shift-intensity;
+                    bg-only-effect <=> root.bg-only-effect;
+
+                    track-title <=> root.track-title;
+                    track-artist <=> root.track-artist;
+                    show-title <=> root.show-title;
+                    show-artist <=> root.show-artist;
+
+                    config-changed => { root.config-changed(); }
+                    theme-preset-selected(preset) => { root.theme-preset-selected(preset); }
+                    open-radial-image-clicked => { root.open-radial-image-clicked(); }
+                    remove-radial-image-clicked => { root.remove-radial-image-clicked(); }
+                    }
+                }
+            }
+
+            // BOTTOM AUDIO PLAYER BAR
+            AudioBar {
+                track-title: root.track-title;
+                track-artist: root.track-artist;
+                current-time-str: root.current-time-str;
+                duration-str: root.duration-str;
+                playback-progress: root.playback-progress;
+                is-playing: root.is-playing;
+                is-muted: root.is-muted;
+                volume: root.volume;
+
+                toggle-play-clicked => { root.toggle-play-clicked(); }
+                stop-clicked => { root.stop-clicked(); }
+                seek-position(pos) => { root.seek-position(pos); }
+                volume-changed(vol) => { root.volume = vol; root.volume-changed(vol); }
+                mute-toggle-clicked => { root.mute-toggle-clicked(); }
+            }
+        }
+
+        // EXPORT MODAL OVERLAY
+        if (root.show-export-modal) : ExportModal {
+            export-aspect-ratio <=> root.export-aspect-ratio;
+            export-resolution <=> root.export-resolution;
+            export-fps <=> root.export-fps;
+            export-format <=> root.export-format;
+            export-encoder <=> root.export-encoder;
+            export-fft-size <=> root.export-fft-size;
+            include-audio <=> root.include-audio;
+            export-progress-percent <=> root.export-progress-percent;
+            export-status-text <=> root.export-status-text;
+            is-exporting <=> root.is-exporting;
+
+            start-export-clicked => { root.start-export-clicked(); }
+            cancel-export-clicked => { root.cancel-export-clicked(); }
+            close-clicked => { root.show-export-modal = false; }
+        }
+
+        // HARDWARE INFO MODAL OVERLAY
+        if (root.show-hardware-modal) : HardwareModal {
+            ram-info-text: root.ram-info-text;
+            gpu-info-text: root.gpu-info-text;
+            ffmpeg-status-text: root.ffmpeg-status-text;
+            hardware-detail-text: root.hardware-detail-text;
+
+            close-clicked => { root.show-hardware-modal = false; }
+            rescan-clicked => { root.rescan-hardware-clicked(); }
+        }
+
+        // ABOUT MODAL OVERLAY
+        if (root.show-about-modal) : AboutModal {
+            close-clicked => { root.show-about-modal = false; }
+        }
+
+        // TOAST NOTIFICATIONS — topmost layer: painted after the modals so
+        // toasts always float above every surface. Anchored top-LEFT, over the
+        // canvas viewport: the right side is occupied by the control panel, and
+        // toasts there would cover the very controls the user is adjusting.
+        ToastHost {
+            x: 16px;
+            y: 72px;
+            toasts <=> root.toast-list;
+            dismissed(id) => { root.toast-dismissed(id); }
+        }
+
+        // FLOATING PANEL TOGGLE — a chevron handle floating on the canvas's
+        // right edge (vertically centered) that collapses/expands the control
+        // panel for presentation mode. Anchored to the viewport so it follows
+        // the canvas as it stretches; it lives in the workspace (not the
+        // navbar) so it stays available in fullscreen too. Same micro-interaction
+        // language as the navbar IconBtn (lift + gold glow on hover), and
+        // keyboard-accessible like ModalBtn (Tab focus + Enter/Space + gold
+        // focus ring). Hidden while a modal is open so it never floats above /
+        // steals clicks from the modal surface.
+        pt-fs := FocusScope {
+            x: viewport.x + viewport.width - 30px;
+            y: viewport.y + viewport.height / 2 - 26px;
+            width: 28px;
+            height: 52px;
+            focus-on-click: true;
+            focus-on-tab-navigation: true;
+            visible: !root.show-export-modal && !root.show-hardware-modal && !root.show-about-modal;
+
+            key-pressed(event) => {
+                if (event.text == Key.Return || event.text == Key.Space) {
+                    root.panel-open = !root.panel-open;
+                    accept
+                } else {
+                    reject
+                }
+            }
+
+            Rectangle {
+                width: parent.width;
+                height: parent.height;
+                border-radius: 7px;
+                background: pt.has-hover || pt.pressed ? #1e1e22 : #141417;
+                border-width: 1px;
+                border-color: pt-fs.has-focus ? #ffd700
+                    : (pt.has-hover || pt.pressed ? #ffd70066 : #ffffff1f);
+
+                transform-scale-x: pt.has-hover ? 1.08 : 1.0;
+                transform-scale-y: pt.has-hover ? 1.08 : 1.0;
+                transform-origin: { x: self.width / 2, y: self.height / 2 };
+                drop-shadow-blur: pt.has-hover ? 10px : 0px;
+                drop-shadow-color: #ffd70055;
+                animate transform-scale-x { duration: 120ms; easing: ease-out; }
+                animate transform-scale-y { duration: 120ms; easing: ease-out; }
+                animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+
+                Text {
+                    text: root.panel-open ? "◀" : "▶";
+                    color: #ffd700;
+                    font-size: 14px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                pt := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => { root.panel-open = !root.panel-open; }
+                }
+
+                Tooltip {
+                    Text { text: root.panel-open ? "Hide Controls" : "Show Controls"; font-size: 11px; color: #f8fafc; }
+                }
+            }
+        }
+
+        // Startup keyboard focus: key events are only delivered to a focused
+        // scope, and nothing is focused when the window opens. Give this scope
+        // focus a tick after startup so Space/S/M/arrows work immediately; the
+        // `_initial-focus-given` flag makes this one-shot so it never steals
+        // focus from a control the user focuses later.
+        Timer {
+            interval: 10ms;
+            running: !root._initial-focus-given;
+            triggered() => {
+                root._initial-focus-given = true;
+                window-fs.focus();
+            }
+        }
+    }
+}
+
+// POP-OUT PREVIEW WINDOW — legacy detachedPreviewService.openDetachedPreview():
+// a second, always-on-top-of-workflow window that shows ONLY the live
+// visualizer (no controls), mirroring the exact same rendered frame the main
+// window displays. Supports F11 / Escape / double-click fullscreen and is
+// draggable via its native frame.
+export component PreviewWindow inherits Window {
+    title: "AudioWave Studio - Live Preview";
+    preferred-width: 960px;
+    preferred-height: 540px;
+    min-width: 320px;
+    min-height: 180px;
+    background: #000000;
+
+    in-out property <image> preview-frame;
+
+    FocusScope {
+        width: parent.width;
+        height: parent.height;
+        capture-key-pressed(event) => {
+            if (event.text == Key.F11) {
+                root.full-screen = !root.full-screen;
+                accept
+            } else if (event.text == Key.Escape && root.full-screen) {
+                root.full-screen = false;
+                accept
+            } else {
+                reject
+            }
+        }
+
+        Rectangle {
+            background: #000000;
+
+            Image {
+                source: root.preview-frame;
+                width: 100%;
+                height: 100%;
+                image-fit: contain;
+            }
+
+            preview-ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: default;
+                double-clicked => { root.full-screen = !root.full-screen; }
+            }
+        }
+    }
+}

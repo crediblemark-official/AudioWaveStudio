@@ -1,0 +1,489 @@
+import { Button } from "std-widgets.slint";
+
+// Compact icon button — legacy `.btn-icon` (32×32) with white hover tint (legacy
+// `rgba(255,255,255,0.12)`) and a native tooltip, so secondary actions stay out
+// of the way of the primary text buttons and the navbar stays tidy.
+component IconBtn {
+    in property <string> icon: "";
+    in property <string> tip: "";
+    callback clicked();
+
+    Rectangle {
+        width: 32px;
+        height: 32px;
+        border-radius: 6px;
+        background: ta.has-hover ? #ffffff1f : #ffffff08;
+
+        // Micro-interaction: subtle lift + gold glow on hover, matching the
+        // StyleCard/TabBtn polish (legacy `.btn-icon:hover` had a brighten +
+        // translateY). `transform-scale-*` is the reserved builtin property.
+        // 1.07 stays consistent with the 1.04–1.05 used on cards/tabs.
+        transform-scale-x: ta.has-hover ? 1.07 : 1.0;
+        transform-scale-y: ta.has-hover ? 1.07 : 1.0;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        drop-shadow-blur: ta.has-hover ? 6px : 0px;
+        drop-shadow-color: #ffd70055;
+        animate transform-scale-x { duration: 120ms; easing: ease-out; }
+        animate transform-scale-y { duration: 120ms; easing: ease-out; }
+        animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+
+        ta := TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+
+        Text {
+            text: root.icon;
+            font-size: 15px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Tooltip {
+            Text { text: root.tip; font-size: 11px; color: #f8fafc; }
+        }
+    }
+}
+
+component NavPrimaryBtn {
+    in property <string> text: "";
+    in property <bool> active: false;
+    callback clicked();
+
+    Rectangle {
+        height: 32px;
+        border-radius: 6px;
+        background: root.active ? @linear-gradient(135deg, #00f0ff, #0099ff)
+                                : @linear-gradient(135deg, #ffd700, #d4af37);
+        drop-shadow-blur: ta.has-hover ? 10px : 2px;
+        drop-shadow-color: root.active ? #00f0ff66 : #ffd70066;
+
+        transform-scale-x: ta.has-hover ? 1.04 : 1.0;
+        transform-scale-y: ta.has-hover ? 1.04 : 1.0;
+        transform-origin: { x: self.width / 2, y: self.height / 2 };
+        animate transform-scale-x { duration: 120ms; easing: ease-out; }
+        animate transform-scale-y { duration: 120ms; easing: ease-out; }
+        animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+
+        ta := TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+
+        HorizontalLayout {
+            padding-left: 14px;
+            padding-right: 14px;
+            alignment: center;
+            cross-axis-alignment: center;
+
+            Text {
+                text: root.text;
+                color: #000000;
+                font-size: 12px;
+                font-weight: 700;
+            }
+        }
+    }
+}
+
+export component Navbar inherits Rectangle {
+    height: 60px;
+    background: #000000;
+
+    callback open-file-clicked();
+    callback open-custom-image-clicked();
+    callback open-hardware-clicked();
+    callback open-about-clicked();
+    callback open-export-clicked();
+    callback theme-preset-selected(string);
+    callback save-preset-clicked();
+    callback load-preset-clicked();
+    callback ticker-clicked();
+    callback listen-clicked();
+    callback stop-listen-clicked();
+    callback mic-device-selected(string);
+    callback toggle-preview-clicked();
+    callback minimize-clicked();
+    callback maximize-clicked();
+    callback close-clicked();
+    callback drag-pressed(float, float);
+    callback drag-moved(float, float);
+    callback drag-released();
+
+    in-out property <bool> is-listening: false;
+    in-out property <string> listen-status: "";
+
+    // Mic capture device picker (populated from `arecord -l` by the backend).
+    in-out property <[string]> mic-devices: [];
+    in-out property <string> mic-device-label: "Default (System)";
+    in-out property <bool> show-mic-picker: false;
+
+    private property <float> ticker-progress: 0.0;
+
+    // FULL-NAVBAR DRAG REGION — legacy `data-tauri-drag-region` on the whole
+    // header. Sits behind all interactive elements so it only receives events
+    // on empty/padding areas of the bar. The frameless window is dragged from
+    // here; buttons on top consume their own clicks.
+    drag-ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: default;
+        pointer-event(p) => {
+            // Only the left button drags the window (legacy drag region is left-drag).
+            if (p.kind == PointerEventKind.down && p.button == PointerEventButton.left) { root.drag-pressed(drag-ta.mouse-x / 1px, drag-ta.mouse-y / 1px); }
+            else if (p.kind == PointerEventKind.move) { root.drag-moved(drag-ta.mouse-x / 1px, drag-ta.mouse-y / 1px); }
+            else if (p.kind == PointerEventKind.up) { root.drag-released(); }
+        }
+    }
+
+    // Legacy `.navbar { padding: 0 20px; justify-content: space-between }` with
+    // two clusters: `.navbar-left` (brand + ticker + primary actions) and
+    // `.navbar-right` (icon actions + export + window controls), each gap 16px.
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 20px;
+        spacing: 0;
+        alignment: space-between;
+
+        // ============ LEFT CLUSTER ============
+        left-cluster := HorizontalLayout {
+            spacing: 12px;
+            cross-axis-alignment: center;
+
+            // BRAND — legacy .brand (gold icon box + name + "Studio" gold badge)
+            HorizontalLayout {
+                spacing: 10px;
+
+                Rectangle {
+                    width: 36px;
+                    height: 36px;
+                    border-radius: 10px;
+                    background: @linear-gradient(135deg, #ffd70040 0%, #d4af3726 100%);
+                    Text {
+                        text: "⚡";
+                        font-size: 19px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: "AudioWave";
+                    color: #ffffff;
+                    font-size: 16px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    width: 56px;
+                    height: 22px;
+                    border-radius: 6px;
+                    background: @linear-gradient(135deg, #ffd700, #d4af37);
+                    Text {
+                        text: "Studio";
+                        color: #000000;
+                        font-size: 10px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // CENTER PROMO TICKER — CredibleMark (legacy .crediblemark-ticker-container)
+            Rectangle {
+                horizontal-stretch: 1;
+                max-width: 380px;
+                min-width: 24px;
+                height: 32px;
+                border-radius: 8px;
+                background: ticker-ta.has-hover ? #ffd70029 : #ffd70014;
+                clip: true;
+
+                ticker-ta := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => { root.ticker-clicked(); }
+
+                    ticker-scroll := Rectangle {
+                        x: -1 * root.ticker-progress * measure.width;
+                        y: 0;
+                        width: 2 * measure.width;
+                        height: parent.height;
+
+                        HorizontalLayout {
+                            spacing: 0;
+                            Text {
+                                text: "🚀 Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                                color: #ffd700;
+                                font-size: 11px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                            Text {
+                                text: "🚀 Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                                color: #ffd700;
+                                font-size: 11px;
+                                font-weight: 500;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Hidden measure text: gives the intrinsic content width so the 2-copy
+                // marquee loop is seamless (translate by exactly one copy width).
+                measure := Text {
+                    x: -10000px;
+                    y: -10000px;
+                    text: "🚀 Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                    color: transparent;
+                    font-size: 11px;
+                    font-weight: 500;
+                }
+            }
+
+            Timer {
+                interval: 16ms;
+                running: true;
+                triggered() => {
+                    root.ticker-progress = Math.mod(root.ticker-progress + 1.0 / 1125.0, 1.0);
+                }
+            }
+
+            NavPrimaryBtn {
+                text: "📂 Open Track";
+                clicked => { root.open-file-clicked(); }
+            }
+
+            listen-btn := NavPrimaryBtn {
+                active: root.is-listening;
+                text: root.is-listening ? "⏹ Stop Listen" : "🎧 Listen";
+                clicked => {
+                    if (root.is-listening) { root.stop-listen-clicked(); }
+                    else if (root.mic-devices.length > 1) { root.show-mic-picker = !root.show-mic-picker; }
+                    else { root.listen-clicked(); }
+                }
+            }
+        }
+
+        // ============ RIGHT CLUSTER ============
+        HorizontalLayout {
+            spacing: 6px;
+            cross-axis-alignment: center;
+
+            IconBtn {
+                icon: "⬚";
+                tip: "Custom Background Image";
+                clicked => { root.open-custom-image-clicked(); }
+            }
+
+            IconBtn {
+                icon: "⤓";
+                tip: "Save Preset";
+                clicked => { root.save-preset-clicked(); }
+            }
+
+            IconBtn {
+                icon: "⤒";
+                tip: "Load Preset";
+                clicked => { root.load-preset-clicked(); }
+            }
+
+            IconBtn {
+                icon: "⚡";
+                tip: "Hardware Info";
+                clicked => { root.open-hardware-clicked(); }
+            }
+
+            IconBtn {
+                icon: "ℹ";
+                tip: "About";
+                clicked => { root.open-about-clicked(); }
+            }
+
+            IconBtn {
+                icon: "↗";
+                tip: "Pop-out Preview Window";
+                clicked => { root.toggle-preview-clicked(); }
+            }
+
+            NavPrimaryBtn {
+                text: "🎬 Export Video";
+                clicked => { root.open-export-clicked(); }
+            }
+
+            // WINDOW CONTROLS — legacy .window-controls: border-left divider,
+            // 2px gap, 32×28 buttons (frameless window replacement).
+            Rectangle {
+                width: 1px;
+                height: 24px;
+                background: #ffffff1f;
+            }
+
+            HorizontalLayout {
+                spacing: 2px;
+
+                min-btn := Rectangle {
+                    width: 32px;
+                    height: 28px;
+                    border-radius: 4px;
+                    background: min-ta.has-hover ? #ffffff1a : transparent;
+
+                    // Micro-interaction: gentle lift + white glow (close gets a
+                    // red glow matching its hover fill).
+                    transform-scale-x: min-ta.has-hover ? 1.06 : 1.0;
+                    transform-scale-y: min-ta.has-hover ? 1.06 : 1.0;
+                    transform-origin: { x: self.width / 2, y: self.height / 2 };
+                    drop-shadow-blur: min-ta.has-hover ? 5px : 0px;
+                    drop-shadow-color: #ffffff33;
+                    animate transform-scale-x { duration: 100ms; easing: ease-out; }
+                    animate transform-scale-y { duration: 100ms; easing: ease-out; }
+                    animate drop-shadow-blur { duration: 100ms; easing: ease-out; }
+
+                    min-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.minimize-clicked(); }
+                    }
+                    Text {
+                        text: "–";
+                        color: min-ta.has-hover ? #ffffff : #94a3b8;
+                        font-size: 14px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                max-btn := Rectangle {
+                    width: 32px;
+                    height: 28px;
+                    border-radius: 4px;
+                    background: max-ta.has-hover ? #ffffff1a : transparent;
+
+                    transform-scale-x: max-ta.has-hover ? 1.06 : 1.0;
+                    transform-scale-y: max-ta.has-hover ? 1.06 : 1.0;
+                    transform-origin: { x: self.width / 2, y: self.height / 2 };
+                    drop-shadow-blur: max-ta.has-hover ? 5px : 0px;
+                    drop-shadow-color: #ffffff33;
+                    animate transform-scale-x { duration: 100ms; easing: ease-out; }
+                    animate transform-scale-y { duration: 100ms; easing: ease-out; }
+                    animate drop-shadow-blur { duration: 100ms; easing: ease-out; }
+
+                    max-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.maximize-clicked(); }
+                    }
+                    Text {
+                        text: "▢";
+                        color: max-ta.has-hover ? #ffffff : #94a3b8;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+
+                close-btn := Rectangle {
+                    width: 32px;
+                    height: 28px;
+                    border-radius: 4px;
+                    background: close-ta.has-hover ? #e81123 : transparent;
+
+                    transform-scale-x: close-ta.has-hover ? 1.08 : 1.0;
+                    transform-scale-y: close-ta.has-hover ? 1.08 : 1.0;
+                    transform-origin: { x: self.width / 2, y: self.height / 2 };
+                    drop-shadow-blur: close-ta.has-hover ? 8px : 0px;
+                    drop-shadow-color: #e8112366;
+                    animate transform-scale-x { duration: 100ms; easing: ease-out; }
+                    animate transform-scale-y { duration: 100ms; easing: ease-out; }
+                    animate drop-shadow-blur { duration: 100ms; easing: ease-out; }
+
+                    close-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.close-clicked(); }
+                    }
+                    Text {
+                        text: "✕";
+                        color: close-ta.has-hover ? #ffffff : #94a3b8;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+
+    // MIC DEVICE PICKER — dropdown below the navbar (legacy device picker),
+    // anchored under the Listen button itself.
+    if (root.show-mic-picker && root.mic-devices.length > 1) : Rectangle {
+        // listen-btn is nested inside the left cluster (which itself sits at the
+        // navbar's 20px padding), so anchor in navbar-root coordinates by adding
+        // the cluster's own offset — otherwise the dropdown drifts ~20px left.
+        x: left-cluster.x + listen-btn.x - 40px;
+        y: root.height + 4px;
+        width: 410px;
+        height: root.mic-devices.length * 30px + 46px;
+        border-radius: 10px;
+        background: #0d0d0d;
+        border-width: 1px;
+        border-color: #ffd70066;
+
+        VerticalLayout {
+            padding: 8px;
+            spacing: 3px;
+
+            Text {
+                text: "🎙️ Select Input Device";
+                color: #ffd700;
+                font-size: 11px;
+                font-weight: 700;
+            }
+
+            for dev in root.mic-devices : Rectangle {
+                height: 28px;
+                border-radius: 6px;
+                background: row-ta.has-hover ? #ffd70029
+                    : (dev == root.mic-device-label ? #ffd7001a : #ffffff08);
+
+                row-ta := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => {
+                        root.mic-device-label = dev;
+                        root.show-mic-picker = false;
+                        root.mic-device-selected(dev);
+                    }
+                }
+
+                Text {
+                    text: dev;
+                    color: dev == root.mic-device-label ? #ffd700 : #f8fafc;
+                    font-size: 11px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // Legacy gold border-bottom (rgba(255, 215, 0, 0.2))
+    Rectangle {
+        y: root.height - 1px;
+        width: parent.width;
+        height: 1px;
+        background: #ffd70033;
+    }
+}

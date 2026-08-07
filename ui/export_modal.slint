@@ -1,0 +1,266 @@
+import { Slider, ComboBox, CheckBox, ScrollView } from "std-widgets.slint";
+
+// Custom modal action button (primary gold = legacy btn-export / secondary dark)
+// with the same scale + glow micro-interactions as the navbar/window controls.
+// std-widgets Button doesn't expose has-hover, so we hand-roll it (TabBtn
+// pattern) — and to keep keyboard accessibility (std Button had Tab focus +
+// Enter/Space activation) we wrap it in a FocusScope handling those keys, with
+// a gold focus ring when focused.
+export component ModalBtn inherits Rectangle {
+    in property <string> text: "";
+    in property <bool> primary: false;
+    callback clicked();
+
+    height: 36px;
+
+    fs := FocusScope {
+        width: parent.width;
+        height: parent.height;
+        focus-on-click: true;
+        focus-on-tab-navigation: true;
+
+        key-pressed(event) => {
+            if (event.text == Key.Return || event.text == Key.Space) {
+                root.clicked();
+                accept
+            } else {
+                reject
+            }
+        }
+
+        Rectangle {
+            width: parent.width;
+            height: parent.height;
+            border-radius: 6px;
+            border-width: fs.has-focus ? 2px : 1px;
+            background: root.primary ? (ta.has-hover ? #ffd700 : #d4af37)
+                : (ta.has-hover ? #ffffff18 : #1c1c1c);
+            border-color: fs.has-focus ? #ffd700
+                : (root.primary ? #ffd700
+                    : (ta.has-hover ? #ffffff2e : #ffffff14));
+
+            // Micro-interaction: lift + glow on hover (primary glows gold like
+            // the navbar CTA; secondary gets a soft white glow).
+            transform-scale-x: ta.has-hover ? 1.04 : 1.0;
+            transform-scale-y: ta.has-hover ? 1.04 : 1.0;
+            transform-origin: { x: self.width / 2, y: self.height / 2 };
+            drop-shadow-blur: root.primary ? (ta.has-hover ? 12px : 0px)
+                : (ta.has-hover ? 6px : 0px);
+            drop-shadow-color: root.primary ? #ffd70066 : #ffffff33;
+            animate transform-scale-x { duration: 120ms; easing: ease-out; }
+            animate transform-scale-y { duration: 120ms; easing: ease-out; }
+            animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+
+            ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                clicked => { root.clicked(); }
+            }
+
+            Text {
+                text: root.text;
+                color: root.primary ? #000000 : (ta.has-hover ? #f8fafc : #a3a3a3);
+                font-size: 13px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+export component ExportModal inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: #000000b0;
+
+    in-out property <string> export-aspect-ratio: "16:9";
+    in-out property <string> export-resolution: "1080p";
+    in-out property <int> export-fps: 60;
+    in-out property <string> export-format: "mp4";
+    in-out property <string> export-encoder: "Auto";
+    in-out property <int> export-fft-size: 1024;
+    in-out property <bool> include-audio: true;
+    in-out property <float> export-progress-percent: 0.0;
+    in-out property <string> export-status-text: "Ready to render MP4 video";
+    in-out property <bool> is-exporting: false;
+
+    callback start-export-clicked();
+    callback cancel-export-clicked();
+    callback close-clicked();
+
+    Rectangle {
+        width: 500px;
+        height: 500px;
+        background: #0a0a0a;
+        border-radius: 12px;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: "Export MP4 Video";
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: #ffd700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                // Legacy modal ✕ close button (top-right corner) with the same
+                // lift + glow micro-interaction as the navbar IconBtn.
+                Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 6px;
+                    background: close-ta.has-hover ? #ffffff1f : transparent;
+
+                    transform-scale-x: close-ta.has-hover ? 1.07 : 1.0;
+                    transform-scale-y: close-ta.has-hover ? 1.07 : 1.0;
+                    transform-origin: { x: self.width / 2, y: self.height / 2 };
+                    drop-shadow-blur: close-ta.has-hover ? 6px : 0px;
+                    drop-shadow-color: #ffffff33;
+                    animate transform-scale-x { duration: 120ms; easing: ease-out; }
+                    animate transform-scale-y { duration: 120ms; easing: ease-out; }
+                    animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+
+                    close-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => {
+                            // Same behavior as the bottom Cancel: abort an in-flight
+                            // render, then hide the modal.
+                            if (root.is-exporting) { root.cancel-export-clicked(); }
+                            root.close-clicked();
+                        }
+                    }
+
+                    Text {
+                        text: "✕";
+                        color: close-ta.has-hover ? #ffffff : #94a3b8;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    Tooltip {
+                        Text { text: "Close"; font-size: 11px; color: #f8fafc; }
+                    }
+                }
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    spacing: 10px;
+                    padding: 2px;
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: "Aspect Ratio:"; color: #a3a3a3; vertical-alignment: center; }
+                        ComboBox {
+                            model: ["16:9", "9:16", "1:1"];
+                            current-value: root.export-aspect-ratio;
+                            selected(val) => { root.export-aspect-ratio = val; }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: "Resolution:"; color: #a3a3a3; vertical-alignment: center; }
+                        ComboBox {
+                            model: ["720p", "1080p", "4K"];
+                            current-value: root.export-resolution;
+                            selected(val) => { root.export-resolution = val; }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: "Frame Rate:"; color: #a3a3a3; vertical-alignment: center; }
+                        ComboBox {
+                            model: ["30 FPS", "60 FPS"];
+                            current-value: root.export-fps == 60 ? "60 FPS" : "30 FPS";
+                            selected(val) => { root.export-fps = val == "60 FPS" ? 60 : 30; }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: "Output Format:"; color: #a3a3a3; vertical-alignment: center; }
+                        ComboBox {
+                            model: ["mp4", "webm"];
+                            current-value: root.export-format;
+                            selected(val) => { root.export-format = val; }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: "Encoder:"; color: #a3a3a3; vertical-alignment: center; }
+                        ComboBox {
+                            model: ["Auto", "H.264", "HEVC (H.265)", "AV1"];
+                            current-value: root.export-encoder;
+                            selected(val) => { root.export-encoder = val; }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 12px;
+                        Text { text: "FFT Size:"; color: #a3a3a3; vertical-alignment: center; }
+                        ComboBox {
+                            model: ["256", "512", "1024", "2048"];
+                            current-value: root.export-fft-size;
+                            selected(val) => {
+                                root.export-fft-size = val == "256" ? 256 : val == "512" ? 512 : val == "1024" ? 1024 : 2048;
+                            }
+                        }
+                    }
+
+                    CheckBox {
+                        text: "Include Audio Track";
+                        checked: root.include-audio;
+                        toggled => { root.include-audio = self.checked; }
+                    }
+
+                    Text { text: root.export-status-text; color: #f8fafc; font-size: 13px; wrap: word-wrap; }
+
+                    if (root.is-exporting) : VerticalLayout {
+                        spacing: 4px;
+                        Slider {
+                            minimum: 0.0;
+                            maximum: 100.0;
+                            value: root.export-progress-percent;
+                        }
+                        Text { text: Math.round(root.export-progress-percent) + "%"; color: #a3a3a3; font-size: 12px; }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                Rectangle { horizontal-stretch: 1; }
+                ModalBtn {
+                    text: "Cancel";
+                    clicked => {
+                        root.cancel-export-clicked();
+                        root.close-clicked();
+                    }
+                }
+                ModalBtn {
+                    primary: true;
+                    text: root.is-exporting ? "Rendering..." : "Start Export";
+                    // Guard: no re-trigger while a render is already running.
+                    clicked => { if (!root.is-exporting) { root.start-export-clicked(); } }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,137 @@
+// Lightweight toast/notification stack for AudioWave Studio.
+//
+// Hosts a top-right stack of color-coded, auto-dismissing notifications pushed
+// from Rust (errors, successes, info) — the fix for the previously silent
+// failures (decode errors, preset I/O, mic capture) that only went to stderr.
+//
+// The Rust side owns the backing model and mutates the SAME `VecModel` in place
+// (SlintAppState.toasts ↔ toast-list), so pushing a new toast animates in
+// without replaying the entrance animation / resetting the timers of the
+// existing ones. Each card auto-dismisses itself after `duration-ms` by
+// emitting `dismissed(id)`; Rust then removes it from the model.
+
+export struct ToastItem {
+    id: int,
+    kind: string,
+    text: string,
+    duration-ms: duration,
+}
+
+// Single toast card: colored accent by kind (error = red, success = green,
+// info = brand gold), entrance fade, auto-dismiss timer, manual ✕ dismiss.
+component ToastCard inherits Rectangle {
+    in property <ToastItem> item;
+    callback dismissed(int);
+
+    // Entrance animation: start fully transparent and reveal after one tick so
+    // the `animate opacity` actually runs (Slint animates property *changes*,
+    // not element creation).
+    private property <bool> revealed: false;
+
+    // Per-kind accent colors + glow (8-digit hex = color with alpha).
+    private property <color> accent: root.item.kind == "error" ? #ff5c5c
+        : (root.item.kind == "success" ? #34d399 : #ffd700);
+    private property <color> glow: root.item.kind == "error" ? #ff5c5c55
+        : (root.item.kind == "success" ? #34d39955 : #ffd70055);
+    private property <string> icon: root.item.kind == "error" ? "⚠️"
+        : (root.item.kind == "success" ? "✅" : "ℹ️");
+
+    // Auto-dismiss: wait for the reveal tick, then keep the toast up for the
+    // item's duration (switching the interval restarts the timer).
+    Timer {
+        interval: root.revealed ? root.item.duration-ms : 60ms;
+        running: true;
+        triggered() => {
+            if (!root.revealed) {
+                root.revealed = true;
+            } else {
+                root.dismissed(root.item.id);
+            }
+        }
+    }
+
+    // Sizing: the hosting VerticalLayout stretches cards to full width.
+    opacity: root.revealed ? 1.0 : 0.0;
+    animate opacity { duration: 180ms; easing: ease-out; }
+
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: root.accent;
+    background: #15161a;
+    drop-shadow-blur: 14px;
+    drop-shadow-color: root.glow;
+
+    VerticalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+
+        HorizontalLayout {
+            spacing: 10px;
+            cross-axis-alignment: center;
+
+            Text {
+                text: root.icon;
+                font-size: 15px;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.item.text;
+                color: #f8fafc;
+                font-size: 12px;
+                wrap: word-wrap;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+            }
+
+            Rectangle {
+                width: 22px;
+                height: 22px;
+                border-radius: 6px;
+                background: close-ta.has-hover ? #ffffff1f : transparent;
+
+                close-ta := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => { root.dismissed(root.item.id); }
+                }
+
+                Text {
+                    text: "✕";
+                    color: close-ta.has-hover ? #ffffff : #94a3b8;
+                    font-size: 12px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                Tooltip {
+                    Text { text: "Dismiss"; font-size: 11px; color: #f8fafc; }
+                }
+            }
+        }
+    }
+}
+
+// Top-right stack, anchored just below the 60px navbar and painted AFTER the
+// modals in app_window.slint so toasts always float on top. Positioned by the
+// instantiation site (app_window.slint sets x/y relative to the window).
+export component ToastHost inherits Rectangle {
+    in-out property <[ToastItem]> toasts: [];
+    callback dismissed(int);
+
+    width: 340px;
+    background: transparent;
+
+    VerticalLayout {
+        spacing: 8px;
+        alignment: start;
+
+        for toast in root.toasts : ToastCard {
+            item: toast;
+            dismissed(id) => { root.dismissed(id); }
+        }
+    }
+}

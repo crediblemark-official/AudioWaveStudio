@@ -1,0 +1,113 @@
+import { ScrollView } from "std-widgets.slint";
+import { ModalBtn } from "export_modal.slint";
+
+export component HardwareModal inherits Rectangle {
+    width: 100%;
+    height: 100%;
+    background: #000000b0;
+
+    in-out property <string> ram-info-text: "16 GB System Memory";
+    in-out property <string> gpu-info-text: "Hardware GPU Accelerated";
+    in-out property <string> ffmpeg-status-text: "FFmpeg Ready";
+    in-out property <string> hardware-detail-text: "";
+
+    callback close-clicked();
+    callback rescan-clicked();
+
+    Rectangle {
+        width: 540px;
+        height: 440px;
+        background: #0a0a0a;
+        border-radius: 12px;
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                Text {
+                    text: "⚡ Hardware System Info";
+                    font-size: 17px;
+                    font-weight: 700;
+                    color: #ffd700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle { horizontal-stretch: 1; }
+
+                // Legacy modal ✕ close button (top-right corner) with the same
+                // lift + glow micro-interaction as the navbar IconBtn.
+                Rectangle {
+                    width: 28px;
+                    height: 28px;
+                    border-radius: 6px;
+                    background: close-ta.has-hover ? #ffffff1f : transparent;
+
+                    transform-scale-x: close-ta.has-hover ? 1.07 : 1.0;
+                    transform-scale-y: close-ta.has-hover ? 1.07 : 1.0;
+                    transform-origin: { x: self.width / 2, y: self.height / 2 };
+                    drop-shadow-blur: close-ta.has-hover ? 6px : 0px;
+                    drop-shadow-color: #ffffff33;
+                    animate transform-scale-x { duration: 120ms; easing: ease-out; }
+                    animate transform-scale-y { duration: 120ms; easing: ease-out; }
+                    animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
+
+                    close-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.close-clicked(); }
+                    }
+
+                    Text {
+                        text: "✕";
+                        color: close-ta.has-hover ? #ffffff : #94a3b8;
+                        font-size: 13px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    Tooltip {
+                        Text { text: "Close"; font-size: 11px; color: #f8fafc; }
+                    }
+                }
+            }
+
+            Text { text: "Auto-detects GPU, graphics backend, and FFmpeg video encoders"; color: #a3a3a3; font-size: 12px; }
+
+            Text { text: "RAM: " + root.ram-info-text; color: #f8fafc; font-size: 13px; }
+            Text { text: "GPU: " + root.gpu-info-text; color: #f8fafc; font-size: 13px; }
+            Text { text: "FFmpeg: " + root.ffmpeg-status-text; color: #f8fafc; font-size: 13px; }
+
+            Rectangle {
+                vertical-stretch: 1;
+                background: #0a0a0a;
+                border-radius: 8px;
+
+                ScrollView {
+                    Text {
+                        text: root.hardware-detail-text;
+                        color: #a3a3a3;
+                        font-size: 12px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+                Rectangle { horizontal-stretch: 1; }
+                ModalBtn {
+                    text: "🔄 Rescan Hardware";
+                    clicked => { root.rescan-clicked(); }
+                }
+                ModalBtn {
+                    text: "Close";
+                    clicked => { root.close-clicked(); }
+                }
+            }
+        }
+    }
+}

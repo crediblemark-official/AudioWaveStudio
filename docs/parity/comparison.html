@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AudioWave — Visual Parity Report (Legacy Tauri vs Native Slint)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0f1117; color: #e2e8f0; font-family: 'DejaVu Sans', system-ui, sans-serif; padding: 24px; }
+  h1 { font-size: 22px; color: #00f0ff; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin: 24px 0 12px; color: #ffffff; }
+  .sub { color: #94a3b8; font-size: 13px; margin-bottom: 20px; }
+  .shots { display: flex; gap: 16px; flex-wrap: wrap; }
+  .shot { flex: 1 1 46%; min-width: 420px; }
+  .shot img { width: 100%; border: 1px solid #2a2f3a; border-radius: 8px; }
+  .shot-label { font-size: 13px; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; }
+  .badge-red { background: rgba(239,68,68,0.2); color: #f87171; }
+  .badge-yellow { background: rgba(234,179,8,0.2); color: #facc15; }
+  .badge-green { background: rgba(34,197,94,0.2); color: #4ade80; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 12px; }
+  th, td { border: 1px solid #2a2f3a; padding: 6px 10px; text-align: left; }
+  th { background: #1a1d27; color: #a0aec0; font-weight: 600; }
+  td.code { font-family: monospace; }
+  .sw { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 6px; border: 1px solid rgba(255,255,255,0.2); }
+  .verdict { font-weight: 700; font-size: 11px; }
+  .verdict.same { color: #4ade80; }
+  .verdict.diff { color: #f87171; }
+  .note { background: #1a1d27; border-left: 3px solid #facc15; padding: 10px 14px; border-radius: 6px; font-size: 12px; color: #cbd5e1; margin: 12px 0; }
+  a { color: #00f0ff; }
+</style>
+</head>
+<body>
+<h1>📊 Visual Parity Report — Legacy Tauri vs Native Slint</h1>
+<div class="sub">Mockup statis direkonstruksi dari source masing-masing. Legacy diambil dari <code>legacy_tauri_backup/src</code> (CSS + JSX), Slint dari <code>ui/*.slint</code>. Screenshot via Chrome headless.</div>
+
+<div class="shots">
+  <div class="shot">
+    <div class="shot-label">1️⃣ Legacy Tauri UI <span class="badge badge-red">BASELINE</span></div>
+    <img src="legacy_shot.png" alt="Legacy Tauri UI mockup">
+  </div>
+  <div class="shot">
+    <div class="shot-label">2️⃣ Native Slint UI <span class="badge badge-yellow">PARITY CHECK</span></div>
+    <img src="slint_shot.png" alt="Slint native UI mockup">
+  </div>
+</div>
+
+<h2>🎨 Warna — Tema Umum</h2>
+<table>
+  <tr><th>Elemen</th><th>Legacy Tauri</th><th>Native Slint</th><th>Status</th></tr>
+  <tr><td>Background utama</td><td class="code"><span class="sw" style="background:#000000"></span>#000000 (hitam murni)</td><td class="code"><span class="sw" style="background:#0f1117"></span>#0f1117 (biru gelap)</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Navbar</td><td class="code"><span class="sw" style="background:#000000"></span>#000000 + border gold</td><td class="code"><span class="sw" style="background:#161922"></span>#161922</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Control panel</td><td class="code"><span class="sw" style="background:#0a0a0a"></span>rgba(10,10,10,0.96)</td><td class="code"><span class="sw" style="background:#12151e"></span>#12151e</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Audio bar</td><td class="code"><span class="sw" style="background:#0a0b10"></span>rgba(10,11,16,0.95)</td><td class="code"><span class="sw" style="background:#161922"></span>#161922</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Accent utama</td><td class="code"><span class="sw" style="background:#ffd700"></span>#ffd700 (GOLD)</td><td class="code"><span class="sw" style="background:#00f0ff"></span>#00f0ff (CYAN)</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Accent sekunder</td><td class="code"><span class="sw" style="background:#d4af37"></span>#d4af37 (dark gold)</td><td class="code"><span class="sw" style="background:#ff007f"></span>#ff007f (pink)</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Tombol Export</td><td class="code">gradient gold → hitam teks</td><td class="code">outline cyan</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Text utama</td><td class="code"><span class="sw" style="background:#f8fafc"></span>#f8fafc</td><td class="code"><span class="sw" style="background:#ffffff"></span>#ffffff</td><td><span class="verdict same">≈ SAMA</span></td></tr>
+  <tr><td>Text muted</td><td class="code"><span class="sw" style="background:#a3a3a3"></span>#a3a3a3</td><td class="code"><span class="sw" style="background:#a0aec0"></span>#a0aec0</td><td><span class="verdict same">≈ SAMA</span></td></tr>
+</table>
+
+<h2>📐 Layout & Spacing</h2>
+<table>
+  <tr><th>Dimensi</th><th>Legacy Tauri</th><th>Native Slint</th><th>Status</th></tr>
+  <tr><td>Navbar height</td><td class="code">60px</td><td class="code">56px</td><td><span class="verdict diff">4px beda</span></td></tr>
+  <tr><td>Control panel width</td><td class="code">380px</td><td class="code">380px</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Audio bar height</td><td class="code">64px</td><td class="code">64px</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Panel tabs</td><td class="code">6 tab (Style, Colors, Background, Text, Effects, Export)</td><td class="code">6 tab (Style, Colors, Background, Effects, Text, Export)</td><td><span class="verdict same">SAMA (urutan Text/Effects tukar)</span></td></tr>
+  <tr><td>Style selector</td><td class="code">Grid kartu 19 style</td><td class="code">ComboBox 19 style</td><td><span class="verdict diff">Grid vs dropdown</span></td></tr>
+  <tr><td>Canvas preview</td><td class="code">Area utama</td><td class="code">Area utama (Image)</td><td><span class="verdict same">SAMA</span></td></tr>
+</table>
+
+<h2>🧩 Fitur UI</h2>
+<table>
+  <tr><th>Fitur</th><th>Legacy Tauri</th><th>Native Slint</th><th>Status</th></tr>
+  <tr><td>19 visualizer styles</td><td>✅ Ya</td><td>✅ Ya (setelah paritas)</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Bar gap/width/rounding</td><td>✅ Ya (spectrum)</td><td>✅ Ya</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Mirror waves</td><td>✅ Ya</td><td>✅ Ya</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Fire 3D dims</td><td>✅ Ya (api3D)</td><td>✅ Ya</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Radial center image</td><td>✅ Ya</td><td>✅ Ya</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Peak markers</td><td>✅ Ya</td><td>✅ Ya</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Save/Load preset</td><td>✅ Ya (navbar)</td><td>✅ Ya (navbar)</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Mute button</td><td>✅ Ya</td><td>✅ Ya</td><td><span class="verdict same">SAMA</span></td></tr>
+  <tr><td>Listen (mic input)</td><td>✅ Ya</td><td>❌ Tidak</td><td><span class="verdict diff">BELUM DIPORT</span></td></tr>
+  <tr><td>Pop-out preview</td><td>✅ Ya</td><td>❌ Tidak</td><td><span class="verdict diff">BELUM DIPORT</span></td></tr>
+  <tr><td>Window controls (min/max/close)</td><td>✅ Ya (custom)</td><td>⚠️ Native window decorations</td><td><span class="verdict diff">BERBEDA</span></td></tr>
+  <tr><td>Ticker CredibleMark</td><td>✅ Ya</td><td>❌ Tidak</td><td><span class="verdict diff">BELUM DIPORT</span></td></tr>
+  <tr><td>Export modal detail</td><td>✅ Kaya (method, engine, codec, RAM)</td><td>✅ Kaya (aspect, format, encoder, FFT)</td><td><span class="verdict same">SAMA (struktur berbeda)</span></td></tr>
+  <tr><td>Hardware modal</td><td>✅ Sangat detail</td><td>✅ Detail (GPU, encoder, OS, rescan)</td><td><span class="verdict same">SAMA</span></td></tr>
+</table>
+
+<div class="note">
+⚠️ <strong>Kesimpulan utama:</strong> Struktur & fitur UI kini paritas (19 style, semua kontrol, mute, preset, modals). Namun <strong>tema warna belum identik</strong> — legacy memakai <strong>hitam + gold (#ffd700)</strong> sedangkan Slint memakai <strong>biru gelap + cyan (#00f0ff)</strong>. Untuk UI/UX "sama persis", tema warna legacy harus dipindahkan ke file <code>ui/*.slint</code>. Lihat <code>VISUAL_PARITY.md</code> untuk daftar lengkap.
+</div>
+
+</body>
+</html>

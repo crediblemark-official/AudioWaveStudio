@@ -1,0 +1,211 @@
+import { Slider } from "std-widgets.slint";
+
+// Legacy `.btn-play`: 36px gold-gradient circle with a soft glow, hover scale.
+component PlayBtn {
+    in property <bool> playing: false;
+    callback clicked();
+
+    Rectangle {
+        width: 36px;
+        height: 36px;
+        border-radius: 18px;
+        background: @linear-gradient(135deg, #ffd700, #d4af37);
+        border-width: 0px;
+        // Legacy `.btn-play` glow — drop-shadow equivalents of `box-shadow: 0 0 12px rgba(255,215,0,0.4)`
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #ffd70066;
+
+        ta := TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+
+        Text {
+            text: root.playing ? "⏸" : "▶";
+            color: #000000;
+            font-size: 16px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Tooltip {
+            Text { text: root.playing ? "Pause" : "Play"; font-size: 11px; color: #f8fafc; }
+        }
+    }
+}
+
+// Legacy `.btn-control`: 28px circle, faint white fill, hover brightens.
+component ControlBtn {
+    in property <string> icon: "";
+    in property <string> tip: "";
+    callback clicked();
+
+    Rectangle {
+        width: 28px;
+        height: 28px;
+        border-radius: 14px;
+        background: ta.has-hover ? #ffffff33 : #ffffff14;
+
+        ta := TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
+        }
+
+        Text {
+            text: root.icon;
+            color: ta.has-hover ? #f8fafc : #a3a3a3;
+            font-size: 13px;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+
+        Tooltip {
+            Text { text: root.tip; font-size: 11px; color: #f8fafc; }
+        }
+    }
+}
+
+export component AudioBar inherits Rectangle {
+    height: 64px; // legacy .audio-player-bar height
+    background: #0a0a0a;
+
+    in-out property <string> track-title: "No Audio Loaded";
+    in-out property <string> track-artist: "Select an audio file to start visualizer";
+    in-out property <string> current-time-str: "00:00";
+    in-out property <string> duration-str: "00:00";
+    in-out property <float> playback-progress: 0.0;
+    in-out property <bool> is-playing: false;
+    in-out property <bool> is-muted: false;
+    in-out property <float> volume: 0.8;
+
+    callback toggle-play-clicked();
+    callback stop-clicked();
+    callback seek-position(float);
+    callback volume-changed(float);
+    callback mute-toggle-clicked();
+
+    HorizontalLayout {
+        padding-left: 20px;
+        padding-right: 20px;
+        spacing: 16px; // legacy gap 16px
+
+        // SONG INFO — legacy .player-track-info (music icon + title/artist)
+        HorizontalLayout {
+            width: 200px;
+            spacing: 10px;
+            cross-axis-alignment: center;
+
+            Text {
+                text: "♪";
+                color: #ffd700;
+                font-size: 18px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                alignment: center;
+                spacing: 2px;
+
+                Text {
+                    text: root.track-title;
+                    color: #ffffff;
+                    font-size: 13px;
+                    font-weight: 600;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.track-artist;
+                    color: #a3a3a3;
+                    font-size: 11px;
+                    overflow: elide;
+                }
+            }
+        }
+
+        // CONTROLS + SEEKER — legacy .player-center
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            spacing: 12px;
+
+            // legacy .player-controls (gap 8px)
+            HorizontalLayout {
+                spacing: 8px;
+
+                PlayBtn {
+                    playing: root.is-playing;
+                    clicked => { root.toggle-play-clicked(); }
+                }
+
+                ControlBtn {
+                    icon: "■";
+                    tip: "Stop";
+                    clicked => { root.stop-clicked(); }
+                }
+            }
+
+            HorizontalLayout {
+                horizontal-stretch: 1;
+                spacing: 8px;
+                cross-axis-alignment: center;
+
+                Text {
+                    text: root.current-time-str;
+                    color: #a3a3a3;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: 0.0;
+                    maximum: 1.0;
+                    value: root.playback-progress;
+                    changed(val) => { root.seek-position(val); }
+                }
+
+                Text {
+                    text: root.duration-str;
+                    color: #a3a3a3;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // VOLUME — mute circle + volume slider
+        HorizontalLayout {
+            width: 160px;
+            spacing: 6px;
+            cross-axis-alignment: center;
+
+            ControlBtn {
+                icon: root.is-muted ? "✕" : "🔊";
+                tip: root.is-muted ? "Unmute" : "Mute";
+                clicked => { root.mute-toggle-clicked(); }
+            }
+
+                Slider {
+                    horizontal-stretch: 1;
+                    minimum: 0.0;
+                    maximum: 1.0;
+                    value: root.volume;
+                    enabled: !root.is-muted;
+                    changed(val) => { root.volume = val; root.volume-changed(val); }
+                }
+        }
+    }
+
+    // Legacy border-top (var(--border-color))
+    Rectangle {
+        y: 0;
+        width: parent.width;
+        height: 1px;
+        background: #ffffff1f;
+    }
+}

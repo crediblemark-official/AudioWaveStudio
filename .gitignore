@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Cargo target directory
+target/
+
+# Legacy backup directory
+legacy_tauri_backup/
+
