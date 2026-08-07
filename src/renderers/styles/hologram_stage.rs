@@ -77,7 +77,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     (center_x + base_rx * 0.8, base_y),
   ];
   c.set_fill(Fill::Solid(Color::rgba(1.0, 0.0, 0.65, 0.07)));
-  c.fill_polyline_to_base(&beam_pts, base_y);
+  c.fill_polygon(&beam_pts);
 
   // -------------------------------------------------------------------------
   // 3. STACKED NEON MAGENTA CYLINDER RINGS (14 LAYERS)
