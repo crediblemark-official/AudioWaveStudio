@@ -109,8 +109,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     // Render solid white vector polygon claw
     c.set_fill(Fill::Solid(Color::WHITE));
-    let base_y = claw_poly.iter().map(|p| p.1).fold(f32::NAN, f32::max);
-    c.fill_polyline_to_base(&claw_poly, base_y);
+    c.fill_polygon(&claw_poly);
 
     c.set_stroke(Fill::Solid(Color::WHITE));
     c.set_line_width(2.0);

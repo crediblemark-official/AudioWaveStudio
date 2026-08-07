@@ -76,11 +76,17 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     top_pts.push((start_x + wave_w, center_y));
     bot_pts.push((start_x + wave_w, center_y));
 
-    // 1. Smooth Filled Glowing Red Core Waveform
+    // Combine top_pts and reverse bot_pts into a single closed polygon contour
+    let mut core_poly = Vec::with_capacity(WAVE_PTS * 2 + 2);
+    core_poly.extend_from_slice(&top_pts);
+    for pt in bot_pts.iter().rev() {
+      core_poly.push(*pt);
+    }
+
+    // 1. Smooth Filled Glowing Red Core Waveform (Closed 2D Polygon)
     c.set_fill(Fill::Solid(bright_red));
     c.set_shadow(bright_red, 14.0 + bs * 6.0);
-    c.fill_polyline_to_base(&top_pts, center_y);
-    c.fill_polyline_to_base(&bot_pts, center_y);
+    c.fill_polygon(&core_poly);
 
     // 2. Multilayered Stacked Oscilloscope Contour Lines (6 Parallel Layers)
     let num_layers = 6;
