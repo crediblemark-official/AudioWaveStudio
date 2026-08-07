@@ -43,6 +43,10 @@ pub enum VisualizerStyle {
   SpeakerSplatter,
   #[serde(rename = "radialRipple3D")]
   RadialRipple3D,
+  #[serde(rename = "waterfall3D")]
+  Waterfall3D,
+  #[serde(rename = "cassetteTape")]
+  CassetteTape,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
