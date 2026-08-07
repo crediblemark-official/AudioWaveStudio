@@ -12,6 +12,7 @@ pub mod pulse_rings;
 pub mod radial;
 pub mod smooth_spectrum;
 pub mod speaker_3d;
+pub mod radial_ripple_3d;
 pub mod speaker_splatter;
 pub mod speaker_trio;
 pub mod spectrum;
@@ -46,5 +47,6 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::Speaker3D => speaker_3d::render(c, ctx),
     VisualizerStyle::SpeakerTrio => speaker_trio::render(c, ctx),
     VisualizerStyle::SpeakerSplatter => speaker_splatter::render(c, ctx),
+    VisualizerStyle::RadialRipple3D => radial_ripple_3d::render(c, ctx),
   }
 }
