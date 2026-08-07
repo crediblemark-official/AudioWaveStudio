@@ -532,12 +532,37 @@ pub fn bind_app_callbacks(
 
         if let Some(path) = file {
             let path_str = path.to_string_lossy().to_string();
+            let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
             let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
             s.config.background.mode = crate::config::BackgroundMode::CustomImage;
             s.config.background.custom_image_uri = Some(path_str);
             if let Some(w) = window_handle.upgrade() {
                 w.set_bg_mode(slint::SharedString::from("Custom Image"));
+                push_toast(
+                    &w,
+                    &mut s,
+                    ToastKind::Success,
+                    format!("Custom background image loaded: {filename}"),
+                );
             }
+        }
+    });
+
+    // BIND CALLBACK: REMOVE CUSTOM BACKGROUND IMAGE
+    let state_clone = state.clone();
+    let window_handle = window.as_weak();
+    window.on_remove_custom_image_clicked(move || {
+        let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+        s.config.background.custom_image_uri = None;
+        s.config.background.mode = crate::config::BackgroundMode::Solid;
+        if let Some(w) = window_handle.upgrade() {
+            w.set_bg_mode(slint::SharedString::from("Solid"));
+            push_toast(
+                &w,
+                &mut s,
+                ToastKind::Info,
+                "Custom background image removed",
+            );
         }
     });
 

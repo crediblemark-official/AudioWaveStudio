@@ -578,6 +578,7 @@ export component ControlPanel inherits Rectangle {
     callback open-radial-image-clicked();
     callback remove-radial-image-clicked();
     callback open-custom-image-clicked();
+    callback remove-custom-image-clicked();
 
     VerticalLayout {
         padding: 10px;
@@ -851,9 +852,21 @@ export component ControlPanel inherits Rectangle {
                     }
 
                     SectionTitle { text: "CUSTOM BACKGROUND IMAGE"; }
-                    Button {
-                        text: "🖼 Choose Custom Background Image";
-                        clicked => { root.open-custom-image-clicked(); }
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Button {
+                            text: "🖼 Select Image File";
+                            clicked => { root.open-custom-image-clicked(); }
+                        }
+                        Button {
+                            text: "🗑 Remove Image";
+                            clicked => { root.remove-custom-image-clicked(); }
+                        }
+                    }
+                    Text {
+                        text: "Select a PNG, JPG, or WEBP image file to use as custom background.";
+                        color: #a3a3a3;
+                        font-size: 11px;
                     }
 
                     SectionTitle { text: "BACKGROUND COLORS"; }
