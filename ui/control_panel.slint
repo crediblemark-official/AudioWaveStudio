@@ -359,12 +359,28 @@ component ColorPickerField inherits Rectangle {
                           : root.hex-val == "#ffffff" ? #ffffff
                           : #000000;
             }
+        }
+
+        // Custom Hex Input Field & Direct Editing
+        HorizontalLayout {
+            spacing: 6px;
 
             Text {
-                text: root.hex-val;
-                color: #ffd700;
+                text: "Hex:";
+                color: #94a3b8;
                 font-size: 11px;
-                font-weight: 700;
+                font-weight: 600;
+                vertical-alignment: center;
+            }
+
+            LineEdit {
+                horizontal-stretch: 1;
+                text: root.hex-val;
+                placeholder-text: "#RRGGBB";
+                edited(val) => {
+                    root.hex-val = val;
+                    root.changed(val);
+                }
             }
         }
 
