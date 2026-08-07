@@ -801,6 +801,10 @@ pub fn bind_app_callbacks(
             s.config.background.show_particles = w.get_show_particles();
             s.config.background.show_music_notes = Some(w.get_show_music_notes());
             s.config.background.show_fireworks = Some(w.get_show_fireworks());
+            s.config.background.show_matrix_rain = Some(w.get_show_matrix_rain());
+            s.config.background.show_fireflies = Some(w.get_show_fireflies());
+            s.config.background.show_sakura = Some(w.get_show_sakura());
+            s.config.background.show_cyber_lightning = Some(w.get_show_cyber_lightning());
 
             s.config.background.grid_size = Some(w.get_grid_size());
             s.config.background.grid_line_width = Some(w.get_grid_line_width());

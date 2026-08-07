@@ -539,6 +539,10 @@ export component ControlPanel inherits Rectangle {
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
     in-out property <bool> show-fireworks: false;
+    in-out property <bool> show-matrix-rain: false;
+    in-out property <bool> show-fireflies: false;
+    in-out property <bool> show-sakura: false;
+    in-out property <bool> show-cyber-lightning: false;
     in-out property <float> grid-size: 40.0;
     in-out property <float> grid-line-width: 1.0;
     in-out property <string> grid-color: "#ffffff";
@@ -1217,6 +1221,30 @@ export component ControlPanel inherits Rectangle {
                         text: "Show Fireworks & Starburst Constellations";
                         checked: root.show-fireworks;
                         toggled => { root.show-fireworks = self.checked; root.config-changed(); }
+                    }
+
+                    CheckBox {
+                        text: "Show Matrix Code Rain";
+                        checked: root.show-matrix-rain;
+                        toggled => { root.show-matrix-rain = self.checked; root.config-changed(); }
+                    }
+
+                    CheckBox {
+                        text: "Show Fireflies & Magic Dust";
+                        checked: root.show-fireflies;
+                        toggled => { root.show-fireflies = self.checked; root.config-changed(); }
+                    }
+
+                    CheckBox {
+                        text: "Show Floating Sakura Petals";
+                        checked: root.show-sakura;
+                        toggled => { root.show-sakura = self.checked; root.config-changed(); }
+                    }
+
+                    CheckBox {
+                        text: "Show Cyber Lightning Arcs";
+                        checked: root.show-cyber-lightning;
+                        toggled => { root.show-cyber-lightning = self.checked; root.config-changed(); }
                     }
                 }
 

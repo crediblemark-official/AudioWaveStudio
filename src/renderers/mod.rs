@@ -555,6 +555,10 @@ pub fn draw_frame_pass(
     let show_p = config.background.show_particles;
     let show_m = config.background.show_music_notes.unwrap_or(false);
     let show_f = config.background.show_fireworks.unwrap_or(false);
+    let show_mr = config.background.show_matrix_rain.unwrap_or(false);
+    let show_ff = config.background.show_fireflies.unwrap_or(false);
+    let show_sk = config.background.show_sakura.unwrap_or(false);
+    let show_cl = config.background.show_cyber_lightning.unwrap_or(false);
 
     if show_p {
       background::render_particles(c, &mut ctx);
@@ -564,6 +568,18 @@ pub fn draw_frame_pass(
     }
     if show_f {
       background::render_fireworks(c, &mut ctx);
+    }
+    if show_mr {
+      background::render_matrix_rain(c, &mut ctx);
+    }
+    if show_ff {
+      background::render_fireflies(c, &mut ctx);
+    }
+    if show_sk {
+      background::render_sakura(c, &mut ctx);
+    }
+    if show_cl {
+      background::render_cyber_lightning(c, &mut ctx);
     }
 
     // Text overlay (title/artist/blocks) — Phase 6 text port.

@@ -691,3 +691,145 @@ pub fn render_fireworks(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   c.restore();
 }
+
+// ---------------------------------------------------------------------------
+// 1. FLOATING MATRIX CODE RAIN EFFECT
+// ---------------------------------------------------------------------------
+pub fn render_matrix_rain(c: &mut GpuCanvas, ctx: &RenderContext) {
+  if ctx.width <= 0.0 || ctx.height <= 0.0 {
+    return;
+  }
+  let t = ctx.frame_time;
+  let be = ctx.bass_energy;
+  let cols = (ctx.width / 24.0) as usize;
+  let col_w = ctx.width / cols.max(1) as f32;
+
+  c.save();
+  for i in 0..cols {
+    let seed = i as f32 * 37.1;
+    let speed = 60.0 + (seed % 40.0) + be * 50.0;
+    let fall_y = (t * speed + seed * 100.0) % (ctx.height + 200.0) - 100.0;
+    let x = i as f32 * col_w + col_w * 0.5;
+
+    let num_chars = 8usize;
+    for j in 0..num_chars {
+      let cy = fall_y - j as f32 * 18.0;
+      if cy < 0.0 || cy > ctx.height {
+        continue;
+      }
+      let alpha = ((num_chars - j) as f32 / num_chars as f32).clamp(0.1, 0.95);
+      let col = if j == 0 {
+        Color::rgba(0.9, 1.0, 0.95, alpha) // Lead white character
+      } else {
+        Color::rgba(0.0, 0.95, 0.4, alpha * 0.8) // Phosphor matrix green
+      };
+      c.set_fill(Fill::Solid(col));
+      if j == 0 {
+        c.set_shadow(Color::rgba(0.0, 1.0, 0.4, 0.8), 8.0);
+      } else {
+        c.set_shadow(Color::TRANSPARENT, 0.0);
+      }
+      c.fill_ellipse(x, cy, 3.5, 6.0);
+    }
+  }
+  c.restore();
+}
+
+// ---------------------------------------------------------------------------
+// 2. FLOATING FIREFLIES & MAGIC DUST EFFECT
+// ---------------------------------------------------------------------------
+pub fn render_fireflies(c: &mut GpuCanvas, ctx: &RenderContext) {
+  if ctx.width <= 0.0 || ctx.height <= 0.0 {
+    return;
+  }
+  let t = ctx.frame_time;
+  let be = ctx.bass_energy;
+  let bs = ctx.beat_strength;
+  let num_fireflies = 36usize;
+
+  c.save();
+  for i in 0..num_fireflies {
+    let seed = i as f32 * 83.7;
+    let speed = 0.12 + (seed % 0.15);
+    let fx = ((seed * 0.2 + t * speed).sin() * 0.45 + 0.5) * ctx.width;
+    let fy = ((seed * 0.3 + t * speed * 0.8).cos() * 0.45 + 0.5) * ctx.height;
+
+    let pulse = 0.4 + (t * 3.0 + seed).sin() * 0.6 + bs * 0.4;
+    let size = (4.0 + (seed % 4.0) + be * 3.0) * pulse.max(0.2);
+    let col = Color::rgba(1.0, 0.85, 0.25, (0.5 + pulse * 0.5).min(0.95));
+
+    c.set_fill(Fill::Solid(col));
+    c.set_shadow(Color::rgba(1.0, 0.75, 0.1, 0.8), 12.0 + be * 8.0);
+    c.fill_ellipse(fx, fy, size, size);
+  }
+  c.restore();
+}
+
+// ---------------------------------------------------------------------------
+// 3. FLOATING SAKURA PETALS EFFECT
+// ---------------------------------------------------------------------------
+pub fn render_sakura(c: &mut GpuCanvas, ctx: &RenderContext) {
+  if ctx.width <= 0.0 || ctx.height <= 0.0 {
+    return;
+  }
+  let t = ctx.frame_time;
+  let be = ctx.bass_energy;
+  let num_petals = 28usize;
+
+  c.save();
+  for i in 0..num_petals {
+    let seed = i as f32 * 53.3;
+    let fall_speed = 35.0 + (seed % 25.0) + be * 30.0;
+    let drift_x = (t * 1.2 + seed).sin() * 40.0;
+
+    let py = (t * fall_speed + seed * 80.0) % (ctx.height + 60.0) - 30.0;
+    let px = (seed * 11.0 + drift_x) % ctx.width;
+
+    let petal_w = 6.0 + (seed % 4.0);
+    let petal_h = 10.0 + (seed % 6.0);
+    let pink_col = Color::rgba(1.0, 0.65, 0.8, 0.75);
+
+    c.set_fill(Fill::Solid(pink_col));
+    c.set_shadow(Color::rgba(1.0, 0.4, 0.7, 0.4), 6.0);
+    c.fill_ellipse(px, py, petal_w, petal_h);
+  }
+  c.restore();
+}
+
+// ---------------------------------------------------------------------------
+// 4. FLOATING CYBER LIGHTNING EFFECT
+// ---------------------------------------------------------------------------
+pub fn render_cyber_lightning(c: &mut GpuCanvas, ctx: &RenderContext) {
+  if ctx.width <= 0.0 || ctx.height <= 0.0 {
+    return;
+  }
+  let t = ctx.frame_time;
+  let bs = ctx.beat_strength;
+  let be = ctx.bass_energy;
+
+  if bs < 0.25 {
+    return;
+  }
+
+  let num_arcs = 4usize;
+  c.save();
+
+  for i in 0..num_arcs {
+    let seed = i as f32 * 97.1 + (t * 10.0).floor() * 13.0;
+    let x1 = ((seed * 0.1).sin() * 0.4 + 0.5) * ctx.width;
+    let y1 = ((seed * 0.2).cos() * 0.4 + 0.5) * ctx.height;
+    let x2 = x1 + (seed * 0.3).sin() * 120.0;
+    let y2 = y1 + (seed * 0.4).cos() * 120.0;
+
+    let mid_x = (x1 + x2) * 0.5 + (seed * 0.7).sin() * 30.0;
+    let mid_y = (y1 + y2) * 0.5 + (seed * 0.9).cos() * 30.0;
+
+    let cyan_col = Color::rgba(0.0, 0.95, 1.0, (0.7 + be * 0.3).min(1.0));
+    c.set_stroke(Fill::Solid(cyan_col));
+    c.set_line_width(2.2 + bs * 2.0);
+    c.set_shadow(cyan_col, 14.0);
+
+    c.stroke_polyline(&[(x1, y1), (mid_x, mid_y), (x2, y2)]);
+  }
+  c.restore();
+}
