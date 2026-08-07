@@ -838,21 +838,28 @@ export component ControlPanel inherits Rectangle {
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
                     }
 
-                    SectionTitle { text: "COLORS"; }
-                    Text { text: "Solid Color (Hex)"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.solid-color;
-                        edited(val) => { root.solid-color = val; root.config-changed(); }
+                    SectionTitle { text: "BACKGROUND COLORS"; }
+
+                    if (root.bg-mode == "Solid") : ColorPickerField {
+                        label: "Solid Color";
+                        hex-val: root.solid-color;
+                        changed(val) => { root.solid-color = val; root.config-changed(); }
                     }
-                    Text { text: "Gradient Start (Hex)"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.gradient-start;
-                        edited(val) => { root.gradient-start = val; root.config-changed(); }
-                    }
-                    Text { text: "Gradient End (Hex)"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.gradient-end;
-                        edited(val) => { root.gradient-end = val; root.config-changed(); }
+
+                    if (root.bg-mode == "Gradient" || root.bg-mode != "Solid") : VerticalLayout {
+                        spacing: 10px;
+
+                        ColorPickerField {
+                            label: "Gradient Start Color";
+                            hex-val: root.gradient-start;
+                            changed(val) => { root.gradient-start = val; root.config-changed(); }
+                        }
+
+                        ColorPickerField {
+                            label: "Gradient End Color";
+                            hex-val: root.gradient-end;
+                            changed(val) => { root.gradient-end = val; root.config-changed(); }
+                        }
                     }
 
                     SliderRow {
