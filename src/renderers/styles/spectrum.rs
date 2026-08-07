@@ -45,6 +45,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   let step = ((ctx.freq_data.len() as f32) / bar_count as f32).floor().max(1.0) as usize;
 
+  if ctx.state.peak_data.len() < bar_count {
+    ctx.state.peak_data.resize(bar_count, 0.0);
+  }
+
   for i in 0..bar_count {
     let val = bin_value(ctx.freq_data, step, i).min(1.0) * sensitivity;
     let bar_height = val * max_bar_height;
