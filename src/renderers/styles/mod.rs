@@ -18,6 +18,7 @@ pub mod cassette_tape;
 pub mod vinyl_record;
 pub mod turntable;
 pub mod retro_radio;
+pub mod dj_controller;
 pub mod speaker_splatter;
 pub mod speaker_trio;
 pub mod spectrum;
@@ -58,5 +59,6 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::VinylRecord => vinyl_record::render(c, ctx),
     VisualizerStyle::Turntable => turntable::render(c, ctx),
     VisualizerStyle::RetroRadio => retro_radio::render(c, ctx),
+    VisualizerStyle::DjController => dj_controller::render(c, ctx),
   }
 }
