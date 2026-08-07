@@ -676,6 +676,7 @@ export component ControlPanel inherits Rectangle {
                         StyleCard { row: 10; col: 1; style-id: "cassetteTape"; label: "Retro Cassette"; icon: "📻"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
                         StyleCard { row: 11; col: 0; style-id: "vinylRecord"; label: "Vinyl Record"; icon: "🛞"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 11; col: 1; style-id: "turntable"; label: "Turntable"; icon: "🎛️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
                     }
 
                     SliderRow {

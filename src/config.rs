@@ -49,6 +49,8 @@ pub enum VisualizerStyle {
   CassetteTape,
   #[serde(rename = "vinylRecord")]
   VinylRecord,
+  #[serde(rename = "turntable")]
+  Turntable,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
