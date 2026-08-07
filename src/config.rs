@@ -47,6 +47,8 @@ pub enum VisualizerStyle {
   Waterfall3D,
   #[serde(rename = "cassetteTape")]
   CassetteTape,
+  #[serde(rename = "vinylRecord")]
+  VinylRecord,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

@@ -15,6 +15,7 @@ pub mod speaker_3d;
 pub mod radial_ripple_3d;
 pub mod waterfall_3d;
 pub mod cassette_tape;
+pub mod vinyl_record;
 pub mod speaker_splatter;
 pub mod speaker_trio;
 pub mod spectrum;
@@ -52,5 +53,6 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::RadialRipple3D => radial_ripple_3d::render(c, ctx),
     VisualizerStyle::Waterfall3D => waterfall_3d::render(c, ctx),
     VisualizerStyle::CassetteTape => cassette_tape::render(c, ctx),
+    VisualizerStyle::VinylRecord => vinyl_record::render(c, ctx),
   }
 }
