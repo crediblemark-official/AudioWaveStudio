@@ -1,12 +1,11 @@
 //! Hologram Stage style renderer (`hologramStage`).
 //!
-//! Recreates the exact 3D Cylindrical Hologram Podium Stage from the reference image:
-//! Dark navy background, stacked glowing neon magenta rings forming a cylindrical podium,
-//! cyan dotted floor boundary ring, bright 3D center text ("TSIXOM"), and exact upside-down floor mirror reflection.
+//! 3D Cylindrical Hologram Podium Stage: dark background, stacked glowing
+//! neon magenta rings forming a 3D cylinder podium, inner holographic light beam,
+//! and outer cyan dashed floor boundary ring.
 
 use std::f32::consts::TAU;
 
-use crate::gpu2d::text::TextAlign;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 use crate::renderers::RenderContext;
 
@@ -21,111 +20,93 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let rot = ctx.rotation_angle;
 
   let center_x = width * 0.5;
-  let center_y = height * 0.55;
+  let base_y = height * 0.62; // Bottom of the cylinder (floor level)
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  // Dark Navy Space Background (Reference Image)
-  c.set_fill(Fill::Solid(Color::rgba(0.04, 0.05, 0.12, 1.0)));
-  c.fill_rect(0.0, 0.0, width, height);
-
   let hot_pink = Color::rgba(1.0, 0.0, 0.65, 0.98);
   let cyan_col = Color::rgba(0.0, 0.85, 1.0, 0.95);
 
-  let tilt_y = 0.36f32; // 3D perspective vertical tilt
-  let base_rx = (width.min(height) * 0.32).clamp(110.0, 360.0);
+  let tilt_y = 0.32f32; // 3D perspective tilt
+  let base_rx = (width.min(height) * 0.28).clamp(100.0, 340.0);
 
   // -------------------------------------------------------------------------
-  // 1. OUTER CYAN DOTTED FLOOR BOUNDARY RING (REFERENCE IMAGE)
+  // 1. OUTER CYAN DASHED FLOOR BOUNDARY RING
   // -------------------------------------------------------------------------
-  let floor_rx = base_rx * 1.25 + (be * 15.0);
+  let floor_rx = base_rx * 1.35 + (be * 12.0);
   let floor_ry = floor_rx * tilt_y;
-  let num_dots = 42;
+  let num_dashes = 36;
 
-  for d in 0..num_dots {
+  for d in 0..num_dashes {
     if d % 2 == 0 {
-      let a1 = -rot * 0.8 + (d as f32 / num_dots as f32) * TAU;
-      let a2 = -rot * 0.8 + ((d as f32 + 0.6) / num_dots as f32) * TAU;
+      let a1 = -rot * 0.8 + (d as f32 / num_dashes as f32) * TAU;
+      let a2 = -rot * 0.8 + ((d as f32 + 0.55) / num_dashes as f32) * TAU;
 
-      let mut pts = Vec::with_capacity(8);
-      for k in 0..8 {
-        let angle = a1 + (k as f32 / 7.0) * (a2 - a1);
-        pts.push((center_x + angle.cos() * floor_rx, center_y + angle.sin() * floor_ry));
+      let mut pts = Vec::with_capacity(10);
+      for k in 0..10 {
+        let angle = a1 + (k as f32 / 9.0) * (a2 - a1);
+        pts.push((center_x + angle.cos() * floor_rx, base_y + angle.sin() * floor_ry));
       }
 
       c.set_stroke(Fill::Solid(cyan_col));
-      c.set_line_width(3.0);
+      c.set_line_width(3.5);
       c.set_shadow(cyan_col, 10.0);
       c.stroke_polyline(&pts);
     }
   }
 
   // -------------------------------------------------------------------------
-  // 2. STACKED GLOWING NEON MAGENTA PODIUM RINGS (EXACT REFERENCE)
+  // 2. INNER HOLOGRAPHIC LIGHT BEAM / GLOW CORE
   // -------------------------------------------------------------------------
-  let num_layers = 5;
-  let layer_h = (height * 0.024).clamp(8.0, 20.0);
+  let cylinder_height = (height * 0.28).clamp(60.0, 200.0);
+  let top_y = base_y - cylinder_height;
+
+  // Solid floor base disc fill
+  c.set_fill(Fill::Solid(Color::rgba(1.0, 0.0, 0.65, 0.15)));
+  c.set_shadow(hot_pink, 20.0 + bs * 10.0);
+  c.fill_ellipse(center_x, base_y, base_rx, base_rx * tilt_y);
+
+  // Vertical hologram beam column
+  let beam_pts = [
+    (center_x - base_rx * 0.7, base_y),
+    (center_x - base_rx * 0.5, top_y),
+    (center_x + base_rx * 0.5, top_y),
+    (center_x + base_rx * 0.7, base_y),
+  ];
+  c.set_fill(Fill::Solid(Color::rgba(1.0, 0.0, 0.65, 0.08)));
+  c.fill_polyline_to_base(&beam_pts, base_y);
+
+  // -------------------------------------------------------------------------
+  // 3. STACKED MAGENTA RINGS FORMING A 3D CYLINDER PODIUM
+  // -------------------------------------------------------------------------
+  let num_layers = 12;
+  let layer_spacing = cylinder_height / (num_layers - 1) as f32;
 
   for l in 0..num_layers {
     let l_ratio = l as f32 / (num_layers - 1) as f32;
-    let ly = center_y - l as f32 * layer_h;
+    let ly = base_y - l as f32 * layer_spacing;
 
     let bin = (l * freq.len() / num_layers).min(freq.len().saturating_sub(1));
     let fv = *freq.get(bin).unwrap_or(&0) as f32 / 255.0;
 
-    let rx = (base_rx * (0.88 - l_ratio * 0.15) + fv * 18.0 * sensitivity).clamp(30.0, width);
+    let rx = base_rx + fv * 14.0 * sensitivity;
     let ry = rx * tilt_y;
 
-    let mut ring_pts = Vec::with_capacity(40);
-    for k in 0..=36 {
-      let a = (k as f32 / 36.0) * TAU;
+    let mut ring_pts = Vec::with_capacity(50);
+    for k in 0..=40 {
+      let a = (k as f32 / 40.0) * TAU;
       ring_pts.push((center_x + a.cos() * rx, ly + a.sin() * ry));
     }
 
-    c.set_stroke(Fill::Solid(hot_pink));
-    c.set_line_width(2.5 + l_ratio * 1.5);
-    c.set_shadow(hot_pink, 14.0 + bs * 8.0);
+    let alpha = 0.55 + (l_ratio - 0.5).abs() * 0.9;
+    let ring_col = hot_pink.with_alpha(alpha.clamp(0.45, 0.98));
+
+    c.set_stroke(Fill::Solid(ring_col));
+    c.set_line_width(2.0 + l_ratio * 1.0);
+    c.set_shadow(hot_pink, 10.0 + bs * 6.0);
     c.stroke_polyline(&ring_pts);
   }
-
-  // -------------------------------------------------------------------------
-  // 3. 3D CENTER TEXT & UPSIDE-DOWN FLOOR REFLECTION ("TSIXOM") (EXACT REFERENCE)
-  // -------------------------------------------------------------------------
-  let top_stage_y = center_y - (num_layers - 1) as f32 * layer_h;
-  let font_sz = (base_rx * 0.24).clamp(20.0, 52.0);
-
-  let text_val = "TSIXOM";
-
-  // Main Bright 3D Magenta Text Standing on Stage
-  c.draw_text(
-    text_val,
-    center_x,
-    top_stage_y - font_sz * 0.65,
-    font_sz,
-    "sans-serif",
-    800.0,
-    false,
-    TextAlign::Center,
-    Fill::Solid(Color::rgba(1.0, 0.25, 0.9, 0.98)),
-    1.0,
-    &Default::default(),
-  );
-
-  // Inverted Mirror Floor Reflection ("TSIXOM" Vertically Mirrored Directly Below Stage)
-  c.draw_text(
-    text_val,
-    center_x,
-    top_stage_y + font_sz * 0.45,
-    font_sz,
-    "sans-serif",
-    800.0,
-    false,
-    TextAlign::Center,
-    Fill::Solid(hot_pink.with_alpha(0.42)),
-    1.0,
-    &Default::default(),
-  );
 
   c.restore();
 }
