@@ -23,6 +23,7 @@ symphonia = { version = "0.5", features = ["mp3", "wav", "flac", "ogg", "isomp4"
 realfft = "3.4"
 image = "0.25"
 wgpu = "23"
+three-d = "0.17"
 bytemuck = { version = "1", features = ["derive"] }
 ab_glyph = "0.2"
 # HarfBuzz shaping for proper Arabic (RTL, joined letter forms).

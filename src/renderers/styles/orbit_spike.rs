@@ -107,10 +107,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     claw_poly.push(base_out);
     claw_poly.push(base_in);
 
-    // Render solid white vector polygon claw
-    c.set_fill(Fill::Solid(Color::WHITE));
-    c.fill_polygon(&claw_poly);
+    // Decompose horn polygon into two convex triangles to prevent concave fan folding
+    let tri1 = [base_in, (tip_x, tip_y), (fin_x, fin_y)];
+    let tri2 = [base_in, (fin_x, fin_y), base_out];
 
+    c.set_fill(Fill::Solid(Color::WHITE));
+    c.fill_polygon(&tri1);
+    c.fill_polygon(&tri2);
+
+    // Stroke crisp white contour outline
     c.set_stroke(Fill::Solid(Color::WHITE));
     c.set_line_width(2.0);
     c.stroke_polyline(&claw_poly);
