@@ -6,6 +6,7 @@
 pub mod background;
 pub mod helpers;
 pub mod screen_effects;
+pub mod three_d_engine;
 mod styles;
 
 // Re-exported so tests can verify slider parity without exposing `styles`.
