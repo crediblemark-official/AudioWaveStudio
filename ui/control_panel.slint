@@ -540,10 +540,12 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> grid-size: 40.0;
     in-out property <float> grid-line-width: 1.0;
     in-out property <string> grid-color: "#ffffff";
+    in-out property <string> particle-style: "Float";
     in-out property <float> particle-size: 4.0;
     in-out property <float> particle-speed: 1.0;
     in-out property <float> particle-count: 60.0;
     in-out property <string> particle-color: "#00f0ff";
+    in-out property <string> music-note-style: "Float";
     in-out property <float> music-note-size: 60.0;
     in-out property <float> music-note-count: 80.0;
     in-out property <float> music-note-sensitivity: 1.0;
@@ -1113,6 +1115,13 @@ export component ControlPanel inherits Rectangle {
                     }
                     if (root.show-particles) : VerticalLayout {
                         spacing: 10px;
+                        Text { text: "Movement Style"; color: #a3a3a3; font-size: 11px; }
+                        ComboBox {
+                            height: 34px;
+                            model: ["Float", "Bounce", "Wave", "Static", "Confined"];
+                            current-value: root.particle-style;
+                            selected(val) => { root.particle-style = val; root.config-changed(); }
+                        }
                         SliderRow {
                             label: "Particle Count";
                             value-text: Math.round(root.particle-count) + "";
@@ -1151,6 +1160,13 @@ export component ControlPanel inherits Rectangle {
                     }
                     if (root.show-music-notes) : VerticalLayout {
                         spacing: 10px;
+                        Text { text: "Movement Style"; color: #a3a3a3; font-size: 11px; }
+                        ComboBox {
+                            height: 34px;
+                            model: ["Float", "Bounce", "Spiral", "Wave", "Burst", "Confined"];
+                            current-value: root.music-note-style;
+                            selected(val) => { root.music-note-style = val; root.config-changed(); }
+                        }
                         SliderRow {
                             label: "Max Note Count";
                             value-text: Math.round(root.music-note-count) + "";

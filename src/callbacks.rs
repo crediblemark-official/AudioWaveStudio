@@ -93,6 +93,25 @@ const ENCODER_PAIRS: &[(&str, &str)] = &[
     ("AV1", "av1"),
 ];
 
+/// (display label, raw serde id) pairs for particle movement style combo.
+const PARTICLE_STYLE_PAIRS: &[(&str, &str)] = &[
+    ("Float", "float"),
+    ("Bounce", "bounce"),
+    ("Wave", "wave"),
+    ("Static", "static"),
+    ("Confined", "confined"),
+];
+
+/// (display label, raw serde id) pairs for music note movement style combo.
+const MUSIC_NOTE_STYLE_PAIRS: &[(&str, &str)] = &[
+    ("Float", "float"),
+    ("Bounce", "bounce"),
+    ("Spiral", "spiral"),
+    ("Wave", "wave"),
+    ("Burst", "burst"),
+    ("Confined", "confined"),
+];
+
 /// Label (ComboBox entry) -> raw serde id. Unknown labels pass through
 /// unchanged so stale values never break the round-trip.
 fn label_to_id(label: &str, pairs: &[(&str, &str)]) -> String {
@@ -784,6 +803,16 @@ pub fn bind_app_callbacks(
             s.config.background.grid_size = Some(w.get_grid_size());
             s.config.background.grid_line_width = Some(w.get_grid_line_width());
             s.config.background.grid_color = Some(w.get_grid_color().to_string());
+
+            let p_style_id = label_to_id(w.get_particle_style().as_str(), PARTICLE_STYLE_PAIRS);
+            if let Ok(st) = serde_json::from_str::<crate::config::ParticleStyle>(&format!("\"{p_style_id}\"")) {
+                s.config.background.particle_style = Some(st);
+            }
+
+            let m_style_id = label_to_id(w.get_music_note_style().as_str(), MUSIC_NOTE_STYLE_PAIRS);
+            if let Ok(st) = serde_json::from_str::<crate::config::MusicNoteStyle>(&format!("\"{m_style_id}\"")) {
+                s.config.background.music_note_style = Some(st);
+            }
 
             s.config.background.particle_size = Some(w.get_particle_size());
             s.config.background.particle_speed = Some(w.get_particle_speed());

@@ -186,10 +186,12 @@ export component AppWindow inherits Window {
     in-out property <float> grid-size: 40.0;
     in-out property <float> grid-line-width: 1.0;
     in-out property <string> grid-color: "#ffffff";
+    in-out property <string> particle-style: "Float";
     in-out property <float> particle-size: 4.0;
     in-out property <float> particle-speed: 1.0;
     in-out property <float> particle-count: 60.0;
     in-out property <string> particle-color: "#00f0ff";
+    in-out property <string> music-note-style: "Float";
     in-out property <float> music-note-size: 60.0;
     in-out property <float> music-note-count: 80.0;
     in-out property <float> music-note-sensitivity: 1.0;
@@ -541,10 +543,12 @@ export component AppWindow inherits Window {
                     grid-size <=> root.grid-size;
                     grid-line-width <=> root.grid-line-width;
                     grid-color <=> root.grid-color;
+                    particle-style <=> root.particle-style;
                     particle-size <=> root.particle-size;
                     particle-speed <=> root.particle-speed;
                     particle-count <=> root.particle-count;
                     particle-color <=> root.particle-color;
+                    music-note-style <=> root.music-note-style;
                     music-note-size <=> root.music-note-size;
                     music-note-count <=> root.music-note-count;
                     music-note-sensitivity <=> root.music-note-sensitivity;
