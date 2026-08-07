@@ -1,12 +1,12 @@
 //! Cyber Ring 3D style renderer (`cyberRing3D`).
 //!
-//! Complete overhaul: 3D HUD Stage Podium
-//! - Perspective floor grid with clean line perspective
-//! - Outer floor ring: Amber radial spectrum ticks
-//! - Base cyan dashed HUD ring (clean 12 dashed arcs)
-//! - Mid magenta dotted HUD ring (30 clean dots)
-//! - Upper magenta wavy spectrum line
-//! - Elevated top pink glowing music disc with black double music note ♫
+//! Full Structural Vector Architecture Rebuild:
+//! - 3D Perspective Grid Floor
+//! - Outer Floor Rim: Amber radial spectrum ticks
+//! - Base HUD Tier: 8 wide cyan thick dashed arcs
+//! - Mid HUD Tier: 32 magenta dotted circular beads
+//! - Upper HUD Tier: Pink wavy audio spectrum ring
+//! - Top Podium Badge: Glossy pink 3D disc with black double music note (♫) symbol
 
 use std::f32::consts::TAU;
 
@@ -25,7 +25,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let rot = ctx.rotation_angle;
 
   let center_x = width * 0.5;
-  let center_y = height * 0.58; // Positioned lower to give 3D perspective height
+  let center_y = height * 0.58;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
@@ -57,7 +57,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   // -------------------------------------------------------------------------
-  // 2. OUTER AMBER RADIAL SPECTRUM TICKS (FLOOR BASE)
+  // 2. OUTER AMBER RADIAL SPECTRUM TICKS (FLOOR RIM)
   // -------------------------------------------------------------------------
   let rx_ticks = base_rx * 1.06;
   let ry_ticks = rx_ticks * tilt_y;
@@ -82,15 +82,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   // -------------------------------------------------------------------------
-  // 3. BASE CYAN DASHED HUD RING (12 CLEAN DASHED ARCS)
+  // 3. BASE CYAN DASHED HUD RING (8 CLEAN DASHED ARCS)
   // -------------------------------------------------------------------------
   let rx_cyan = base_rx * 0.88;
   let ry_cyan = rx_cyan * tilt_y;
-  let dash_count = 12;
+  let dash_count = 8;
 
   for d in 0..dash_count {
     let a1 = rot * 0.8 + (d as f32 / dash_count as f32) * TAU;
-    let a2 = rot * 0.8 + ((d as f32 + 0.5) / dash_count as f32) * TAU;
+    let a2 = rot * 0.8 + ((d as f32 + 0.45) / dash_count as f32) * TAU;
 
     let mut arc_pts = Vec::with_capacity(10);
     for k in 0..10 {
@@ -99,15 +99,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
 
     c.set_stroke(Fill::Solid(cyan_col));
-    c.set_line_width(4.0 + bs * 2.0);
+    c.set_line_width(4.5 + bs * 2.0);
     c.set_shadow(cyan_col, 10.0);
     c.stroke_polyline(&arc_pts);
   }
 
   // -------------------------------------------------------------------------
-  // 4. MID ELEVATED MAGENTA DOTTED HUD RING
+  // 4. MID ELEVATED MAGENTA DOTTED HUD RING (32 DOTS)
   // -------------------------------------------------------------------------
-  let y_mid = center_y - (height * 0.04);
+  let y_mid = center_y - (height * 0.045);
   let rx_dot = base_rx * 0.72;
   let ry_dot = rx_dot * tilt_y;
   let dot_count = 32;
@@ -124,7 +124,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 5. UPPER MAGENTA WAVY SPECTRUM LINE RING
   // -------------------------------------------------------------------------
-  let y_upper = center_y - (height * 0.08);
+  let y_upper = center_y - (height * 0.09);
   let rx_wave = base_rx * 0.60;
   let ry_wave = rx_wave * tilt_y;
 
@@ -146,7 +146,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 6. ELEVATED TOP PINK MUSIC BADGE (PROPORTIONAL 3D BADGE)
   // -------------------------------------------------------------------------
-  let y_badge = center_y - (height * 0.16);
+  let y_badge = center_y - (height * 0.17);
   let badge_r = (base_rx * 0.28 + be * 10.0).clamp(28.0, 95.0);
   let badge_ry = badge_r * 0.65;
 
