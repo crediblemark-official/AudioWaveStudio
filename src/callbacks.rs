@@ -800,6 +800,7 @@ pub fn bind_app_callbacks(
             s.config.background.image_opacity = Some(w.get_image_opacity());
             s.config.background.show_particles = w.get_show_particles();
             s.config.background.show_music_notes = Some(w.get_show_music_notes());
+            s.config.background.show_fireworks = Some(w.get_show_fireworks());
 
             s.config.background.grid_size = Some(w.get_grid_size());
             s.config.background.grid_line_width = Some(w.get_grid_line_width());

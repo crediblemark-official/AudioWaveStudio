@@ -620,3 +620,74 @@ pub fn render_psychedelic(c: &mut GpuCanvas, ctx: &RenderContext) {
     c.stroke_circle(cx, cy, ring_radius);
   }
 }
+
+pub fn render_fireworks(c: &mut GpuCanvas, ctx: &mut RenderContext) {
+  if ctx.width <= 0.0 || ctx.height <= 0.0 {
+    return;
+  }
+
+  let t = ctx.frame_time;
+  let be = ctx.bass_energy;
+  let bs = ctx.beat_strength;
+
+  let num_bursts = 7usize;
+  let sparks_per_burst = 22usize;
+
+  c.save();
+
+  for b in 0..num_bursts {
+    let seed = b as f32 * 137.5;
+    // Periodic burst expansion lifecycle
+    let cycle_period = 2.5 + (seed % 1.5);
+    let local_t = (t + seed * 0.4) % cycle_period;
+    let progress = local_t / cycle_period; // 0.0 to 1.0
+
+    // Position of burst center
+    let cx = ((seed * 0.17 + t * 0.08).sin() * 0.38 + 0.5) * ctx.width;
+    let cy = ((seed * 0.23 + t * 0.06).cos() * 0.35 + 0.45) * ctx.height;
+
+    // Burst radius expands outwards over time and pulses on beat
+    let max_r = 140.0 + (seed % 90.0) + bs * 60.0;
+    let r = progress * max_r;
+    let alpha = (1.0 - progress).powi(2) * (0.6 + be * 0.4);
+
+    if alpha <= 0.05 {
+      continue;
+    }
+
+    // 1. Draw glowing burst center point
+    let core_r = (6.0 + bs * 5.0).clamp(3.0, 14.0);
+    let core_col = Color::rgba(1.0, 0.95, 0.9, alpha);
+    c.set_fill(Fill::Solid(core_col));
+    c.set_shadow(Color::rgba(1.0, 0.7, 0.3, alpha * 0.9), 12.0);
+    c.fill_ellipse(cx, cy, core_r, core_r);
+
+    // 2. Draw radiating spark particles and connecting constellation laser lines
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+
+    for s in 0..sparks_per_burst {
+      let spark_seed = seed + s as f32 * 23.1;
+      let angle = (s as f32 / sparks_per_burst as f32) * std::f32::consts::TAU + (seed * 0.1);
+
+      // Particle distance with slight variance
+      let dist_var = 0.7 + (spark_seed.sin() * 0.3);
+      let px = cx + angle.cos() * (r * dist_var);
+      let py = cy + angle.sin() * (r * dist_var);
+
+      let spark_hue = (seed * 50.0 + s as f32 * 18.0 + t * 30.0) % 360.0;
+      let spark_col = hsl_to_color(spark_hue, 0.9, 0.7, alpha * 0.85);
+
+      // Connecting laser/constellation line
+      c.set_stroke(Fill::Solid(spark_col.with_alpha(alpha * 0.4)));
+      c.set_line_width((1.2 * (1.0 - progress)).max(0.5));
+      c.stroke_line(cx, cy, px, py);
+
+      // Radiating spark particle dot
+      let p_size = (3.5 * (1.0 - progress * 0.5)).clamp(1.5, 6.0);
+      c.set_fill(Fill::Solid(spark_col));
+      c.fill_ellipse(px, py, p_size, p_size);
+    }
+  }
+
+  c.restore();
+}

@@ -538,6 +538,7 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> image-opacity: 1.0;
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
+    in-out property <bool> show-fireworks: false;
     in-out property <float> grid-size: 40.0;
     in-out property <float> grid-line-width: 1.0;
     in-out property <string> grid-color: "#ffffff";
@@ -1210,6 +1211,12 @@ export component ControlPanel inherits Rectangle {
                             hex-val: root.music-note-color;
                             changed(val) => { root.music-note-color = val; root.config-changed(); }
                         }
+                    }
+
+                    CheckBox {
+                        text: "Show Fireworks & Starburst Constellations";
+                        checked: root.show-fireworks;
+                        toggled => { root.show-fireworks = self.checked; root.config-changed(); }
                     }
                 }
 

@@ -262,6 +262,8 @@ pub struct BackgroundSettings {
   #[serde(default)]
   pub show_music_notes: Option<bool>,
   #[serde(default)]
+  pub show_fireworks: Option<bool>,
+  #[serde(default)]
   pub music_note_style: Option<MusicNoteStyle>,
   #[serde(default)]
   pub music_note_color: Option<String>,

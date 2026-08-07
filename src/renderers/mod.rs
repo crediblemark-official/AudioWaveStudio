@@ -554,12 +554,16 @@ pub fn draw_frame_pass(
     // NOT the background effects array.
     let show_p = config.background.show_particles;
     let show_m = config.background.show_music_notes.unwrap_or(false);
+    let show_f = config.background.show_fireworks.unwrap_or(false);
 
     if show_p {
       background::render_particles(c, &mut ctx);
     }
     if show_m {
       background::render_music_notes(c, &mut ctx);
+    }
+    if show_f {
+      background::render_fireworks(c, &mut ctx);
     }
 
     // Text overlay (title/artist/blocks) — Phase 6 text port.
