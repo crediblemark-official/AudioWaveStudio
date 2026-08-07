@@ -18,6 +18,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let width = ctx.width;
   let height = ctx.height;
   let theme = &ctx.config.theme;
+  let sensitivity = ctx.config.reactivity.sensitivity;
   let p = crate::renderers::theme_primary(theme);
   let s = crate::renderers::theme_secondary(theme);
   let glow = crate::renderers::theme_glow(theme);
@@ -47,37 +48,58 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
   }
 
-  // TS: `const rotSpeed = 0.003 + be * 0.01 + bs * 0.02;`
-  let rot_speed = 0.003 + be * 0.01 + bs * 0.02;
-  // TS: `const glowIntensity = 0.5 + be * 1.5;`
-  let glow_intensity = 0.5 + be * 1.5;
+  // Base rotation speed amplified by bass & beat strength
+  let rot_speed = 0.003 + be * 0.015 * sensitivity + bs * 0.025 * sensitivity;
+  let glow_intensity = 0.5 + be * 1.8 * sensitivity;
 
   for gp in st.galaxy.iter_mut() {
-    // TS: `p.angle += p.speed + rotSpeed;`
-    gp.angle += gp.speed + rot_speed;
+    // Sample audio frequency band corresponding to particle radius
+    let bin_idx = ((gp.radius * 0.85) * (ctx.freq_data.len() as f32 - 1.0)) as usize;
+    let freq_val = if bin_idx < ctx.freq_data.len() {
+      (ctx.freq_data[bin_idx] as f32 / 255.0) * sensitivity
+    } else {
+      0.0
+    };
 
-    // TS: `dist = p.radius * maxR; spiralOffset = p.radius * 0.5;
-    //      a = p.angle + p.arm * 2.1 + p.radius * 3;`
-    let dist = gp.radius * max_r;
-    let spiral = gp.radius * 0.5;
+    let audio_pulse = (freq_val * 0.7 + be * 0.8 + bs * 0.5).clamp(0.0, 3.0);
+
+    // Audio-reactive rotation & particle displacement
+    gp.angle += gp.speed + rot_speed * (1.0 + audio_pulse * 1.5);
+
+    // Dynamic distance & spiral arm expansion on audio beats
+    let dist = gp.radius * max_r * (1.0 + audio_pulse * 0.35);
+    let spiral = gp.radius * 0.5 * (1.0 + audio_pulse * 0.5);
     let a = gp.angle + gp.arm as f32 * 2.1 + gp.radius * 3.0;
     let x = cx + a.cos() * (dist + (gp.angle * 3.0 + gp.arm as f32).sin() * spiral);
     let y = cy + a.sin() * (dist + (gp.angle * 3.0 + gp.arm as f32).cos() * spiral);
 
-    let alpha = (0.3 + gp.radius * 0.4) * (0.5 + be * 0.5);
-    let size = gp.size * (1.0 + be * 0.5);
+    // Audio-reactive sizing, alpha & glow
+    let alpha = ((0.3 + gp.radius * 0.4) * (0.6 + audio_pulse * 0.6)).clamp(0.0, 1.0);
+    let size = gp.size * (1.0 + audio_pulse * 1.4);
     let col = mix(p, s, gp.radius);
-    c.set_global_alpha(alpha.clamp(0.0, 1.0));
+
+    c.set_global_alpha(alpha);
     c.set_fill(Fill::Solid(col));
     c.set_shadow(glow, size * 3.0 * glow_intensity);
     c.fill_circle(x, y, size);
   }
 
-  // TS white core: `arc(cx, cy, 2 + be*4)`, alpha `0.8 + be*0.2`.
+  // Pulsing white galactic core + dynamic beat aura
+  let core_radius = 2.5 + be * 8.0 * sensitivity + bs * 5.0;
   c.set_fill(Fill::Solid(Color::WHITE));
   c.set_shadow(glow, 20.0 * glow_intensity);
   c.set_global_alpha((0.8 + be * 0.2).clamp(0.0, 1.0));
-  c.fill_circle(cx, cy, 2.0 + be * 4.0);
+  c.fill_circle(cx, cy, core_radius);
+
+  // Outer audio shockwave ring on strong beats
+  let beat_pulse = (be * 0.6 + bs * 0.4) * sensitivity;
+  if beat_pulse > 0.35 {
+    let ring_radius = core_radius * 2.0 + beat_pulse * 30.0;
+    c.set_stroke(Fill::Solid(glow));
+    c.set_line_width(1.5);
+    c.set_global_alpha((beat_pulse * 0.6).clamp(0.0, 0.7));
+    c.stroke_circle(cx, cy, ring_radius);
+  }
 
   c.set_global_alpha(1.0);
   c.set_shadow(Color::TRANSPARENT, 0.0);
