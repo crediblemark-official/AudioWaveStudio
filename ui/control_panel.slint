@@ -780,6 +780,7 @@ export component ControlPanel inherits Rectangle {
                     spacing: 10px;
                     SectionTitle { text: "COLOR THEME PRESETS"; }
                     ComboBox {
+                        height: 34px;
                         model: ["Cyberpunk", "Synthwave", "Emerald", "Violet", "Gold", "Custom"];
                         current-value: root.theme-name;
                         selected(val) => { root.theme-name = val; root.theme-preset-selected(val); }
@@ -842,6 +843,7 @@ export component ControlPanel inherits Rectangle {
                     spacing: 10px;
                     SectionTitle { text: "BACKGROUND FILL MODE"; }
                     ComboBox {
+                        height: 34px;
                         model: ["Solid", "Gradient", "Custom Image", "Grid", "Aurora", "Noise", "Bokeh", "Starfield", "Nebula", "Psychedelic"];
                         current-value: root.bg-mode;
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
@@ -915,6 +917,7 @@ export component ControlPanel inherits Rectangle {
 
                         Text { text: "Effect Type"; color: #a3a3a3; font-size: 11px; }
                         ComboBox {
+                            height: 34px;
                             model: ["None", "Shake", "Glitch", "Vignette", "Pulse", "Spotlight", "Strobe", "Scanline", "Chromatic Aberration", "Zoom", "Invert", "Bars", "Shockwave", "Pixelate", "Tilt", "Heat Haze", "Hue Shift"];
                             current-value: root.main-effect;
                             selected(val) => { root.main-effect = val; root.config-changed(); }
@@ -1164,6 +1167,7 @@ export component ControlPanel inherits Rectangle {
 
                     SectionTitle { text: "QUICK POSITION PRESET"; }
                     ComboBox {
+                        height: 34px;
                         model: ["Bottom Center", "Top Center", "Center", "Bottom Left", "Left Middle", "Right Middle"];
                         current-value: root.text-preset;
                         selected(val) => {
