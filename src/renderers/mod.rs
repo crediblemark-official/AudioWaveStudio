@@ -538,7 +538,9 @@ pub fn draw_frame_pass(
   if draw_style {
     c.save();
     c.translate(env.shake_x, env.shake_y);
-    c.translate(width / 2.0 + config.position_x, height / 2.0 + config.position_y);
+    let pos_offset_x = config.position_x * width * 0.5;
+    let pos_offset_y = config.position_y * height * 0.5;
+    c.translate(width / 2.0 + pos_offset_x, height / 2.0 + pos_offset_y);
     let sx = config.scale;
     if (sx - 1.0).abs() > 1e-6 {
       c.scale(sx, sx);

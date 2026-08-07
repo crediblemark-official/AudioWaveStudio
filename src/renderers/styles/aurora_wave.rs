@@ -41,18 +41,18 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     AuroraLayer { offset: 4.0, speed: 0.3, freq: 0.002, amp: 0.08, color: accent, alpha: 0.15, y_base: ctx.height * 0.35 },
   ];
 
+  let sensitivity = ctx.config.reactivity.sensitivity;
+
   for layer in &layers {
     let mut points: Vec<(f32, f32)> = Vec::new();
     let mut x = 0.0f32;
     while x <= ctx.width {
-      // TS samples ONE bin: `freqData[freqIdx] || 0` (auroraWave.ts:35). No
-      // window averaging — averaging 5 bins changed every layer's amp.
       let freq_idx = ((x / ctx.width) * ctx.freq_data.len() as f32).floor() as usize;
       let f_val = ctx.freq_data.get(freq_idx).copied().unwrap_or(0) as f32;
 
       let wave = (x * layer.freq + t * layer.speed + layer.offset).sin();
       let wave2 = (x * layer.freq * 2.3 + t * layer.speed * 1.7 + layer.offset + 1.5).sin();
-      let amp = layer.amp * (1.0 + bass_amp * 2.0) * (1.0 + (f_val / 255.0) * 0.5);
+      let amp = layer.amp * (1.0 + bass_amp * 2.0 * sensitivity) * (1.0 + (f_val / 255.0) * 0.5 * sensitivity);
       let y = layer.y_base + wave * amp * ctx.height + wave2 * amp * ctx.height * 0.5;
       points.push((x, y));
       x += 4.0;
