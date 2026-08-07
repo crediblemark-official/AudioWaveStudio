@@ -1,116 +1,88 @@
 //! Orbit Spike style renderer (`orbitSpike`).
 //!
-//! Renders a sleek modern audio orbit ring featuring two sharp opposing arrow/horn spikes
-//! at 180-degree opposite poles that spin continuously, pulse with bass hits,
-//! and modulate along audio frequency spectrum waves.
+//! Recreates the exact black & white minimalist vector visualizer from the reference image:
+//! A pure high-contrast white circular orbit ring with two sharp triangular arrowheads/spikes
+//! attached at 180-degree opposite poles on a pitch black background.
 
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 use crate::renderers::RenderContext;
 
-const RING_POINTS: usize = 120;
+const RING_PTS: usize = 120;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let width = ctx.width;
   let height = ctx.height;
-  let theme = &ctx.config.theme;
-  let p = crate::renderers::theme_primary(theme);
-  let s = crate::renderers::theme_secondary(theme);
 
-  let sensitivity = ctx.config.reactivity.sensitivity;
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
-  let freq = ctx.freq_data;
-  let rot = ctx.rotation_angle * 0.8;
+  let rot = ctx.rotation_angle * 0.9;
 
   let center_x = width * 0.5;
   let center_y = height * 0.5;
 
-  let base_r = (width.min(height) * 0.22).clamp(70.0, 260.0);
-  let orbit_r = base_r + (be * 35.0) + (bs * 15.0);
-
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
+  // Pure High-Contrast Dark Canvas
+  c.set_fill(Fill::Solid(Color::BLACK));
+  c.fill_rect(0.0, 0.0, width, height);
+
+  let base_r = (width.min(height) * 0.23).clamp(80.0, 280.0);
+  let r = base_r + (be * 18.0) + (bs * 8.0);
+  let stroke_w = (base_r * 0.045).clamp(4.0, 12.0);
+
   // -------------------------------------------------------------------------
-  // 1. FREQUENCY-MODULATED CENTRAL ORBIT RING
+  // 1. PURE WHITE CIRCULAR ORBIT RING (EXACT REFERENCE GRAPHIC)
   // -------------------------------------------------------------------------
-  let step = (freq.len() / (RING_POINTS / 2)).max(1);
-  let mut ring_pts = Vec::with_capacity(RING_POINTS + 1);
-
-  for i in 0..=RING_POINTS {
-    let angle = (i as f32 / RING_POINTS as f32) * TAU + rot;
-
-    let bin_i = if i <= RING_POINTS / 2 {
-      (i * step).min(freq.len().saturating_sub(1))
-    } else {
-      ((RING_POINTS - i) * step).min(freq.len().saturating_sub(1))
-    };
-
-    let raw_v = *freq.get(bin_i).unwrap_or(&0) as f32 / 255.0;
-    let wave_mod = raw_v * sensitivity * 24.0;
-
-    let r = orbit_r + wave_mod;
+  let mut ring_pts = Vec::with_capacity(RING_PTS + 1);
+  for i in 0..=RING_PTS {
+    let angle = (i as f32 / RING_PTS as f32) * TAU;
     let px = center_x + angle.cos() * r;
     let py = center_y + angle.sin() * r;
     ring_pts.push((px, py));
   }
 
-  // Outer Glow Shadow
-  c.set_stroke(Fill::Solid(p));
-  c.set_line_width(5.0 + bs * 3.0);
-  c.set_shadow(p.with_alpha(0.85), 18.0 + bs * 8.0);
-  c.stroke_polyline(&ring_pts);
-
-  // Inner Core Bright White Line
   c.set_stroke(Fill::Solid(Color::WHITE));
-  c.set_line_width(3.0);
-  c.set_shadow(Color::TRANSPARENT, 0.0);
+  c.set_line_width(stroke_w);
   c.stroke_polyline(&ring_pts);
 
   // -------------------------------------------------------------------------
-  // 2. TWO OPPOSING SHARP ARROW / HORN SPIKES (180 DEGREES APART)
+  // 2. TWO SHARP TRIANGULAR ARROWHEADS / HORNS (180° OPPOSITE POLES)
   // -------------------------------------------------------------------------
-  let spike_len = (base_r * 0.45 + be * 40.0 + bs * 20.0).clamp(25.0, 160.0);
-  let spike_width = (base_r * 0.16).clamp(12.0, 36.0);
+  // In the reference image: Two sharp triangular arrowheads attached at opposite sides,
+  // tapering smoothly outward from the ring.
+  let spike_length = (base_r * 0.52 + be * 25.0).clamp(35.0, 180.0);
+  let spike_base_w = (base_r * 0.22).clamp(16.0, 60.0);
 
   for &pole in &[0.0f32, std::f32::consts::PI] {
-    let pole_angle = rot + pole;
+    let angle = rot + pole;
+    let tang = angle + std::f32::consts::FRAC_PI_2;
 
-    // Contact point on orbit ring
-    let base_cx = center_x + pole_angle.cos() * orbit_r;
-    let base_cy = center_y + pole_angle.sin() * orbit_r;
+    // Base point on ring
+    let contact_x = center_x + angle.cos() * r;
+    let contact_y = center_y + angle.sin() * r;
 
-    // Tangent angle along circle movement
-    let tangent_angle = pole_angle + std::f32::consts::FRAC_PI_2;
+    // Tip of sharp arrow head
+    let tip_x = contact_x + (angle.cos() * 0.65 + tang.cos() * 0.75) * spike_length;
+    let tip_y = contact_y + (angle.sin() * 0.65 + tang.sin() * 0.75) * spike_length;
 
-    // Sharp pointed tip location
-    let tip_x = base_cx + (pole_angle.cos() * 0.7 + tangent_angle.cos() * 0.7) * spike_len;
-    let tip_y = base_cy + (pole_angle.sin() * 0.7 + tangent_angle.sin() * 0.7) * spike_len;
+    // Two base points on ring boundary
+    let b1_x = contact_x - tang.cos() * (spike_base_w * 0.5);
+    let b1_y = contact_y - tang.sin() * (spike_base_w * 0.5);
 
-    // Base corners of the arrow spike
-    let norm_angle = pole_angle;
-    let b1_x = base_cx - norm_angle.cos() * (spike_width * 0.5);
-    let b1_y = base_cy - norm_angle.sin() * (spike_width * 0.5);
-    let b2_x = base_cx + norm_angle.cos() * (spike_width * 0.5);
-    let b2_y = base_cy + norm_angle.sin() * (spike_width * 0.5);
+    let b2_x = contact_x + angle.cos() * (spike_base_w * 0.4);
+    let b2_y = contact_y + angle.sin() * (spike_base_w * 0.4);
 
-    // Render sharp pointed arrow spike (matching user photo)
+    // Draw solid filled white triangle
+    c.set_fill(Fill::Solid(Color::WHITE));
+    c.fill_polyline_to_base(&[(b1_x, b1_y), (tip_x, tip_y), (b2_x, b2_y)], b1_y);
+
     c.set_stroke(Fill::Solid(Color::WHITE));
-    c.set_line_width(2.5);
-    c.set_shadow(s.with_alpha(0.9), 16.0);
-
+    c.set_line_width(2.0);
     c.stroke_polyline(&[(b1_x, b1_y), (tip_x, tip_y), (b2_x, b2_y), (b1_x, b1_y)]);
   }
-
-  // -------------------------------------------------------------------------
-  // 3. INNER CORE PULSING DOTS & ORBITING PARTICLES
-  // -------------------------------------------------------------------------
-  let core_r = (orbit_r * 0.25 + be * 10.0).clamp(10.0, 60.0);
-  c.set_stroke(Fill::Solid(s.with_alpha(0.6)));
-  c.set_line_width(1.5);
-  c.stroke_circle(center_x, center_y, core_r);
 
   c.restore();
 }
