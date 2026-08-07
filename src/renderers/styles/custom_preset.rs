@@ -1,7 +1,8 @@
 //! Custom Preset JSON style renderer (`customPreset`).
 //!
 //! Scans and renders user-created JSON visualizer presets from `./custom_styles/*.json`.
-//! Allows users to add, edit, and share their own custom visualizer styles without modifying code.
+//! Supports complex multi-layered compositions: radial spectrums, equalizer bars,
+//! glowing neon rings, oscilloscope waveforms, particle bursts, and image asset overlays!
 
 use std::f32::consts::TAU;
 use std::fs;
@@ -41,8 +42,20 @@ pub enum LayerConfig {
     #[serde(default = "default_glow")]
     glow_intensity: f32,
   },
+  GlowingDisc {
+    #[serde(default = "default_inner_ratio")]
+    radius_ratio: f32,
+    #[serde(default = "default_pink")]
+    color: String,
+  },
   WaveformLine {
     #[serde(default = "default_pink")]
+    color: String,
+  },
+  ParticlesBurst {
+    #[serde(default = "default_bar_count")]
+    count: usize,
+    #[serde(default = "default_cyan")]
     color: String,
   },
 }
@@ -97,7 +110,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let center_x = width * 0.5;
   let center_y = height * 0.5;
 
-  // Try to load preset from `./custom_styles/custom_cyber_ring.json` or first `.json` file found
   let custom_dir = Path::new("./custom_styles");
   let mut preset = None;
 
@@ -169,6 +181,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
           c.set_shadow(ring_col, *glow_intensity + bs * 10.0);
           c.stroke_circle(center_x, center_y, ring_r);
         }
+        LayerConfig::GlowingDisc { radius_ratio, color } => {
+          let disc_r = (width.min(height) * radius_ratio).clamp(10.0, 350.0) + (be * 12.0);
+          let disc_col = Color::hex(color);
+
+          c.set_fill(Fill::Solid(disc_col));
+          c.set_shadow(disc_col, 16.0);
+          c.fill_ellipse(center_x, center_y, disc_r, disc_r);
+        }
         LayerConfig::SpectrumBars { bar_count, color } => {
           let num_bars = (*bar_count).clamp(16, 128);
           let bar_w = width / num_bars as f32;
@@ -206,6 +226,24 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
           c.set_line_width(3.0);
           c.set_shadow(wave_col, 12.0);
           c.stroke_polyline(&pts);
+        }
+        LayerConfig::ParticlesBurst { count, color } => {
+          let p_count = (*count).clamp(8, 120);
+          let p_col = Color::hex(color);
+
+          c.set_shadow(p_col, 10.0);
+          for i in 0..p_count {
+            let seed = i as f32 * 71.3;
+            let angle = (seed * 0.3 + rot * 0.5) % TAU;
+            let dist = (width.min(height) * 0.15) + (seed % (height * 0.25)) + (be * 30.0);
+
+            let px = center_x + angle.cos() * dist;
+            let py = center_y + angle.sin() * dist;
+            let pr = (3.0 + (seed % 4.0) + bs * 3.0).clamp(1.5, 10.0);
+
+            c.set_fill(Fill::Solid(p_col));
+            c.fill_ellipse(px, py, pr, pr);
+          }
         }
       }
     }
