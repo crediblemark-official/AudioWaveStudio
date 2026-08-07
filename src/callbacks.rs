@@ -781,6 +781,41 @@ pub fn bind_app_callbacks(
             s.config.background.show_particles = w.get_show_particles();
             s.config.background.show_music_notes = Some(w.get_show_music_notes());
 
+            s.config.background.grid_size = Some(w.get_grid_size());
+            s.config.background.grid_line_width = Some(w.get_grid_line_width());
+            s.config.background.grid_color = Some(w.get_grid_color().to_string());
+
+            s.config.background.particle_size = Some(w.get_particle_size());
+            s.config.background.particle_speed = Some(w.get_particle_speed());
+            s.config.background.particle_count = Some(w.get_particle_count() as u32);
+            s.config.background.particle_color = w.get_particle_color().to_string();
+
+            s.config.background.music_note_size = Some(w.get_music_note_size());
+            s.config.background.music_note_count = Some(w.get_music_note_count() as u32);
+            s.config.background.music_note_sensitivity = Some(w.get_music_note_sensitivity());
+            s.config.background.music_note_color = Some(w.get_music_note_color().to_string());
+
+            s.config.background.star_count = Some(w.get_star_count() as u32);
+            s.config.background.star_speed = Some(w.get_star_speed());
+            s.config.background.star_brightness = Some(w.get_star_brightness());
+
+            s.config.background.nebula_intensity = Some(w.get_nebula_intensity());
+            s.config.background.nebula_speed = Some(w.get_nebula_speed());
+
+            s.config.background.aurora_speed = Some(w.get_aurora_speed());
+            s.config.background.aurora_amplitude = Some(w.get_aurora_amplitude());
+            s.config.background.aurora_opacity = Some(w.get_aurora_opacity());
+
+            s.config.background.grain_opacity = Some(w.get_grain_opacity());
+
+            s.config.background.bokeh_count = Some(w.get_bokeh_count() as u32);
+            s.config.background.bokeh_size = Some(w.get_bokeh_size());
+            s.config.background.bokeh_opacity = Some(w.get_bokeh_opacity());
+
+            s.config.background.psychedelic_speed = Some(w.get_psychedelic_speed());
+            s.config.background.psychedelic_bands = Some(w.get_psychedelic_bands() as u32);
+            s.config.background.psychedelic_line_width = Some(w.get_psychedelic_line_width());
+
             // Screen effects
             let fx_id = label_to_id(w.get_main_effect().as_str(), MAIN_EFFECT_PAIRS);
             if let Ok(fx) = serde_json::from_str::<ScreenEffect>(&format!("\"{fx_id}\"")) {

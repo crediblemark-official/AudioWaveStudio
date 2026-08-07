@@ -537,6 +537,32 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> overlay-opacity: 0.3;
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
+    in-out property <float> grid-size: 40.0;
+    in-out property <float> grid-line-width: 1.0;
+    in-out property <string> grid-color: "#ffffff";
+    in-out property <float> particle-size: 4.0;
+    in-out property <float> particle-speed: 1.0;
+    in-out property <float> particle-count: 60.0;
+    in-out property <string> particle-color: "#00f0ff";
+    in-out property <float> music-note-size: 60.0;
+    in-out property <float> music-note-count: 80.0;
+    in-out property <float> music-note-sensitivity: 1.0;
+    in-out property <string> music-note-color: "#ffe600";
+    in-out property <float> star-count: 160.0;
+    in-out property <float> star-speed: 1.0;
+    in-out property <float> star-brightness: 1.0;
+    in-out property <float> nebula-intensity: 0.6;
+    in-out property <float> nebula-speed: 1.0;
+    in-out property <float> aurora-speed: 1.0;
+    in-out property <float> aurora-amplitude: 50.0;
+    in-out property <float> aurora-opacity: 0.25;
+    in-out property <float> grain-opacity: 0.08;
+    in-out property <float> bokeh-count: 18.0;
+    in-out property <float> bokeh-size: 30.0;
+    in-out property <float> bokeh-opacity: 0.3;
+    in-out property <float> psychedelic-speed: 1.0;
+    in-out property <float> psychedelic-bands: 24.0;
+    in-out property <float> psychedelic-line-width: 4.0;
 
     in-out property <string> main-effect: "None";
     in-out property <bool> effects-enabled: true;
@@ -902,17 +928,258 @@ export component ControlPanel inherits Rectangle {
                         changed(val) => { root.overlay-opacity = val; root.config-changed(); }
                     }
 
-                    SectionTitle { text: "DECORATIONS"; }
+                    // SUB-SLIDERS PER BACKGROUND MODE
+                    if (root.bg-mode == "Grid") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "GRID SETTINGS"; }
+                        SliderRow {
+                            label: "Grid Size";
+                            value-text: Math.round(root.grid-size) + "px";
+                            minimum: 10.0;
+                            maximum: 120.0;
+                            value: root.grid-size;
+                            changed(val) => { root.grid-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Line Width";
+                            value-text: Math.round(root.grid-line-width) + "px";
+                            minimum: 1.0;
+                            maximum: 6.0;
+                            value: root.grid-line-width;
+                            changed(val) => { root.grid-line-width = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Grid Color";
+                            hex-val: root.grid-color;
+                            changed(val) => { root.grid-color = val; root.config-changed(); }
+                        }
+                    }
+
+                    if (root.bg-mode == "Starfield") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "STARFIELD SETTINGS"; }
+                        SliderRow {
+                            label: "Star Count";
+                            value-text: Math.round(root.star-count) + "";
+                            minimum: 30.0;
+                            maximum: 300.0;
+                            value: root.star-count;
+                            changed(val) => { root.star-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Twinkle Speed";
+                            value-text: Math.round(root.star-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.star-speed;
+                            changed(val) => { root.star-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Brightness";
+                            value-text: Math.round(root.star-brightness * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 1.5;
+                            value: root.star-brightness;
+                            changed(val) => { root.star-brightness = val; root.config-changed(); }
+                        }
+                    }
+
+                    if (root.bg-mode == "Nebula") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "NEBULA SETTINGS"; }
+                        SliderRow {
+                            label: "Nebula Intensity";
+                            value-text: Math.round(root.nebula-intensity * 100) + "%";
+                            minimum: 0.1;
+                            maximum: 1.0;
+                            value: root.nebula-intensity;
+                            changed(val) => { root.nebula-intensity = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Animation Speed";
+                            value-text: Math.round(root.nebula-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.nebula-speed;
+                            changed(val) => { root.nebula-speed = val; root.config-changed(); }
+                        }
+                    }
+
+                    if (root.bg-mode == "Aurora") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "AURORA SETTINGS"; }
+                        SliderRow {
+                            label: "Wave Speed";
+                            value-text: Math.round(root.aurora-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.aurora-speed;
+                            changed(val) => { root.aurora-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Wave Height";
+                            value-text: Math.round(root.aurora-amplitude) + "px";
+                            minimum: 10.0;
+                            maximum: 120.0;
+                            value: root.aurora-amplitude;
+                            changed(val) => { root.aurora-amplitude = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Aurora Opacity";
+                            value-text: Math.round(root.aurora-opacity * 100) + "%";
+                            minimum: 0.05;
+                            maximum: 0.6;
+                            value: root.aurora-opacity;
+                            changed(val) => { root.aurora-opacity = val; root.config-changed(); }
+                        }
+                    }
+
+                    if (root.bg-mode == "Noise") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "FILM GRAIN SETTINGS"; }
+                        SliderRow {
+                            label: "Grain Opacity";
+                            value-text: Math.round(root.grain-opacity * 100) + "%";
+                            minimum: 0.01;
+                            maximum: 0.3;
+                            value: root.grain-opacity;
+                            changed(val) => { root.grain-opacity = val; root.config-changed(); }
+                        }
+                    }
+
+                    if (root.bg-mode == "Bokeh") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "BOKEH SETTINGS"; }
+                        SliderRow {
+                            label: "Orb Count";
+                            value-text: Math.round(root.bokeh-count) + "";
+                            minimum: 5.0;
+                            maximum: 40.0;
+                            value: root.bokeh-count;
+                            changed(val) => { root.bokeh-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Orb Size";
+                            value-text: Math.round(root.bokeh-size) + "px";
+                            minimum: 10.0;
+                            maximum: 80.0;
+                            value: root.bokeh-size;
+                            changed(val) => { root.bokeh-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Bokeh Opacity";
+                            value-text: Math.round(root.bokeh-opacity * 100) + "%";
+                            minimum: 0.05;
+                            maximum: 0.6;
+                            value: root.bokeh-opacity;
+                            changed(val) => { root.bokeh-opacity = val; root.config-changed(); }
+                        }
+                    }
+
+                    if (root.bg-mode == "Psychedelic") : VerticalLayout {
+                        spacing: 10px;
+                        SectionTitle { text: "PSYCHEDELIC SETTINGS"; }
+                        SliderRow {
+                            label: "Spiral Speed";
+                            value-text: Math.round(root.psychedelic-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.psychedelic-speed;
+                            changed(val) => { root.psychedelic-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Ring Count";
+                            value-text: Math.round(root.psychedelic-bands) + "";
+                            minimum: 10.0;
+                            maximum: 50.0;
+                            value: root.psychedelic-bands;
+                            changed(val) => { root.psychedelic-bands = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Line Width";
+                            value-text: Math.round(root.psychedelic-line-width) + "px";
+                            minimum: 1.0;
+                            maximum: 12.0;
+                            value: root.psychedelic-line-width;
+                            changed(val) => { root.psychedelic-line-width = val; root.config-changed(); }
+                        }
+                    }
+
+                    SectionTitle { text: "FLOATING DECORATIONS"; }
                     CheckBox {
                         text: "Show Floating Particles";
                         checked: root.show-particles;
                         toggled => { root.show-particles = self.checked; root.config-changed(); }
+                    }
+                    if (root.show-particles) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Particle Count";
+                            value-text: Math.round(root.particle-count) + "";
+                            minimum: 10.0;
+                            maximum: 150.0;
+                            value: root.particle-count;
+                            changed(val) => { root.particle-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Particle Size";
+                            value-text: Math.round(root.particle-size) + "px";
+                            minimum: 1.0;
+                            maximum: 12.0;
+                            value: root.particle-size;
+                            changed(val) => { root.particle-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Reactivity Speed";
+                            value-text: Math.round(root.particle-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.particle-speed;
+                            changed(val) => { root.particle-speed = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Particle Color";
+                            hex-val: root.particle-color;
+                            changed(val) => { root.particle-color = val; root.config-changed(); }
+                        }
                     }
 
                     CheckBox {
                         text: "Show Music Notes";
                         checked: root.show-music-notes;
                         toggled => { root.show-music-notes = self.checked; root.config-changed(); }
+                    }
+                    if (root.show-music-notes) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Max Note Count";
+                            value-text: Math.round(root.music-note-count) + "";
+                            minimum: 10.0;
+                            maximum: 80.0;
+                            value: root.music-note-count;
+                            changed(val) => { root.music-note-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Note Size";
+                            value-text: Math.round(root.music-note-size) + "px";
+                            minimum: 16.0;
+                            maximum: 120.0;
+                            value: root.music-note-size;
+                            changed(val) => { root.music-note-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Beat Sensitivity";
+                            value-text: Math.round(root.music-note-sensitivity * 100) + "%";
+                            minimum: 0.0;
+                            maximum: 2.0;
+                            value: root.music-note-sensitivity;
+                            changed(val) => { root.music-note-sensitivity = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Note Color";
+                            hex-val: root.music-note-color;
+                            changed(val) => { root.music-note-color = val; root.config-changed(); }
+                        }
                     }
                 }
 
