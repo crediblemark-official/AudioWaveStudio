@@ -264,6 +264,95 @@ component SliderRow {
     }
 }
 
+component ColorSwatch inherits Rectangle {
+    in property <string> hex: "#00f0ff";
+    callback clicked(string);
+
+    width: 22px;
+    height: 22px;
+    border-radius: 5px;
+    border-width: ta.has-hover ? 2px : 1px;
+    border-color: ta.has-hover ? #ffffff : #ffffff33;
+
+    background: root.hex == "#00f0ff" ? #00f0ff
+              : root.hex == "#ff007f" ? #ff007f
+              : root.hex == "#ffe600" ? #ffe600
+              : root.hex == "#9333ea" ? #9333ea
+              : root.hex == "#10b981" ? #10b981
+              : root.hex == "#ef4444" ? #ef4444
+              : root.hex == "#f97316" ? #f97316
+              : root.hex == "#3b82f6" ? #3b82f6
+              : #ffffff;
+
+    transform-scale-x: ta.has-hover ? 1.15 : 1.0;
+    transform-scale-y: ta.has-hover ? 1.15 : 1.0;
+    animate transform-scale-x { duration: 100ms; }
+    animate transform-scale-y { duration: 100ms; }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(root.hex); }
+    }
+}
+
+component ColorPickerField {
+    in property <string> label: "";
+    in-out property <string> hex-val: "#00f0ff";
+    callback changed(string);
+
+    VerticalLayout {
+        spacing: 6px;
+
+        HorizontalLayout {
+            spacing: 8px;
+            cross-axis-alignment: center;
+
+            Text {
+                text: root.label;
+                color: #cbd5e1;
+                font-size: 11px;
+                font-weight: 600;
+            }
+
+            Rectangle { horizontal-stretch: 1; }
+
+            Text {
+                text: root.hex-val;
+                color: #ffd700;
+                font-size: 11px;
+                font-weight: 700;
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 6px;
+
+            LineEdit {
+                horizontal-stretch: 1;
+                text: root.hex-val;
+                edited(val) => { root.hex-val = val; root.changed(val); }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 5px;
+            alignment: start;
+
+            ColorSwatch { hex: "#00f0ff"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#ff007f"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#ffe600"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#9333ea"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#10b981"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#ef4444"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#f97316"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#3b82f6"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+            ColorSwatch { hex: "#ffffff"; clicked(c) => { root.hex-val = c; root.changed(c); } }
+        }
+    }
+}
+
 export component ControlPanel inherits Rectangle {
     width: 380px; // legacy .control-panel width
     background: #0a0a0a;
@@ -550,26 +639,30 @@ export component ControlPanel inherits Rectangle {
                         font-size: 11px;
                     }
 
-                    SectionTitle { text: "CUSTOM COLORS (HEX)"; }
-                    Text { text: "Primary Color"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.primary-color;
-                        edited(val) => { root.primary-color = val; root.config-changed(); }
+                    SectionTitle { text: "CUSTOM COLORS & PALETTE"; }
+
+                    ColorPickerField {
+                        label: "Primary Color";
+                        hex-val: root.primary-color;
+                        changed(val) => { root.primary-color = val; root.config-changed(); }
                     }
-                    Text { text: "Secondary Color"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.secondary-color;
-                        edited(val) => { root.secondary-color = val; root.config-changed(); }
+
+                    ColorPickerField {
+                        label: "Secondary Color";
+                        hex-val: root.secondary-color;
+                        changed(val) => { root.secondary-color = val; root.config-changed(); }
                     }
-                    Text { text: "Accent Color"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.accent-color;
-                        edited(val) => { root.accent-color = val; root.config-changed(); }
+
+                    ColorPickerField {
+                        label: "Accent Color";
+                        hex-val: root.accent-color;
+                        changed(val) => { root.accent-color = val; root.config-changed(); }
                     }
-                    Text { text: "Glow Color"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.glow-color;
-                        edited(val) => { root.glow-color = val; root.config-changed(); }
+
+                    ColorPickerField {
+                        label: "Glow Color";
+                        hex-val: root.glow-color;
+                        changed(val) => { root.glow-color = val; root.config-changed(); }
                     }
 
                     SectionTitle { text: "PEAK MARKERS"; }
@@ -580,10 +673,10 @@ export component ControlPanel inherits Rectangle {
                     }
                     if (root.show-peaks) : VerticalLayout {
                         spacing: 10px;
-                        Text { text: "Peak Marker Color (Hex)"; color: #a3a3a3; font-size: 11px; }
-                        LineEdit {
-                            text: root.peak-color;
-                            edited(val) => { root.peak-color = val; root.config-changed(); }
+                        ColorPickerField {
+                            label: "Peak Marker Color";
+                            hex-val: root.peak-color;
+                            changed(val) => { root.peak-color = val; root.config-changed(); }
                         }
                     }
                 }
