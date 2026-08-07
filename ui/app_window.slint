@@ -206,10 +206,18 @@ export component AppWindow inherits Window {
     in-out property <float> hue-shift-intensity: 0.6;
     in-out property <bool> bg-only-effect: true;
 
-    // Text Overlay
+    // Text Overlay & Typography
     in-out property <bool> show-title: true;
     in-out property <bool> show-artist: true;
-    in-out property <float> title-font-size: 32.0;
+    in-out property <string> text-preset: "Bottom Center";
+    in-out property <float> title-pos-x: 50.0;
+    in-out property <float> title-pos-y: 78.0;
+    in-out property <float> title-font-size: 36.0;
+    in-out property <string> title-color: "#ffffff";
+    in-out property <float> artist-pos-x: 50.0;
+    in-out property <float> artist-pos-y: 86.0;
+    in-out property <float> artist-font-size: 20.0;
+    in-out property <string> artist-color: "#a3a3a3";
 
     // Export Settings
     in-out property <string> export-aspect-ratio: "16:9";
@@ -529,6 +537,15 @@ export component AppWindow inherits Window {
                     track-artist <=> root.track-artist;
                     show-title <=> root.show-title;
                     show-artist <=> root.show-artist;
+                    text-preset <=> root.text-preset;
+                    title-pos-x <=> root.title-pos-x;
+                    title-pos-y <=> root.title-pos-y;
+                    title-font-size <=> root.title-font-size;
+                    title-color <=> root.title-color;
+                    artist-pos-x <=> root.artist-pos-x;
+                    artist-pos-y <=> root.artist-pos-y;
+                    artist-font-size <=> root.artist-font-size;
+                    artist-color <=> root.artist-color;
 
                     config-changed => { root.config-changed(); }
                     theme-preset-selected(preset) => { root.theme-preset-selected(preset); }

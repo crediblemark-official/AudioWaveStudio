@@ -563,6 +563,15 @@ export component ControlPanel inherits Rectangle {
     in-out property <string> track-artist: "";
     in-out property <bool> show-title: true;
     in-out property <bool> show-artist: true;
+    in-out property <string> text-preset: "Bottom Center";
+    in-out property <float> title-pos-x: 50.0;
+    in-out property <float> title-pos-y: 78.0;
+    in-out property <float> title-font-size: 36.0;
+    in-out property <string> title-color: "#ffffff";
+    in-out property <float> artist-pos-x: 50.0;
+    in-out property <float> artist-pos-y: 86.0;
+    in-out property <float> artist-font-size: 20.0;
+    in-out property <string> artist-color: "#a3a3a3";
 
     callback config-changed();
     callback theme-preset-selected(string);
@@ -1105,31 +1114,121 @@ export component ControlPanel inherits Rectangle {
                 // TEXT OVERLAY TAB
                 if (root.active-tab == "text") : VerticalLayout {
                     spacing: 10px;
-                    SectionTitle { text: "SONG INFO & TYPOGRAPHY"; }
+                    SectionTitle { text: "SONG METADATA & TYPOGRAPHY"; }
 
-                    Text { text: "Song Title"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.track-title;
-                        edited(val) => { root.track-title = val; root.config-changed(); }
-                    }
-
-                    Text { text: "Artist Name"; color: #a3a3a3; font-size: 11px; }
-                    LineEdit {
-                        text: root.track-artist;
-                        edited(val) => { root.track-artist = val; root.config-changed(); }
-                    }
-
-                    SectionTitle { text: "OVERLAY VISIBILITY"; }
                     CheckBox {
-                        text: "Show Title Overlay";
+                        text: "Display Song Title";
                         checked: root.show-title;
                         toggled => { root.show-title = self.checked; root.config-changed(); }
                     }
 
+                    LineEdit {
+                        text: root.track-title;
+                        placeholder-text: "Song Title";
+                        edited(val) => { root.track-title = val; root.config-changed(); }
+                    }
+
                     CheckBox {
-                        text: "Show Artist Overlay";
+                        text: "Display Artist Name";
                         checked: root.show-artist;
                         toggled => { root.show-artist = self.checked; root.config-changed(); }
+                    }
+
+                    LineEdit {
+                        text: root.track-artist;
+                        placeholder-text: "Artist Name";
+                        edited(val) => { root.track-artist = val; root.config-changed(); }
+                    }
+
+                    SectionTitle { text: "QUICK POSITION PRESET"; }
+                    ComboBox {
+                        model: ["Bottom Center", "Top Center", "Center", "Bottom Left", "Left Middle", "Right Middle"];
+                        current-value: root.text-preset;
+                        selected(val) => {
+                            root.text-preset = val;
+                            if (val == "Bottom Center") {
+                                root.title-pos-x = 50.0; root.title-pos-y = 78.0;
+                                root.artist-pos-x = 50.0; root.artist-pos-y = 86.0;
+                            } else if (val == "Top Center") {
+                                root.title-pos-x = 50.0; root.title-pos-y = 12.0;
+                                root.artist-pos-x = 50.0; root.artist-pos-y = 20.0;
+                            } else if (val == "Center") {
+                                root.title-pos-x = 50.0; root.title-pos-y = 45.0;
+                                root.artist-pos-x = 50.0; root.artist-pos-y = 55.0;
+                            } else if (val == "Bottom Left") {
+                                root.title-pos-x = 8.0; root.title-pos-y = 78.0;
+                                root.artist-pos-x = 8.0; root.artist-pos-y = 86.0;
+                            } else if (val == "Left Middle") {
+                                root.title-pos-x = 8.0; root.title-pos-y = 45.0;
+                                root.artist-pos-x = 8.0; root.artist-pos-y = 55.0;
+                            } else if (val == "Right Middle") {
+                                root.title-pos-x = 92.0; root.title-pos-y = 45.0;
+                                root.artist-pos-x = 92.0; root.artist-pos-y = 55.0;
+                            }
+                            root.config-changed();
+                        }
+                    }
+
+                    SectionTitle { text: "TITLE STYLE & POSITION"; }
+                    SliderRow {
+                        label: "Title Horizontal X";
+                        value-text: Math.round(root.title-pos-x) + "%";
+                        minimum: 0.0;
+                        maximum: 100.0;
+                        value: root.title-pos-x;
+                        changed(val) => { root.title-pos-x = Math.round(val); root.config-changed(); }
+                    }
+                    SliderRow {
+                        label: "Title Vertical Y";
+                        value-text: Math.round(root.title-pos-y) + "%";
+                        minimum: 0.0;
+                        maximum: 100.0;
+                        value: root.title-pos-y;
+                        changed(val) => { root.title-pos-y = Math.round(val); root.config-changed(); }
+                    }
+                    SliderRow {
+                        label: "Title Font Size";
+                        value-text: Math.round(root.title-font-size) + "px";
+                        minimum: 12.0;
+                        maximum: 96.0;
+                        value: root.title-font-size;
+                        changed(val) => { root.title-font-size = Math.round(val); root.config-changed(); }
+                    }
+                    ColorPickerField {
+                        label: "Title Color";
+                        hex-val: root.title-color;
+                        changed(val) => { root.title-color = val; root.config-changed(); }
+                    }
+
+                    SectionTitle { text: "ARTIST STYLE & POSITION"; }
+                    SliderRow {
+                        label: "Artist Horizontal X";
+                        value-text: Math.round(root.artist-pos-x) + "%";
+                        minimum: 0.0;
+                        maximum: 100.0;
+                        value: root.artist-pos-x;
+                        changed(val) => { root.artist-pos-x = Math.round(val); root.config-changed(); }
+                    }
+                    SliderRow {
+                        label: "Artist Vertical Y";
+                        value-text: Math.round(root.artist-pos-y) + "%";
+                        minimum: 0.0;
+                        maximum: 100.0;
+                        value: root.artist-pos-y;
+                        changed(val) => { root.artist-pos-y = Math.round(val); root.config-changed(); }
+                    }
+                    SliderRow {
+                        label: "Artist Font Size";
+                        value-text: Math.round(root.artist-font-size) + "px";
+                        minimum: 10.0;
+                        maximum: 72.0;
+                        value: root.artist-font-size;
+                        changed(val) => { root.artist-font-size = Math.round(val); root.config-changed(); }
+                    }
+                    ColorPickerField {
+                        label: "Artist Color";
+                        hex-val: root.artist-color;
+                        changed(val) => { root.artist-color = val; root.config-changed(); }
                     }
                 }
             }
