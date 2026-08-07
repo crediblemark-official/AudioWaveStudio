@@ -81,7 +81,7 @@ component StyleVisualIcon {
 // Legacy .style-card: 2-column grid card with icon + label, gold-tinted on black.
 // Micro-interactions: subtle scale + gold glow on hover, stronger glow when
 // selected (legacy `box-shadow: 0 0 12px rgba(...,0.2)` + border gold).
-component StyleCard {
+component StyleCard inherits Rectangle {
     in property <string> style-id: "";
     in property <string> label: "";
     in property <string> icon: "";
@@ -89,9 +89,11 @@ component StyleCard {
     in-out property <bool> has-hover: ta.has-hover;
     callback style-clicked(string);
 
+    height: 56px;
+
     ta := TouchArea {
         width: parent.width;
-        height: 56px;
+        height: parent.height;
         mouse-cursor: pointer; // legacy .style-card { cursor: pointer }
         clicked => { root.style-clicked(root.style-id); }
 
@@ -139,16 +141,15 @@ component StyleCard {
 // with a gold active state, denser than the default widget buttons.
 // Micro-interactions: subtle glow + lift on hover; active tab keeps a soft gold
 // glow so the current tab reads at a glance (legacy active underline + tint).
-component TabBtn {
+component TabBtn inherits Rectangle {
     in property <string> label: "";
     in property <bool> active: false;
     callback clicked();
 
-    Rectangle {
-        height: 30px;
-        horizontal-stretch: 1;
-        border-radius: 6px;
-        background: root.active ? #ffd700 : (ta.has-hover ? #ffffff14 : #ffffff06);
+    height: 30px;
+    horizontal-stretch: 1;
+    border-radius: 6px;
+    background: root.active ? #ffd700 : (ta.has-hover ? #ffffff14 : #ffffff06);
 
         transform-scale-x: ta.has-hover && !root.active ? 1.05 : 1.0;
         transform-scale-y: ta.has-hover && !root.active ? 1.05 : 1.0;
@@ -178,7 +179,6 @@ component TabBtn {
         Tooltip {
             Text { text: root.label; font-size: 11px; color: #f8fafc; }
         }
-    }
 }
 
 // Legacy `.section-title`: uppercase, bold, muted, letter-spaced. A single line
