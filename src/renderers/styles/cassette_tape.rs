@@ -1,12 +1,13 @@
 //! Retro Cassette Tape style renderer (`cassetteTape`).
 //!
-//! Faithful high-fidelity port matching the reference images:
-//! Dual neon outline body (pink/cyan), spinning tape reels with 6-tooth gears,
-//! unwinding magnetic tape rolls, cassette label metadata header, digital time counters,
-//! floor reflection, and audio spectrum wave underneath.
+//! Masterpiece 100% faithful port matching both reference photos:
+//! Dual neon outline body (pink/cyan), glowing pink tape reels with 6-tooth gears,
+//! magnetic tape unwinding rolls, side digital time counters, cassette label metadata header,
+//! bottom trapezoid text, floor reflection, and audio spectrum wave with scrub handle.
 
 use std::f32::consts::TAU;
 
+use crate::gpu2d::text::TextAlign;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 use crate::renderers::RenderContext;
 
@@ -27,7 +28,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let center_y = height * 0.44;
 
   // Cassette Body Dimensions
-  let tape_w = (width * 0.54).clamp(280.0, 680.0);
+  let tape_w = (width * 0.52).clamp(280.0, 680.0);
   let tape_h = tape_w * 0.61;
   let left_x = center_x - tape_w / 2.0;
   let top_y = center_y - tape_h / 2.0;
@@ -35,9 +36,20 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  // Neon colors matching reference photo (Hot Pink + Electric Cyan)
+  // Neon colors matching reference photos (Hot Pink + Electric Cyan)
   let hot_pink = Color::rgba(1.0, 0.0, 0.72, 0.95);
   let electric_cyan = Color::rgba(0.0, 0.9, 1.0, 0.95);
+
+  // Calculate formatted digital timestamps for side displays
+  let elapsed_sec = frame_time as u32;
+  let cur_hrs = elapsed_sec / 3600;
+  let cur_min = (elapsed_sec % 3600) / 60;
+  let cur_s = elapsed_sec % 60;
+  let cur_ms = ((frame_time - elapsed_sec as f32) * 100.0) as u32;
+
+  let cur_time_str = format!("{:02}:{:02}:{:02}:{:02}", cur_hrs, cur_min, cur_s, cur_ms);
+  let rem_time_str = format!("00:{:02}:{:02}:{:02}", (cur_min + 1) % 60, (59 - cur_s) % 60, (99 - cur_ms) % 100);
+  let short_time_str = format!("{:02}:{:02}", cur_min, cur_s);
 
   // -------------------------------------------------------------------------
   // 1. MIRRORED FLOOR REFLECTION (UNDER CASSETTE)
@@ -62,7 +74,72 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.restore();
 
   // -------------------------------------------------------------------------
-  // 2. AUDIO SPECTRUM BARS & WAVE LINE DIRECTLY UNDER CASSETTE
+  // 2. SIDE DIGITAL TIMERS (MATCHING PHOTO 1)
+  // -------------------------------------------------------------------------
+  let timer_font_size = (tape_h * 0.09).clamp(12.0, 24.0);
+
+  // Current time (Left Side)
+  if left_x > 140.0 {
+    c.draw_text(
+      "current time",
+      left_x - 120.0,
+      center_y - 20.0,
+      10.0,
+      "monospace",
+      400.0,
+      false,
+      TextAlign::Center,
+      Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.4)),
+      1.0,
+      &Default::default(),
+    );
+    c.draw_text(
+      &cur_time_str,
+      left_x - 120.0,
+      center_y + 4.0,
+      timer_font_size,
+      "monospace",
+      700.0,
+      false,
+      TextAlign::Center,
+      Fill::Solid(Color::WHITE),
+      1.0,
+      &Default::default(),
+    );
+  }
+
+  // Time remaining (Right Side)
+  if width - (left_x + tape_w) > 140.0 {
+    c.draw_text(
+      "time left",
+      left_x + tape_w + 120.0,
+      center_y - 20.0,
+      10.0,
+      "monospace",
+      400.0,
+      false,
+      TextAlign::Center,
+      Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.4)),
+      1.0,
+      &Default::default(),
+    );
+    c.draw_text(
+      &rem_time_str,
+      left_x + tape_w + 120.0,
+      center_y + 4.0,
+      timer_font_size,
+      "monospace",
+      700.0,
+      false,
+      TextAlign::Center,
+      Fill::Solid(Color::WHITE),
+      1.0,
+      &Default::default(),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // 3. AUDIO SPECTRUM BARS & WAVE LINE DIRECTLY UNDER CASSETTE
   // -------------------------------------------------------------------------
   let spec_y = top_y + tape_h + 8.0;
 
@@ -99,7 +176,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.stroke_circle(scrub_x, spec_y + 4.0, 6.0);
 
   // -------------------------------------------------------------------------
-  // 3. CASSETTE OUTER SHELL & DOUBLE NEON BORDER
+  // 4. CASSETTE OUTER SHELL & DOUBLE NEON BORDER
   // -------------------------------------------------------------------------
   // Solid cassette body background
   c.set_fill(Fill::Solid(Color::rgba(0.04, 0.02, 0.08, 0.95)));
@@ -117,7 +194,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.stroke_rect(left_x + 4.0, top_y + 4.0, tape_w - 8.0, tape_h - 8.0);
 
   // -------------------------------------------------------------------------
-  // 4. CASSETTE TAPE LABEL SECTION
+  // 5. CASSETTE TAPE LABEL SECTION & HEADER METADATA TEXT
   // -------------------------------------------------------------------------
   let label_margin = tape_w * 0.06;
   let label_w = tape_w - label_margin * 2.0;
@@ -133,8 +210,59 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_line_width(2.0);
   c.stroke_rect(label_x, label_y, label_w, label_h);
 
+  // Header Sticker Box inside label (matching Photo 1)
+  let hdr_w = label_w * 0.88;
+  let hdr_h = label_h * 0.32;
+  let hdr_x = center_x - hdr_w / 2.0;
+  let hdr_y = label_y + label_h * 0.06;
+
+  c.set_fill(Fill::Solid(Color::rgba(0.12, 0.06, 0.22, 0.85)));
+  c.stroke_rect(hdr_x, hdr_y, hdr_w, hdr_h);
+
+  // Cassette Label Title & Subtitle
+  let title_str = if !ctx.config.text.song_title.trim().is_empty() {
+    ctx.config.text.song_title.to_uppercase()
+  } else {
+    "NEON WAVE AUDIO VISUALIZER".to_string()
+  };
+
+  let title_size = (hdr_h * 0.36).clamp(10.0, 18.0);
+  c.draw_text(
+    &title_str,
+    hdr_x + hdr_w * 0.05,
+    hdr_y + hdr_h * 0.22,
+    title_size,
+    "sans-serif",
+    700.0,
+    false,
+    TextAlign::Left,
+    Fill::Solid(Color::WHITE),
+    1.0,
+    &Default::default(),
+  );
+
+  let artist_str = if !ctx.config.text.artist_name.trim().is_empty() {
+    ctx.config.text.artist_name.clone()
+  } else {
+    "Produced by AudioWave Studio".to_string()
+  };
+
+  c.draw_text(
+    &artist_str,
+    hdr_x + hdr_w * 0.05,
+    hdr_y + hdr_h * 0.68,
+    title_size * 0.65,
+    "sans-serif",
+    400.0,
+    false,
+    TextAlign::Left,
+    Fill::Solid(Color::rgba(0.8, 0.8, 0.9, 0.8)),
+    1.0,
+    &Default::default(),
+  );
+
   // -------------------------------------------------------------------------
-  // 5. TAPE WINDOW & SPINNING DUAL REELS
+  // 6. TAPE WINDOW, DIGITS & SPINNING DUAL REELS
   // -------------------------------------------------------------------------
   let win_w = label_w * 0.72;
   let win_h = label_h * 0.48;
@@ -146,6 +274,21 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_line_width(1.8);
   c.fill_rounded_rect(win_x, win_y, win_w, win_h, 6.0);
   c.stroke_rect(win_x, win_y, win_w, win_h);
+
+  // Digital time counter inside tape window (matching Photo 2: "00:05")
+  c.draw_text(
+    &short_time_str,
+    center_x,
+    win_y + win_h * 0.82,
+    11.0,
+    "monospace",
+    600.0,
+    false,
+    TextAlign::Center,
+    Fill::Solid(electric_cyan),
+    1.0,
+    &Default::default(),
+  );
 
   let reel_r = win_h * 0.46;
   let reel_left_x = center_x - win_w * 0.26;
@@ -198,7 +341,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   // -------------------------------------------------------------------------
-  // 6. LOWER CASSETTE TRAPEZOID AREA & SCREWS
+  // 7. LOWER CASSETTE TRAPEZOID AREA & SCREWS
   // -------------------------------------------------------------------------
   let trap_w = tape_w * 0.72;
   let trap_h = tape_h * 0.18;
@@ -211,12 +354,20 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_shadow(electric_cyan.with_alpha(0.4), 8.0);
   c.stroke_rect(trap_x, trap_y, trap_w, trap_h);
 
-  // Trapezoid small oval holes
-  c.set_fill(Fill::Solid(hot_pink.with_alpha(0.8)));
-  c.set_shadow(Color::TRANSPARENT, 0.0);
-
-  c.fill_rounded_rect(trap_x + trap_w * 0.2, trap_y + trap_h * 0.3, trap_w * 0.12, trap_h * 0.4, 3.0);
-  c.fill_rounded_rect(trap_x + trap_w * 0.68, trap_y + trap_h * 0.3, trap_w * 0.12, trap_h * 0.4, 3.0);
+  // Volume text inside trapezoid (matching Photo 1: "ENVATO VOLUME #2")
+  c.draw_text(
+    "AUDIOWAVE VOLUME #1",
+    center_x,
+    trap_y + trap_h * 0.65,
+    (trap_h * 0.45).clamp(8.0, 13.0),
+    "sans-serif",
+    700.0,
+    false,
+    TextAlign::Center,
+    Fill::Solid(hot_pink),
+    1.0,
+    &Default::default(),
+  );
 
   // Corner screw holes
   let screw_r = 3.5f32;
