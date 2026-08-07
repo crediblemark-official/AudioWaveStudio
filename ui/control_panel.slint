@@ -535,6 +535,7 @@ export component ControlPanel inherits Rectangle {
     in-out property <string> gradient-end: "#06101e";
     in-out property <float> blur-amount: 0.0;
     in-out property <float> overlay-opacity: 0.3;
+    in-out property <float> image-opacity: 1.0;
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
     in-out property <float> grid-size: 40.0;
@@ -871,7 +872,7 @@ export component ControlPanel inherits Rectangle {
                 // BACKGROUND TAB
                 if (root.active-tab == "background") : VerticalLayout {
                     spacing: 10px;
-                    SectionTitle { text: "BACKGROUND FILL MODE"; }
+                    SectionTitle { text: "BACKGROUND FILL & EFFECT STYLE"; }
                     ComboBox {
                         height: 34px;
                         model: ["Solid", "Gradient", "Custom Image", "Grid", "Aurora", "Noise", "Bokeh", "Starfield", "Nebula", "Psychedelic"];
@@ -879,36 +880,30 @@ export component ControlPanel inherits Rectangle {
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
                     }
 
-                    if (root.bg-mode == "Custom Image") : VerticalLayout {
+                    SectionTitle { text: "CUSTOM BACKGROUND IMAGE"; }
+                    HorizontalLayout {
                         spacing: 8px;
-                        SectionTitle { text: "CUSTOM BACKGROUND IMAGE FILE"; }
-                        HorizontalLayout {
-                            spacing: 8px;
-                            Button {
-                                text: "🖼 Select Image File";
-                                clicked => { root.open-custom-image-clicked(); }
-                            }
-                            Button {
-                                text: "🗑 Remove Image";
-                                clicked => { root.remove-custom-image-clicked(); }
-                            }
+                        Button {
+                            text: "🖼 Select Background Image";
+                            clicked => { root.open-custom-image-clicked(); }
                         }
-                        Text {
-                            text: "Select a PNG, JPG, or WEBP image file to use as custom background.";
-                            color: #a3a3a3;
-                            font-size: 11px;
+                        Button {
+                            text: "🗑 Remove Image";
+                            clicked => { root.remove-custom-image-clicked(); }
                         }
+                    }
+                    SliderRow {
+                        label: "Image Opacity";
+                        value-text: Math.round(root.image-opacity * 100) + "%";
+                        minimum: 0.0;
+                        maximum: 1.0;
+                        value: root.image-opacity;
+                        changed(val) => { root.image-opacity = val; root.config-changed(); }
                     }
 
                     SectionTitle { text: "BACKGROUND COLORS"; }
 
-                    if (root.bg-mode == "Solid") : ColorPickerField {
-                        label: "Solid Color";
-                        hex-val: root.solid-color;
-                        changed(val) => { root.solid-color = val; root.config-changed(); }
-                    }
-
-                    if (root.bg-mode == "Gradient" || root.bg-mode != "Solid") : VerticalLayout {
+                    if (root.bg-mode == "Gradient") : VerticalLayout {
                         spacing: 10px;
 
                         ColorPickerField {
@@ -924,8 +919,14 @@ export component ControlPanel inherits Rectangle {
                         }
                     }
 
+                    if (root.bg-mode != "Gradient") : ColorPickerField {
+                        label: "Background Color";
+                        hex-val: root.solid-color;
+                        changed(val) => { root.solid-color = val; root.config-changed(); }
+                    }
+
                     SliderRow {
-                        label: "Overlay Opacity";
+                        label: "Canvas Darkening (Overlay)";
                         value-text: Math.round(root.overlay-opacity * 100) + "%";
                         minimum: 0.0;
                         maximum: 1.0;

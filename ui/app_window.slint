@@ -181,6 +181,7 @@ export component AppWindow inherits Window {
     in-out property <string> gradient-end: "#06101e";
     in-out property <float> blur-amount: 0.0;
     in-out property <float> overlay-opacity: 0.3;
+    in-out property <float> image-opacity: 1.0;
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
     in-out property <float> grid-size: 40.0;
@@ -538,6 +539,7 @@ export component AppWindow inherits Window {
                     gradient-end <=> root.gradient-end;
                     blur-amount <=> root.blur-amount;
                     overlay-opacity <=> root.overlay-opacity;
+                    image-opacity <=> root.image-opacity;
                     show-particles <=> root.show-particles;
                     show-music-notes <=> root.show-music-notes;
                     grid-size <=> root.grid-size;

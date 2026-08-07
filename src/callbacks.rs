@@ -797,6 +797,7 @@ pub fn bind_app_callbacks(
             s.config.background.gradient_start = w.get_gradient_start().to_string();
             s.config.background.gradient_end = w.get_gradient_end().to_string();
             s.config.background.overlay_opacity = w.get_overlay_opacity();
+            s.config.background.image_opacity = Some(w.get_image_opacity());
             s.config.background.show_particles = w.get_show_particles();
             s.config.background.show_music_notes = Some(w.get_show_music_notes());
 
