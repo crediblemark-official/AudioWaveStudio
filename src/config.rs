@@ -61,6 +61,8 @@ pub enum VisualizerStyle {
   OrbitSpike,
   #[serde(rename = "cyberRing3D")]
   CyberRing3D,
+  #[serde(rename = "hologramStage")]
+  HologramStage,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

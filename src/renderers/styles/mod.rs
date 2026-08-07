@@ -22,6 +22,7 @@ pub mod dj_controller;
 pub mod speaker_explosion;
 pub mod orbit_spike;
 pub mod cyber_ring_3d;
+pub mod hologram_stage;
 pub mod speaker_splatter;
 pub mod speaker_trio;
 pub mod spectrum;
@@ -66,5 +67,6 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::SpeakerExplosion => speaker_explosion::render(c, ctx),
     VisualizerStyle::OrbitSpike => orbit_spike::render(c, ctx),
     VisualizerStyle::CyberRing3D => cyber_ring_3d::render(c, ctx),
+    VisualizerStyle::HologramStage => hologram_stage::render(c, ctx),
   }
 }
