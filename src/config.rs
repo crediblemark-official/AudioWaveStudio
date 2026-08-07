@@ -57,8 +57,8 @@ pub enum VisualizerStyle {
   DjController,
   #[serde(rename = "speakerExplosion")]
   SpeakerExplosion,
-  #[serde(rename = "customPreset")]
-  CustomPreset,
+  #[serde(rename = "orbitSpike")]
+  OrbitSpike,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
