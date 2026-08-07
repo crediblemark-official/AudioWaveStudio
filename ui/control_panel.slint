@@ -264,48 +264,6 @@ component SliderRow {
     }
 }
 
-component ColorSwatch inherits Rectangle {
-    in property <string> hex: "#00f0ff";
-    in property <bool> selected: false;
-    callback clicked(string);
-
-    width: 28px;
-    height: 24px;
-    border-radius: 6px;
-    border-width: root.selected ? 2px : (ta.has-hover ? 2px : 1px);
-    border-color: root.selected ? #ffd700 : (ta.has-hover ? #ffffff : #ffffff26);
-    drop-shadow-blur: root.selected ? 6px : 0px;
-    drop-shadow-color: #ffd70088;
-
-    background: root.hex == "#00f0ff" ? #00f0ff
-              : root.hex == "#ff007f" ? #ff007f
-              : root.hex == "#ffe600" ? #ffe600
-              : root.hex == "#9333ea" ? #9333ea
-              : root.hex == "#10b981" ? #10b981
-              : root.hex == "#ef4444" ? #ef4444
-              : root.hex == "#f97316" ? #f97316
-              : root.hex == "#3b82f6" ? #3b82f6
-              : root.hex == "#ec4899" ? #ec4899
-              : root.hex == "#00ff99" ? #00ff99
-              : root.hex == "#7c3aed" ? #7c3aed
-              : root.hex == "#f59e0b" ? #f59e0b
-              : root.hex == "#ff6b6b" ? #ff6b6b
-              : root.hex == "#84cc16" ? #84cc16
-              : root.hex == "#ffffff" ? #ffffff
-              : #000000;
-
-    transform-scale-x: ta.has-hover ? 1.15 : 1.0;
-    transform-scale-y: ta.has-hover ? 1.15 : 1.0;
-    animate transform-scale-x { duration: 100ms; }
-    animate transform-scale-y { duration: 100ms; }
-
-    ta := TouchArea {
-        width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(root.hex); }
-    }
-}
 
 component ColorCanvas2D inherits Rectangle {
     in-out property <string> hex-val: "#ff0000";
@@ -538,31 +496,6 @@ component ColorPickerField inherits Rectangle {
                     root.changed(val);
                 }
             }
-        }
-
-        // 16-Color Visual Swatch Palette Grid (2 rows x 8 columns)
-        GridLayout {
-            spacing: 4px;
-
-            // Row 1
-            ColorSwatch { row: 0; col: 0; hex: "#00f0ff"; selected: root.hex-val == "#00f0ff"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 1; hex: "#ff007f"; selected: root.hex-val == "#ff007f"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 2; hex: "#ffe600"; selected: root.hex-val == "#ffe600"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 3; hex: "#9333ea"; selected: root.hex-val == "#9333ea"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 4; hex: "#10b981"; selected: root.hex-val == "#10b981"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 5; hex: "#ef4444"; selected: root.hex-val == "#ef4444"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 6; hex: "#f97316"; selected: root.hex-val == "#f97316"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 0; col: 7; hex: "#3b82f6"; selected: root.hex-val == "#3b82f6"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-
-            // Row 2
-            ColorSwatch { row: 1; col: 0; hex: "#ec4899"; selected: root.hex-val == "#ec4899"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 1; hex: "#00ff99"; selected: root.hex-val == "#00ff99"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 2; hex: "#7c3aed"; selected: root.hex-val == "#7c3aed"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 3; hex: "#f59e0b"; selected: root.hex-val == "#f59e0b"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 4; hex: "#ff6b6b"; selected: root.hex-val == "#ff6b6b"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 5; hex: "#84cc16"; selected: root.hex-val == "#84cc16"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 6; hex: "#ffffff"; selected: root.hex-val == "#ffffff"; clicked(c) => { root.hex-val = c; root.changed(c); } }
-            ColorSwatch { row: 1; col: 7; hex: "#000000"; selected: root.hex-val == "#000000"; clicked(c) => { root.hex-val = c; root.changed(c); } }
         }
     }
 }
