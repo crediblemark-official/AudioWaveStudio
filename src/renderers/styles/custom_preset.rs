@@ -2,7 +2,8 @@
 //!
 //! Scans and renders user-created JSON visualizer presets from `./custom_styles/*.json`.
 //! Supports complex multi-layered compositions: radial spectrums, equalizer bars,
-//! glowing neon rings, oscilloscope waveforms, particle bursts, and image asset overlays!
+//! glowing neon rings, oscilloscope waveforms, particle bursts, 3D wireframe tunnels,
+//! dual studio speakers, and raw SVG vector code paths (`svg_path`)!
 
 use std::f32::consts::TAU;
 use std::fs;
@@ -58,6 +59,23 @@ pub enum LayerConfig {
     #[serde(default = "default_cyan")]
     color: String,
   },
+  WireframeTunnel {
+    #[serde(default = "default_pink")]
+    color: String,
+  },
+  DualSpeakers {
+    #[serde(default = "default_pink")]
+    color: String,
+  },
+  SvgPath {
+    path_data: String,
+    #[serde(default = "default_cyan")]
+    color: String,
+    #[serde(default = "default_scale")]
+    scale: f32,
+    #[serde(default = "default_motion")]
+    motion: String,
+  },
 }
 
 fn default_bar_count() -> usize {
@@ -77,6 +95,12 @@ fn default_cyan() -> String {
 }
 fn default_glow() -> f32 {
   14.0
+}
+fn default_scale() -> f32 {
+  1.0
+}
+fn default_motion() -> String {
+  "pulse".to_string()
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -133,6 +157,70 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   if let Some(p_data) = preset {
     for layer in &p_data.layers {
       match layer {
+        LayerConfig::SvgPath {
+          path_data,
+          color,
+          scale,
+          motion,
+        } => {
+          let svg_col = Color::hex(color);
+          c.set_stroke(Fill::Solid(svg_col));
+          c.set_line_width(2.5);
+          c.set_shadow(svg_col, 12.0);
+
+          let m_scale = match motion.as_str() {
+            "pulse" | "bounce" => scale * (1.0 + be * 0.2),
+            _ => *scale,
+          };
+          let m_angle = if motion == "spin" { rot } else { 0.0 };
+
+          // Parse SVG path coordinates M x y L x y Z
+          let tokens: Vec<&str> = path_data.split_whitespace().collect();
+          let mut pts: Vec<(f32, f32)> = Vec::new();
+          let mut idx = 0;
+
+          while idx < tokens.len() {
+            let cmd = tokens[idx];
+            if (cmd == "M" || cmd == "L") && idx + 2 < tokens.len() {
+              if let (Ok(px), Ok(py)) = (tokens[idx + 1].parse::<f32>(), tokens[idx + 2].parse::<f32>()) {
+                let sx = (px - 50.0) * m_scale;
+                let sy = (py - 50.0) * m_scale;
+                let rx = sx * m_angle.cos() - sy * m_angle.sin();
+                let ry = sx * m_angle.sin() + sy * m_angle.cos();
+
+                pts.push((center_x + rx, center_y + ry));
+              }
+              idx += 3;
+            } else {
+              idx += 1;
+            }
+          }
+
+          if pts.len() > 1 {
+            c.stroke_polyline(&pts);
+          }
+        }
+        LayerConfig::WireframeTunnel { color } => {
+          let wire_col = Color::hex(color).with_alpha(0.4);
+          c.set_stroke(Fill::Solid(wire_col));
+          c.set_line_width(1.5);
+
+          let num_frames = 12usize;
+          for f in 0..num_frames {
+            let z_t = ((f as f32 / num_frames as f32) + rot * 0.2) % 1.0;
+            let fw = width * (0.15 + z_t * 0.85);
+            let fh = height * (0.15 + z_t * 0.85);
+            let fx = center_x - fw / 2.0;
+            let fy = center_y - fh / 2.0;
+
+            c.stroke_rect(fx, fy, fw, fh);
+          }
+
+          // Corner vanishing lines to center
+          for &(cx_sign, cy_sign) in &[(-1.0f32, -1.0f32), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)] {
+            c.stroke_line(center_x, center_y, center_x + cx_sign * width * 0.5, center_y + cy_sign * height * 0.5);
+          }
+        }
         LayerConfig::SpectrumRadial {
           bar_count,
           inner_ratio,
@@ -243,6 +331,52 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
             c.set_fill(Fill::Solid(p_col));
             c.fill_ellipse(px, py, pr, pr);
+          }
+        }
+        LayerConfig::DualSpeakers { color } => {
+          let spk_col = Color::hex(color);
+          let spk_w = (width * 0.22).clamp(120.0, 320.0);
+          let spk_h = spk_w * 1.35;
+          let spk_y = center_y - spk_h * 0.45;
+
+          let left_spk_x = center_x - spk_w * 1.15;
+          let right_spk_x = center_x + spk_w * 0.15;
+
+          for &sx in &[left_spk_x, right_spk_x] {
+            // Speaker Box Cabinet Body
+            c.set_fill(Fill::Solid(Color::rgba(0.08, 0.07, 0.11, 0.98)));
+            c.set_stroke(Fill::Solid(spk_col.with_alpha(0.85)));
+            c.set_line_width(2.5);
+            c.set_shadow(spk_col.with_alpha(0.6), 18.0);
+            c.fill_rounded_rect(sx, spk_y, spk_w, spk_h, 8.0);
+            c.stroke_rect(sx, spk_y, spk_w, spk_h);
+
+            // Upper Tweeter Circle
+            let tw_cx = sx + spk_w * 0.5;
+            let tw_cy = spk_y + spk_h * 0.25;
+            let tw_r = spk_w * 0.15;
+            c.set_fill(Fill::Solid(Color::rgba(0.03, 0.02, 0.04, 0.98)));
+            c.set_stroke(Fill::Solid(Color::rgba(0.8, 0.8, 0.9, 0.9)));
+            c.set_line_width(1.5);
+            c.fill_ellipse(tw_cx, tw_cy, tw_r, tw_r);
+            c.stroke_circle(tw_cx, tw_cy, tw_r);
+
+            // Main Lower Woofer Cone (Pumping on Bass!)
+            let woo_cx = sx + spk_w * 0.5;
+            let woo_cy = spk_y + spk_h * 0.68;
+            let woo_r = spk_w * (0.34 + be * 0.05);
+
+            c.set_fill(Fill::Solid(Color::rgba(0.02, 0.02, 0.04, 0.98)));
+            c.set_stroke(Fill::Solid(spk_col));
+            c.set_line_width(3.0);
+            c.set_shadow(spk_col, 14.0);
+            c.fill_ellipse(woo_cx, woo_cy, woo_r, woo_r);
+            c.stroke_circle(woo_cx, woo_cy, woo_r);
+
+            // Gold Dust Cap
+            let cap_r = woo_r * 0.35;
+            c.set_fill(Fill::Solid(Color::rgba(1.0, 0.7, 0.2, 0.98)));
+            c.fill_ellipse(woo_cx, woo_cy, cap_r, cap_r);
           }
         }
       }
