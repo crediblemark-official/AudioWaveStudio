@@ -879,22 +879,25 @@ export component ControlPanel inherits Rectangle {
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
                     }
 
-                    SectionTitle { text: "CUSTOM BACKGROUND IMAGE"; }
-                    HorizontalLayout {
+                    if (root.bg-mode == "Custom Image") : VerticalLayout {
                         spacing: 8px;
-                        Button {
-                            text: "🖼 Select Image File";
-                            clicked => { root.open-custom-image-clicked(); }
+                        SectionTitle { text: "CUSTOM BACKGROUND IMAGE FILE"; }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            Button {
+                                text: "🖼 Select Image File";
+                                clicked => { root.open-custom-image-clicked(); }
+                            }
+                            Button {
+                                text: "🗑 Remove Image";
+                                clicked => { root.remove-custom-image-clicked(); }
+                            }
                         }
-                        Button {
-                            text: "🗑 Remove Image";
-                            clicked => { root.remove-custom-image-clicked(); }
+                        Text {
+                            text: "Select a PNG, JPG, or WEBP image file to use as custom background.";
+                            color: #a3a3a3;
+                            font-size: 11px;
                         }
-                    }
-                    Text {
-                        text: "Select a PNG, JPG, or WEBP image file to use as custom background.";
-                        color: #a3a3a3;
-                        font-size: 11px;
                     }
 
                     SectionTitle { text: "BACKGROUND COLORS"; }
