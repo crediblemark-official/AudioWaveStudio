@@ -1,8 +1,9 @@
-//! Cosmic Nebula Particle Cloud 3D style renderer (`nebulaCloud3D`) — Volumetric Space Engine.
+//! Cosmic Nebula Particle Cloud 3D style renderer (`nebulaCloud3D`) — Volumetric Interstellar Gas Engine.
 //!
-//! Masterpiece 3D Cosmic Cloud:
-//! - Glowing 3D central star core surrounded by 120 swirling 3D starlight particle discs.
-//! - Audio-reactive double-helix spiral orbits & bass shockwave compression.
+//! Masterpiece Volumetric Interstellar Cloud:
+//! - Multi-layered translucent cosmic gas puffs that blend into a glowing interstellar cloud.
+//! - 120+ glowing starlight embers & cosmic dust filaments swirling in spiral galaxy arms.
+//! - Audio-reactive stellar core pulses & bass shockwave expansion.
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
@@ -11,7 +12,8 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const NEBULA_PARTICLES: usize = 120;
+const NEBULA_CLOUDS: usize = 48;
+const STAR_EMBERS: usize = 120;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
@@ -30,7 +32,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
-    let _bs = ctx.beat_strength.clamp(0.0, 1.0);
+    let bs = ctx.beat_strength.clamp(0.0, 1.0);
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
@@ -40,78 +42,119 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep cosmic space backdrop
-    c.set_fill(Fill::Solid(Color::hex("#010207")));
+    // Deep pitch-black cosmic space backdrop
+    c.set_fill(Fill::Solid(Color::hex("#010206")));
     c.fill_rect(0.0, 0.0, width, height);
 
-    // Volumetric nebula core glow
-    let nebula_glow = Fill::radial_gradient(
+    // Ambient interstellar cloud glow
+    let amb_nebula = Fill::radial_gradient(
         cx,
         cy,
         0.0,
         cx,
         cy,
-        width * 0.65 * user_scale,
+        width * 0.70 * user_scale,
         &[
-            (0.0, mix(glow_col, Color::rgba(0.0, 0.90, 1.0, 0.35 + be * 0.15), 0.5)),
-            (0.40, mix(p_col, Color::rgba(0.80, 0.10, 0.60, 0.15), 0.5)),
-            (0.80, mix(s_col, Color::rgba(0.20, 0.0, 0.40, 0.05), 0.5)),
+            (0.0, mix(glow_col, Color::rgba(0.0, 0.85, 1.0, 0.35 + be * 0.15), 0.5)),
+            (0.40, mix(p_col, Color::rgba(0.80, 0.10, 0.60, 0.18), 0.5)),
+            (0.75, mix(s_col, Color::rgba(0.20, 0.0, 0.40, 0.06), 0.5)),
             (1.0, Color::TRANSPARENT),
         ],
     );
-    c.set_fill(nebula_glow);
+    c.set_fill(amb_nebula);
     c.fill_rect(0.0, 0.0, width, height);
 
-    // -------------------------------------------------------------------------
-    // 1. CONFIGURE NATIVE 3D SCENE (Scene3D)
-    // -------------------------------------------------------------------------
-    let scene = &mut ctx.scene3d;
-    scene.clear();
-
-    scene.cam_yaw = frame_time * 0.20;
-    scene.cam_pitch = -0.18 + (frame_time * 0.10).sin() * 0.08;
-    scene.cam_zoom = (0.92 - be * 0.04) / user_scale;
-    scene.target_x = pos_offset_x;
-    scene.target_y = pos_offset_y;
-
-    // Central Glowing Star Core
-    let core_r = (24.0 + be * 16.0 * sensitivity) * user_scale;
-    scene.push();
-    scene.add_disc(0.0, 0.0, 0.0, core_r, 32, mix(glow_col, Color::rgba(1.0, 1.0, 1.0, 0.95), 0.7));
-    scene.pop();
-
-    // -------------------------------------------------------------------------
-    // 2. 120 SWIRLING 3D STARLIGHT PARTICLE DISCS IN DOUBLE HELIX ORBITS
-    // -------------------------------------------------------------------------
     let step_f = (freq.len() / bar_count).max(1);
 
-    for p_i in 0..NEBULA_PARTICLES {
-        let p_f = p_i as f32;
-        let bin_k = (p_i * step_f / (NEBULA_PARTICLES / bar_count.max(1)).max(1))
+    // -------------------------------------------------------------------------
+    // 1. VOLUMETRIC INTERSTELLAR GAS PUFFS (SOFT BLENDED NEBULA CLOUDS)
+    // -------------------------------------------------------------------------
+    for g_i in 0..NEBULA_CLOUDS {
+        let g_f = g_i as f32;
+        let bin_k = (g_i * step_f / (NEBULA_CLOUDS / bar_count.max(1)).max(1))
             .min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        // Double-helix orbital radius & angle
-        let orbit_r = (40.0 + p_f * 2.2 + fv * 80.0 * sensitivity + be * 35.0) * user_scale;
-        let angle = p_f * 0.22 + frame_time * (0.30 + (p_i % 3) as f32 * 0.10);
+        let orbit_r = (50.0 + g_f * 4.5 + fv * 90.0 * sensitivity + be * 40.0) * user_scale;
+        let angle = g_f * 0.38 + frame_time * (0.25 + (g_i % 3) as f32 * 0.05);
 
-        let px = angle.cos() * orbit_r;
-        let py = (angle * 2.0 + p_f * 0.5).sin() * (45.0 * user_scale);
-        let pz = angle.sin() * orbit_r;
+        let cloud_x = cx + angle.cos() * orbit_r;
+        let cloud_y = cy + (angle * 1.5 + g_f * 0.4).sin() * (60.0 * user_scale);
 
-        let particle_r = (5.0 + (p_f % 5.0) * 2.0 + fv * 6.0) * user_scale;
+        let cloud_r = (45.0 + (g_i % 4) as f32 * 12.0 + fv * 35.0) * user_scale;
 
-        let particle_col = mix(
-            mix(p_col, glow_col, (p_i % 3) as f32 / 3.0),
-            mix(accent_col, s_col, (p_i % 2) as f32),
-            p_f / NEBULA_PARTICLES as f32,
+        let gas_color = mix(
+            mix(p_col, glow_col, (g_i % 3) as f32 / 3.0),
+            mix(accent_col, s_col, (g_i % 2) as f32),
+            g_f / NEBULA_CLOUDS as f32,
         );
 
-        scene.push();
-        scene.translate(px, py, pz);
-        scene.add_disc(0.0, 0.0, 0.0, particle_r, 16, particle_col);
-        scene.pop();
+        let soft_gas = Fill::radial_gradient(
+            cloud_x,
+            cloud_y,
+            0.0,
+            cloud_x,
+            cloud_y,
+            cloud_r,
+            &[
+                (0.0, Color::rgba(gas_color.r, gas_color.g, gas_color.b, 0.28 + fv * 0.15)),
+                (0.50, Color::rgba(gas_color.r, gas_color.g, gas_color.b, 0.10)),
+                (1.0, Color::TRANSPARENT),
+            ],
+        );
+
+        c.set_fill(soft_gas);
+        c.fill_circle(cloud_x, cloud_y, cloud_r);
     }
+
+    // -------------------------------------------------------------------------
+    // 2. SWIRLING STARLIGHT EMBERS & COSMIC DUST SPARKLES
+    // -------------------------------------------------------------------------
+    for s_i in 0..STAR_EMBERS {
+        let s_f = s_i as f32;
+        let bin_k = (s_i * step_f / (STAR_EMBERS / bar_count.max(1)).max(1))
+            .min(freq.len().saturating_sub(1));
+        let fv = freq[bin_k] as f32 / 255.0;
+
+        let orbit_r = (30.0 + s_f * 2.8 + fv * 80.0 * sensitivity + be * 35.0) * user_scale;
+        let angle = s_f * 0.24 + frame_time * 0.35;
+
+        let star_x = cx + angle.cos() * orbit_r;
+        let star_y = cy + (angle * 2.0 + s_f * 0.5).sin() * (50.0 * user_scale);
+
+        let star_r = (1.8 + (s_i % 3) as f32 * 1.2 + fv * 2.5) * user_scale;
+
+        let star_color = mix(
+            Color::rgba(1.0, 1.0, 1.0, 0.95),
+            glow_col,
+            (s_i % 3) as f32 / 3.0,
+        );
+
+        c.set_fill(Fill::Solid(star_color));
+        c.set_shadow(star_color, (6.0 + fv * 8.0) * user_scale);
+        c.fill_circle(star_x, star_y, star_r);
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. INTENSE GLOWING STELLAR CORE AT NEBULA CENTER
+    // -------------------------------------------------------------------------
+    let core_r = (30.0 + be * 20.0 * sensitivity + bs * 10.0) * user_scale;
+    let core_glow = Fill::radial_gradient(
+        cx,
+        cy,
+        0.0,
+        cx,
+        cy,
+        core_r * 2.5,
+        &[
+            (0.0, Color::rgba(1.0, 1.0, 1.0, 0.98)),
+            (0.30, mix(glow_col, Color::rgba(0.0, 0.95, 1.0, 0.85), 0.6)),
+            (0.70, mix(p_col, Color::rgba(0.90, 0.10, 0.70, 0.35), 0.5)),
+            (1.0, Color::TRANSPARENT),
+        ],
+    );
+    c.set_fill(core_glow);
+    c.fill_circle(cx, cy, core_r * 2.5);
 
     c.set_global_alpha(1.0);
     c.restore();
