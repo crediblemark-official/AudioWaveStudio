@@ -11,7 +11,6 @@ use std::f32::consts::TAU;
 
 use crate::gpu2d::text::TextAlign;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
 use crate::renderers::{
   theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -27,12 +26,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let glow = theme_glow(theme);
 
   // Settings integration
-  let sensitivity = ctx.config.reactivity.sensitivity;
-  let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+  let _sensitivity = ctx.config.reactivity.sensitivity;
+  let _bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
   let be = ctx.bass_energy;
-  let bs = ctx.beat_strength;
-  let freq = ctx.freq_data;
+  let _bs = ctx.beat_strength;
+  let _freq = ctx.freq_data;
   let frame_time = ctx.frame_time;
   let rot = ctx.rotation_angle;
 
@@ -479,30 +478,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.fill_circle(pin_left_x, head_y + 2.0, 4.0);
   c.fill_circle(pin_right_x, head_y + 2.0, 4.0);
 
-  // -------------------------------------------------------------------------
-  // 8. AUDIO SPECTRUM EQUALIZER BARS (INTEGRATED ON LABEL FOOTER)
-  // -------------------------------------------------------------------------
-  let spec_y = label_y + label_h - 6.0;
-  let spec_w = label_w * 0.90;
-  let spec_x = center_x - spec_w / 2.0;
-
-  let step_f = (freq.len() / bar_count).max(1);
-  let bar_w = (spec_w / bar_count as f32) - 1.2;
-
-  for i in 0..bar_count {
-    let k = (i * step_f).min(freq.len().saturating_sub(1));
-    let raw_v = freq[k] as f32 / 255.0;
-    let val = (raw_v * sensitivity).clamp(0.0, 1.4);
-
-    let bh = (val * (label_h * 0.22) + 2.0).clamp(2.0, label_h * 0.30);
-    let bx = spec_x + i as f32 * (bar_w + 1.2);
-
-    let bar_col = mix(p, s, i as f32 / bar_count as f32);
-
-    c.set_fill(Fill::Solid(bar_col.with_alpha(0.85)));
-    c.set_shadow(glow, 6.0 + bs * 6.0);
-    c.fill_rounded_rect(bx, spec_y - bh, bar_w.max(1.5), bh, 1.5);
-  }
 
   // -------------------------------------------------------------------------
   // 9. METALLIC CORNER CROSS SCREWS (4 CORNERS)

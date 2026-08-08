@@ -4,8 +4,8 @@
 //! - Full 3D retained geometry scene built using `ctx.scene3d`.
 //! - Large-scale 3D cassette deck chassis with glowing neon housing & translucent glass cassette window.
 //! - Dual 3D spinning spool wheels with 6 spokes each rotating dynamically with tape speed.
-//! - 32-bar audio spectrum LED grid + dual 3D analog VU meter boxes with glowing neon deflection needles.
-//! - Receding 3D synthwave grid floor in the background.
+//! - Magnetic tape ribbon connecting left & right tape spools (NO unrealistic spectrum bars inside window!).
+//! - Dual 3D analog VU meter boxes with glowing neon deflection needles.
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use std::f32::consts::TAU;
@@ -17,7 +17,6 @@ use crate::renderers::{
 };
 
 const SPOOK_COUNT: usize = 6;
-const DECK_SPECTRUM_BARS: usize = 32;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
@@ -25,7 +24,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let theme = &ctx.config.theme;
 
     let p_col = theme_primary(theme);
-    let s_col = theme_secondary(theme);
+    let _s_col = theme_secondary(theme);
     let accent_col = theme_accent(theme);
     let glow_col = theme_glow(theme);
 
@@ -33,7 +32,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let user_scale = ctx.config.scale.clamp(0.1, 5.0);
     let pos_offset_x = ctx.config.position_x * width * 0.5;
     let pos_offset_y = -ctx.config.position_y * height * 0.5;
-    let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+    let _bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let _bs = ctx.beat_strength.clamp(0.0, 1.0);
@@ -146,72 +145,46 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         scene.pop();
     }
 
-    // D. Tape Magnetic Ribbon Connecting Spools
+    // D. Magnetic Tape Ribbon & Tape Head Mechanism inside Window
     let tape_w = 230.0 * user_scale;
     scene.push();
-    scene.translate(0.0, spool_y, spool_z + 2.0 * user_scale);
-    scene.add_box(0.0, 0.0, 0.0, tape_w, 12.0 * user_scale, 3.0 * user_scale, Color::hex("#4a2b10"));
+    scene.translate(0.0, spool_y - 20.0 * user_scale, spool_z + 2.0 * user_scale);
+    scene.add_box(0.0, 0.0, 0.0, tape_w, 14.0 * user_scale, 3.0 * user_scale, Color::hex("#3d220e"));
     scene.pop();
 
-    // E. 32-BAR AUDIO SPECTRUM LED DISPLAY ACROSS BOTTOM CHASSIS
-    let step_f = (freq.len() / bar_count).max(1);
-    let bar_w = (deck_w * 0.75) / DECK_SPECTRUM_BARS as f32;
-    let b_start_x = - (DECK_SPECTRUM_BARS as f32 * bar_w) * 0.5;
-    let b_base_y = -95.0 * user_scale;
-
-    for b in 0..DECK_SPECTRUM_BARS {
-        let b_f = b as f32;
-        let bx = b_start_x + b_f * bar_w + bar_w * 0.5;
-
-        let bin_k = (b * step_f / (DECK_SPECTRUM_BARS / bar_count.max(1)).max(1))
-            .min(freq.len().saturating_sub(1));
-        let fv = freq[bin_k] as f32 / 255.0;
-
-        let led_h = (10.0 + fv * 60.0 * sensitivity + be * 15.0).clamp(6.0, 80.0) * user_scale;
-        let led_col = mix(
-            mix(p_col, glow_col, fv),
-            mix(accent_col, s_col, b_f / DECK_SPECTRUM_BARS as f32),
-            fv,
-        );
-
-        scene.push();
-        scene.translate(bx, b_base_y + led_h * 0.5, win_z + 6.0 * user_scale);
-        scene.add_box(0.0, 0.0, 0.0, bar_w * 0.78, led_h, 4.0 * user_scale, led_col);
-        scene.pop();
-    }
-
-    // F. Dual 3D Analog VU Meter Boxes at Bottom Corners
+    // E. Dual 3D Analog VU Meter Boxes at Bottom Corners
+    let step_f = (freq.len() / 32).max(1);
     let fv_l = freq[step_f % freq.len()] as f32 / 255.0;
     let fv_r = freq[(step_f * 4) % freq.len()] as f32 / 255.0;
 
     let vu_w = 110.0 * user_scale;
     let vu_h = 50.0 * user_scale;
-    let vu_y = -105.0 * user_scale;
+    let vu_y = -95.0 * user_scale;
 
     // Left VU Box
     scene.push();
-    scene.translate(-200.0 * user_scale, vu_y, 22.0 * user_scale);
+    scene.translate(-180.0 * user_scale, vu_y, 22.0 * user_scale);
     scene.add_box(0.0, 0.0, 0.0, vu_w, vu_h, 6.0 * user_scale, Color::hex("#1a0f2e"));
     scene.pop();
 
     // Left VU Deflection Needle
     let n_ang_l = -0.5 + fv_l * 1.0 * sensitivity + be * 0.2;
     scene.push();
-    scene.translate(-200.0 * user_scale, vu_y, 26.0 * user_scale);
+    scene.translate(-180.0 * user_scale, vu_y, 26.0 * user_scale);
     scene.rotate_z(n_ang_l);
     scene.add_box(0.0, 15.0 * user_scale, 0.0, 3.0 * user_scale, 30.0 * user_scale, 3.0 * user_scale, mix(glow_col, Color::hex("#ff0055"), fv_l));
     scene.pop();
 
     // Right VU Box
     scene.push();
-    scene.translate(200.0 * user_scale, vu_y, 22.0 * user_scale);
+    scene.translate(180.0 * user_scale, vu_y, 22.0 * user_scale);
     scene.add_box(0.0, 0.0, 0.0, vu_w, vu_h, 6.0 * user_scale, Color::hex("#1a0f2e"));
     scene.pop();
 
     // Right VU Deflection Needle
     let n_ang_r = -0.5 + fv_r * 1.0 * sensitivity + be * 0.2;
     scene.push();
-    scene.translate(200.0 * user_scale, vu_y, 26.0 * user_scale);
+    scene.translate(180.0 * user_scale, vu_y, 26.0 * user_scale);
     scene.rotate_z(n_ang_r);
     scene.add_box(0.0, 15.0 * user_scale, 0.0, 3.0 * user_scale, 30.0 * user_scale, 3.0 * user_scale, mix(glow_col, Color::hex("#00ffbb"), fv_r));
     scene.pop();
