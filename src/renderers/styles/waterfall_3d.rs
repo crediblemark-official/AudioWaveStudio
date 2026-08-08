@@ -1,16 +1,14 @@
-//! 3D Audio Waterfall style renderer (`waterfall3D`) — 3D Cyber Waterfall Ring Engine.
+//! 3D Audio Waterfall style renderer (`waterfall3D`) — Cascading Spectrum Waterfall Engine.
 //!
-//! Masterpiece 100% faithful reference match:
-//! Renders a 3D cylindrical equalizer block matrix surrounded by a central cyan neon ring.
+//! Renders a genuine audio FFT waterfall: the current spectrum frame pours in at
+//! the front and cascades upward in a receding column of history rows that fade
+//! and compress toward the horizon like flowing water.
 //! Features:
-//! - Dual concentric 3D equalizer rings (outer orange/amber ring & inner cyan/teal ring)
-//! - Extruded 3D cuboid pillars extending upwards (+Y) and downwards (-Y) from the center plane
-//! - Bright glowing top & bottom cap highlights (cyan and orange neon)
-//! - Center cyan 3D glowing neon ring encircling the 3D block cylinder
-//! - Glossy floor reflection & dark atmospheric backdrop
-//! - 3D camera pitching & yawing with full UI settings integration (Scale, Position X & Y, Sensitivity, Bass Boost, Bar Count).
-
-use std::f32::consts::TAU;
+//! - Rolling spectrum history maintained in `frame_history`
+//! - Perspective-compressed cascade rows (front bright & tall, rear dim & short)
+//! - Bass-reactive surge front wall & oscillating "surface" glint lines
+//! - Falling droplet motes shimmering along the cascade face
+//! - Full UI settings integration (Scale, Position X & Y, Sensitivity, Bass Boost, Bar Count).
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 use crate::renderers::helpers::mix;
@@ -18,168 +16,161 @@ use crate::renderers::{
   theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
+const WATERFALL_ROWS: usize = 40;
+const WATERFALL_COLS: usize = 64;
+
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let width = ctx.width;
   let height = ctx.height;
   let theme = &ctx.config.theme;
 
   let p = theme_primary(theme);
-  let _s = theme_secondary(theme);
-  let _accent = theme_accent(theme);
+  let s = theme_secondary(theme);
+  let accent = theme_accent(theme);
   let glow = theme_glow(theme);
 
   // Settings integration
   let sensitivity = ctx.config.reactivity.sensitivity;
-  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
-  let pos_offset_x = ctx.config.position_x * width * 0.5;
-  let pos_offset_y = -ctx.config.position_y * height * 0.5;
   let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
   let freq = ctx.freq_data;
   let frame_time = ctx.frame_time;
-  let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5 + pos_offset_x;
-  let center_y = height * 0.50 - pos_offset_y;
+  let st = &mut ctx.state.advanced;
 
-  let base_r = ((width.min(height) * 0.25).clamp(80.0, 300.0) * user_scale).clamp(45.0, width * 0.42);
+  // Rolling spectrum history (newest frame first).
+  if st.frame_history.first().map(|f| f.len()) != Some(freq.len()) {
+    st.frame_history.clear();
+  }
+  st.frame_history.insert(0, freq.to_vec());
+  if st.frame_history.len() > WATERFALL_ROWS {
+    st.frame_history.pop();
+  }
+
+  let cx = width * 0.5;
+  let front_y = height * 0.82;
+  let horizon_y = height * 0.18;
+  let rows_avail = st.frame_history.len().min(WATERFALL_ROWS);
+
+  let surf_r = (width * 0.28).clamp(140.0, 520.0);
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  // -------------------------------------------------------------------------
-  // 1. DEEP ATMOSPHERIC BACKDROP & NEON RADIANCE
-  // -------------------------------------------------------------------------
-  let bg_haze = Fill::radial_gradient(
-    center_x,
-    center_y,
+  // Deep watery backdrop
+  let bg = Fill::linear_gradient(
     0.0,
-    center_x,
-    center_y,
-    base_r * 2.2,
+    0.0,
+    0.0,
+    height,
     &[
-      (0.0, glow.with_alpha(0.24 + be * 0.16)),
-      (0.40, p.with_alpha(0.12)),
-      (0.75, Color::rgba(0.04, 0.02, 0.08, 0.06)),
+      (0.0, Color::rgba(0.01, 0.03, 0.06, 1.0)),
+      (0.55, Color::rgba(0.02, 0.05, 0.10, 1.0)),
+      (1.0, Color::rgba(0.01, 0.03, 0.05, 1.0)),
+    ],
+  );
+  c.set_fill(bg);
+  c.fill_rect(0.0, 0.0, width, height);
+
+  // Ambient glow rising from the cascade mouth
+  let glow_fill = Fill::radial_gradient(
+    cx,
+    front_y,
+    0.0,
+    cx,
+    front_y,
+    surf_r,
+    &[
+      (0.0, glow.with_alpha(0.22 + be * 0.18)),
+      (0.45, accent.with_alpha(0.10)),
       (1.0, Color::TRANSPARENT),
     ],
   );
-  c.set_fill(bg_haze);
+  c.set_fill(glow_fill);
   c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
-  // 2. CAMERA CONFIGURATION FOR NATIVE 3D SCENE (Scene3D)
+  // 1. CASCADING SPECTRUM WATERFALL ROWS
   // -------------------------------------------------------------------------
-  let scene = &mut ctx.scene3d;
-  scene.cam_yaw = (rot * 0.05).sin() * (0.12 + be * 0.06);
-  scene.cam_pitch = -0.42 - (frame_time * 0.02).sin() * 0.03 - be * 0.04;
-  scene.cam_zoom = (1.08 - be * 0.05) / user_scale;
-  scene.target_x = pos_offset_x;
-  scene.target_y = pos_offset_y;
+  let step_f = (freq.len() / bar_count).max(1);
+  let row_max_h = height * 0.36 * sensitivity;
+  let row_gap = (front_y - horizon_y) / (WATERFALL_ROWS as f32 * 1.6);
 
-  let world_cy = height * 0.5 - center_y;
-  let max_h = height * 0.32 * sensitivity;
+  let band_w = width / (WATERFALL_COLS as f32 + 2.0);
+  let burst = be * (0.18 + bs * 0.22);
 
-  let cyan_neon = Color::hex("#00f0ff");
-  let orange_neon = Color::hex("#ff7700");
+  for r in 0..rows_avail {
+    let f = r as f32;
+    let t = f / (WATERFALL_ROWS as f32).max(1.0); // 0 front … 1 back
+    let fade = 1.0 - t * 0.86;
+    let persp = 1.0 - t * 0.55; // rows compress toward horizon
+    let row_center_y = front_y - row_gap * f * (1.0 - t * 0.3);
 
-  // -------------------------------------------------------------------------
-  // 3. CYAN NEON CENTER RING ENCIRCLING THE 3D BLOCK CYLINDER (Y = 0)
-  // -------------------------------------------------------------------------
-  let ring_r_inner = base_r * 1.25;
-  let ring_r_outer = base_r * 1.34;
-  let dash_slots = 96usize;
-  let ring_radii = vec![ring_r_outer; dash_slots];
+    let row_col = mix(mix(s, p, fade), glow, fade * 0.35);
 
-  scene.push();
-  scene.translate(0.0, world_cy, 0.0);
-  scene.rotate_x(std::f32::consts::FRAC_PI_2);
-  scene.add_band(0.0, 0.0, 0.0, ring_r_inner, ring_r_outer, &ring_radii, 5.0, cyan_neon);
-  scene.pop();
+    // "Surface" glint line oscillating above each row
+    let glint_y = row_center_y - (frame_time * 1.5 + f * 0.7).sin() * (2.5 + f * 0.35);
+    c.set_stroke(Fill::Solid(row_col.with_alpha(0.14 * fade)));
+    c.set_line_width(1.0);
+    c.stroke_line(cx - surf_r * persp, glint_y, cx + surf_r * persp, glint_y);
 
-  // -------------------------------------------------------------------------
-  // 4. DUAL CONCENTRIC 3D EQUALIZER PILLAR RINGS (OUTER & INNER)
-  // -------------------------------------------------------------------------
-  let outer_count = bar_count;
-  let inner_count = (bar_count * 3 / 4).max(12);
+    // Row bars: mirror-mapped spectrum
+    for j in 0..WATERFALL_COLS {
+      let mirrored = if j < WATERFALL_COLS / 2 {
+        WATERFALL_COLS / 2 - j - 1
+      } else {
+        j - WATERFALL_COLS / 2
+      };
+      let k = (mirrored * step_f * (bar_count as usize / (WATERFALL_COLS / 2)).max(1))
+        .min(freq.len().saturating_sub(1));
+      let row_fv = (st.frame_history[r].get(k).copied().unwrap_or(0) as f32) / 255.0;
 
-  let step_f = (freq.len() / outer_count).max(1);
+      let h_cur = (row_fv * row_max_h * persp + 4.0 * persp) * (1.0 + burst * (1.0 - t));
+      let x0 = cx - surf_r * persp + j as f32 * band_w * persp;
+      let y0 = row_center_y - h_cur;
 
-  // A. Outer Ring (Orange / Amber Pillars)
-  let r_outer = base_r * 1.12;
-  let pillar_w_outer = (TAU * r_outer / outer_count as f32 * 0.65).clamp(4.0, 16.0);
-
-  for i in 0..outer_count {
-    let angle = (i as f32 / outer_count as f32) * TAU + rot * 0.6;
-    let k = (i * step_f).min(freq.len().saturating_sub(1));
-    let fv = freq[k] as f32 / 255.0;
-    let bh = (fv * max_h + 8.0 + be * 12.0).clamp(8.0, (max_h * 1.5).max(8.0));
-
-    let (s_a, c_a) = angle.sin_cos();
-    let px = c_a * r_outer;
-    let pz = s_a * r_outer;
-
-    let pillar_col = mix(Color::rgba(0.12, 0.10, 0.14, 0.95), Color::rgba(0.40, 0.18, 0.08, 0.95), fv);
-    let top_col = if fv > 0.65 || bs > 0.40 {
-      Color::WHITE
-    } else {
-      orange_neon
-    };
-
-    // Main 3D Cuboid Pillar extending UP and DOWN
-    scene.add_box(px, world_cy, pz, pillar_w_outer, bh * 2.0, pillar_w_outer, pillar_col);
-
-    // Glowing Top Cap Highlight (+Y)
-    scene.add_box(px, world_cy + bh + 1.5, pz, pillar_w_outer + 1.0, 3.0, pillar_w_outer + 1.0, top_col);
-    // Glowing Bottom Cap Highlight (-Y)
-    scene.add_box(px, world_cy - bh - 1.5, pz, pillar_w_outer + 1.0, 3.0, pillar_w_outer + 1.0, top_col);
-  }
-
-  // B. Inner Ring (Cyan / Teal Pillars)
-  let r_inner = base_r * 0.76;
-  let pillar_w_inner = (TAU * r_inner / inner_count as f32 * 0.65).clamp(4.0, 16.0);
-
-  for i in 0..inner_count {
-    let angle = (i as f32 / inner_count as f32) * TAU - rot * 0.8;
-    let k = (i * step_f * 2).min(freq.len().saturating_sub(1));
-    let fv = freq[k] as f32 / 255.0;
-    let bh = (fv * max_h * 0.85 + 6.0 + be * 10.0).clamp(6.0, (max_h * 1.3).max(6.0));
-
-    let (s_a, c_a) = angle.sin_cos();
-    let px = c_a * r_inner;
-    let pz = s_a * r_inner;
-
-    let pillar_col = mix(Color::rgba(0.08, 0.12, 0.16, 0.95), Color::rgba(0.08, 0.35, 0.42, 0.95), fv);
-    let top_col = if fv > 0.65 || bs > 0.40 {
-      Color::WHITE
-    } else {
-      cyan_neon
-    };
-
-    // Main 3D Cuboid Pillar extending UP and DOWN
-    scene.add_box(px, world_cy, pz, pillar_w_inner, bh * 2.0, pillar_w_inner, pillar_col);
-
-    // Glowing Top Cap Highlight (+Y)
-    scene.add_box(px, world_cy + bh + 1.5, pz, pillar_w_inner + 1.0, 3.0, pillar_w_inner + 1.0, top_col);
-    // Glowing Bottom Cap Highlight (-Y)
-    scene.add_box(px, world_cy - bh - 1.5, pz, pillar_w_inner + 1.0, 3.0, pillar_w_inner + 1.0, top_col);
+      let col = mix(row_col, Color::WHITE, row_fv * 0.5 * fade);
+      c.set_fill(Fill::Solid(col.with_alpha((0.42 + fade * 0.5).min(0.95))));
+      c.fill_rect(x0, y0, band_w * persp * 0.72, h_cur);
+    }
   }
 
   // -------------------------------------------------------------------------
-  // 5. 3D FLOATING SPARK MOTES
+  // 2. FRONT SURGE WALL (current frame, loudest & nearest)
   // -------------------------------------------------------------------------
-  let mote_count = (16.0 + be * 20.0 * sensitivity).clamp(12.0, 45.0) as usize;
-  for m_i in 0..mote_count {
-    let m_t = ((frame_time * 0.4 + m_i as f32 * 0.19) % 1.0).clamp(0.0, 1.0);
-    let mx = (m_i as f32 * 37.0).sin() * (base_r * 1.5);
-    let my = world_cy + (m_i as f32 * 23.0).cos() * (height * 0.35);
-    let mz = (m_i as f32 * 17.0).sin() * (base_r * 1.5);
+  for j in 0..WATERFALL_COLS {
+    let mirrored = if j < WATERFALL_COLS / 2 {
+      WATERFALL_COLS / 2 - j - 1
+    } else {
+      j - WATERFALL_COLS / 2
+    };
+    let k = (mirrored * step_f * (bar_count as usize / (WATERFALL_COLS / 2)).max(1))
+      .min(freq.len().saturating_sub(1));
+    let fv = freq[k] as f32 / 255.0;
+    let h_cur = fv * row_max_h * (1.0 + burst) + 5.0;
 
-    let m_sz = (2.5 * (1.0 - m_t) + 1.0).clamp(1.0, 4.5);
-    let m_col = mix(glow, Color::WHITE, m_t).with_alpha((1.0 - m_t).clamp(0.1, 0.95));
-    scene.add_disc(mx, my, mz, m_sz, 6, m_col);
+    let x0 = cx - surf_r + j as f32 * band_w;
+    let y0 = front_y - h_cur;
+    let col = mix(mix(p, s, fv), Color::WHITE, fv * 0.45);
+    c.set_fill(Fill::Solid(col.with_alpha(0.95)));
+    c.set_shadow(col.with_alpha(0.5), 14.0);
+    c.fill_rect(x0, y0, band_w * 0.78, h_cur);
+  }
+  c.set_shadow(Color::TRANSPARENT, 0.0);
+
+  // -------------------------------------------------------------------------
+  // 3. FALLING DROPLET MOTES
+  // -------------------------------------------------------------------------
+  for m_i in 0..18usize {
+    let m_t = ((frame_time * 0.5 + m_i as f32 * 0.13) % 1.0).clamp(0.0, 1.0);
+    let mx = cx + (m_i as f32 * 37.0).sin() * surf_r * 0.85;
+    let my = horizon_y + (front_y - horizon_y) * m_t;
+    let m_sz = 1.5 + (1.0 - m_t) * 2.2;
+    let m_col = mix(glow, Color::WHITE, m_t * 0.6).with_alpha(0.25 + (1.0 - m_t) * 0.6);
+    c.set_fill(Fill::Solid(m_col));
+    c.fill_circle(mx, my, m_sz);
   }
 
   c.set_global_alpha(1.0);

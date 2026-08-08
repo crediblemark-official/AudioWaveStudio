@@ -33,8 +33,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let freq = ctx.freq_data;
   let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5 ;
-  let center_y = height * 0.5 ;
+  let center_x = width * 0.5;
+  let center_y = height * 0.5;
 
   let base_disc_r = ((width.min(height) * 0.30).clamp(90.0, 360.0)).clamp(60.0, width * 0.45);
   let disc_r = base_disc_r * (1.0 + be * 0.03);

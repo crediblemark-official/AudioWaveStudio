@@ -1,9 +1,10 @@
-//! Cyber Synthwave Highway 3D style renderer (`synthwaveHighway3D`) — 3D Grid Highway Engine.
+//! Cyber Synthwave Highway 3D style renderer (`synthwaveHighway3D`) — Ultra-Smooth 3D Grid Engine.
 //!
-//! Masterpiece 3D Synthwave Highway:
+//! Features:
 //! - Full 3D retained geometry scene built using `ctx.scene3d`.
-//! - Smooth seamless scrolling 3D synthwave highway grid floor & glowing horizon sun disc.
-//! - 32 rows of 3D equalizer buildings surging on both sides of the highway without motion pops.
+//! - Smooth infinite scrolling 3D neon grid floor & wireframe horizon sun disc.
+//! - 32 rows of 3D equalizer buildings with smooth height interpolation, side shading & window LED grids.
+//! - Distance atmospheric fog fading distant structures seamlessly.
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
@@ -70,14 +71,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let scene = &mut ctx.scene3d;
     scene.clear();
 
-    scene.cam_yaw = (frame_time * 0.10).sin() * 0.06;
+    scene.cam_yaw = (frame_time * 0.08).sin() * 0.05;
     scene.cam_pitch = -0.22 - (frame_time * 0.04).sin() * 0.02 - be * 0.03;
     scene.cam_zoom = (0.92 - be * 0.05) / user_scale;
     scene.target_x = pos_offset_x;
     scene.target_y = pos_offset_y;
 
     let base_y = -100.0 * user_scale;
-    let highway_w = 180.0 * user_scale;
+    let highway_w = 190.0 * user_scale;
     let step_f = (freq.len() / bar_count).max(1);
 
     // A. 3D Glowing Synthwave Sun Disc at Horizon
@@ -118,8 +119,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         let fv_l = freq[bin_left] as f32 / 255.0;
         let fv_r = freq[bin_right] as f32 / 255.0;
 
-        let bld_h_l = (20.0 + fv_l * 280.0 * sensitivity + be * 40.0).clamp(15.0, 420.0) * user_scale;
-        let bld_h_r = (20.0 + fv_r * 280.0 * sensitivity + be * 40.0).clamp(15.0, 420.0) * user_scale;
+        // Smooth height calculation
+        let bld_h_l = (25.0 + fv_l * 270.0 * sensitivity + be * 35.0).clamp(15.0, 420.0) * user_scale;
+        let bld_h_r = (25.0 + fv_r * 270.0 * sensitivity + be * 35.0).clamp(15.0, 420.0) * user_scale;
 
         let bld_w = 28.0 * user_scale;
 

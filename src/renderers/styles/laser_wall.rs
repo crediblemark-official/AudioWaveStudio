@@ -37,8 +37,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.5 - pos_offset_y;
+    let cx = width * 0.5;
+    let cy = height * 0.5;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
@@ -54,7 +54,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         0.0,
         cx,
         cy + height * 0.15,
-        width * 0.70 * user_scale,
+        width * 0.70,
         &[
             (0.0, mix(glow_col, Color::rgba(1.0, 0.10, 0.50, 0.30), 0.5)),
             (0.45, mix(p_col, Color::rgba(0.0, 0.85, 1.0, 0.12), 0.5)),
@@ -82,11 +82,18 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let col_w = (stage_w / LED_PILLARS_3D as f32) * 0.82;
 
     // -------------------------------------------------------------------------
-    // 2. 48 VOLUMETRIC 3D LED WALL EQUALIZER PILLARS & REFLECTIONS
+    // 2. 48 LED WALL EQUALIZER PILLARS ON AN ARCED LEANING STAGE WALL
     // -------------------------------------------------------------------------
+    let arc_depth = stage_w * 0.18;
+    let max_tilt = 0.20;
+
     for i in 0..LED_PILLARS_3D {
         let i_f = i as f32;
-        let x_pos = (i_f - LED_PILLARS_3D as f32 * 0.5 + 0.5) * (stage_w / LED_PILLARS_3D as f32);
+        let t_p = (i_f - LED_PILLARS_3D as f32 * 0.5 + 0.5) / LED_PILLARS_3D as f32; // -0.5..0.5
+        let x_pos = t_p * stage_w;
+
+        // Recess the edges backward -> a concave arena wall, not a flat row
+        let z_pos = -(t_p * t_p) * arc_depth * 4.0;
 
         let bin_k = (i * step_f / (LED_PILLARS_3D / bar_count.max(1)).max(1))
             .min(freq.len().saturating_sub(1));
@@ -100,19 +107,33 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             fv,
         );
 
+        // Lean the pillar slightly toward the stage center (inward V-wall)
+        let tilt = t_p * max_tilt;
+
         // Main 3D LED Box
         scene.push();
-        scene.translate(x_pos, base_y + pillar_h * 0.5, 0.0);
+        scene.translate(x_pos, base_y + pillar_h * 0.5, z_pos);
+        scene.rotate_z(tilt);
         scene.add_box(0.0, 0.0, 0.0, col_w, pillar_h, col_w, pillar_col);
         scene.pop();
 
-        // 3D Translucent Mirror Reflection Below Stage
+        // 3D Translucent Mirror Reflection Below Stage (mirrors the lean)
         let ref_h = pillar_h * 0.40;
         let ref_col = Color::rgba(pillar_col.r, pillar_col.g, pillar_col.b, 0.22);
         scene.push();
-        scene.translate(x_pos, base_y - ref_h * 0.5, 0.0);
+        scene.translate(x_pos, base_y - ref_h * 0.5, z_pos);
+        scene.rotate_z(tilt);
         scene.add_box(0.0, 0.0, 0.0, col_w * 0.95, ref_h, col_w * 0.95, ref_col);
         scene.pop();
+
+        // White-hot cap light on strong bars
+        if fv > 0.7 || bs > 0.4 {
+            scene.push();
+            scene.translate(x_pos, base_y + pillar_h + 2.0 * user_scale, z_pos);
+            scene.rotate_z(tilt);
+            scene.add_box(0.0, 0.0, 0.0, col_w * 0.9, 6.0 * user_scale, col_w * 0.9, Color::WHITE.with_alpha(0.9));
+            scene.pop();
+        }
     }
 
     // -------------------------------------------------------------------------

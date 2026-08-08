@@ -32,8 +32,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let _frame_time = ctx.frame_time;
 
-    let cx = width * 0.5 ;
-    let cy = height * 0.5 ;
+    let cx = width * 0.5;
+    let cy = height * 0.5;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);

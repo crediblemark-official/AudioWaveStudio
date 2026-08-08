@@ -35,8 +35,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let freq = ctx.freq_data;
   let frame_time = ctx.frame_time;
 
-  let center_x = width * 0.5 ;
-  let center_y = height * 0.48 ;
+  let center_x = width * 0.5;
+  let center_y = height * 0.48;
 
   let base_r = ((width.min(height) * 0.24).clamp(80.0, 280.0)).clamp(50.0, width * 0.42);
   let woofer_r = base_r + (be * 32.0 * sensitivity) + (bs * 16.0);

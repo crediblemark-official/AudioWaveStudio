@@ -36,10 +36,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let frame_time = ctx.frame_time;
   let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5 ;
-  let center_y = height * 0.44 ;
+  let center_x = width * 0.5;
+  let center_y = height * 0.44;
 
-  // Cassette Body Dimensions scaled by user_scale setting
+  // Cassette Body Dimensions (global canvas transform applies Scale)
   let tape_w = ((width * 0.54).clamp(300.0, 720.0)).clamp(160.0, width * 0.95);
   let tape_h = tape_w * 0.62;
   let left_x = center_x - tape_w / 2.0;

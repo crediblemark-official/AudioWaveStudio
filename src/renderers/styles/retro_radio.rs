@@ -38,8 +38,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let freq = ctx.freq_data;
   let frame_time = ctx.frame_time;
 
-  let center_x = width * 0.5 ;
-  let center_y = height * 0.5 ;
+  let center_x = width * 0.5;
+  let center_y = height * 0.5;
 
   let radio_w = ((width * 0.58).clamp(320.0, 780.0)).clamp(180.0, width * 0.95);
   let radio_h = radio_w * 0.52;
