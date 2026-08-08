@@ -1,9 +1,10 @@
 //! Solar Flare Crown style renderer (`solarFlareCrown`) — 360° Sun Corona Engine.
 //!
-//! Features:
+//! Masterpiece Solar Prominence Corona:
 //! - Blinding golden solar core with pulsing bass excursion.
-//! - 80+ organic fluid solar prominence ribbons sweeping 360°.
-//! - S-curve Bezier turbulence & solar prominence sparks flying outward.
+//! - 64 organic fluid solar prominence arches & flame loops (NO needle spikes!).
+//! - Bezier turbulence & solar prominence embers flying outward.
+//! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use std::f32::consts::TAU;
 
@@ -13,21 +14,23 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const FLARE_STRANDS: usize = 80;
-const SEGMENTS: usize = 16;
-const PROMINENCE_SPARKS: usize = 48;
+const FLARE_ARCHES: usize = 36;
+const PROMINENCE_SPARKS: usize = 64;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
     let height = ctx.height;
     let theme = &ctx.config.theme;
 
-    let _p = theme_primary(theme);
-    let _s = theme_secondary(theme);
-    let _accent = theme_accent(theme);
-    let _glow = theme_glow(theme);
+    let p_col = theme_primary(theme);
+    let s_col = theme_secondary(theme);
+    let accent_col = theme_accent(theme);
+    let glow_col = theme_glow(theme);
 
     let sensitivity = ctx.config.reactivity.sensitivity;
+    let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
     let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
@@ -35,10 +38,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx = width * 0.5 + pos_offset_x;
+    let cy = height * 0.5 - pos_offset_y;
     let reference_size = width.min(height);
-    let base_r = 80.0 * (reference_size / 500.0);
+    let base_r = 95.0 * (reference_size / 500.0) * user_scale;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
@@ -55,9 +58,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         cy,
         base_r * 3.6,
         &[
-            (0.0, Color::rgba(1.0, 0.55, 0.05, 0.35 + be * 0.20)),
-            (0.45, Color::rgba(0.90, 0.20, 0.02, 0.15)),
-            (0.80, Color::rgba(0.30, 0.03, 0.01, 0.04)),
+            (0.0, mix(glow_col, Color::rgba(1.0, 0.55, 0.05, 0.35 + be * 0.20), 0.5)),
+            (0.45, mix(accent_col, Color::rgba(0.90, 0.20, 0.02, 0.15), 0.5)),
+            (0.80, mix(s_col, Color::rgba(0.30, 0.03, 0.01, 0.04), 0.5)),
             (1.0, Color::TRANSPARENT),
         ],
     );
@@ -65,96 +68,87 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
-    // 1. 360° FLUID SOLAR PROMINENCE FLAME STRANDS
+    // 1. ORGANIC SOLAR PROMINENCE ARCHES (CURVED LOOPS OVER SUN SURFACE)
     // -------------------------------------------------------------------------
     let step_f = (freq.len() / bar_count).max(1);
 
-    c.set_blend_additive();
+    for arch_i in 0..FLARE_ARCHES {
+        let arch_f = arch_i as f32;
+        let angle = (arch_f / FLARE_ARCHES as f32) * TAU + frame_time * 0.10;
 
-    for strand_i in 0..FLARE_STRANDS {
-        let angle = (strand_i as f32 / FLARE_STRANDS as f32) * TAU + frame_time * 0.10;
-        let bin_k = (strand_i * step_f / (FLARE_STRANDS / bar_count.max(1)).max(1))
+        let bin_k = (arch_i * step_f / (FLARE_ARCHES / bar_count.max(1)).max(1))
             .min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let strand_h = 20.0 + fv * 160.0 * sensitivity + be * 45.0;
-        let r_start = base_r * (0.95 + be * 0.10);
+        let arch_r = (25.0 + fv * 140.0 * sensitivity + be * 40.0) * user_scale;
 
-        let (sin_a, cos_a) = angle.sin_cos();
-        let perp_x = -sin_a;
-        let perp_y = cos_a;
+        let mut pts: Vec<(f32, f32)> = Vec::with_capacity(17);
+        for seg in 0..=16 {
+            let t = seg as f32 / 16.0;
+            let a_curr = angle + (t - 0.5) * 0.35;
+            let r_curr = base_r + (t * std::f32::consts::PI).sin() * arch_r;
 
-        let mut left_edge: Vec<(f32, f32)> = Vec::with_capacity(SEGMENTS + 1);
-        let mut right_edge: Vec<(f32, f32)> = Vec::with_capacity(SEGMENTS + 1);
-
-        for seg in 0..=SEGMENTS {
-            let t = seg as f32 / SEGMENTS as f32;
-            let r_curr = r_start + t * strand_h;
-
-            let sway = (t * 5.0 - frame_time * 2.2 + strand_i as f32 * 0.4).sin() * (8.0 + t * 18.0);
-            let px = cx + cos_a * r_curr + perp_x * sway;
-            let py = cy + sin_a * r_curr + perp_y * sway;
-
-            let taper = (std::f32::consts::PI * t).sin() * (1.0 - t * 0.5);
-            let half_w = ((5.0 + fv * 10.0) * taper).clamp(0.5, 22.0);
-
-            left_edge.push((px - perp_x * half_w, py - perp_y * half_w));
-            right_edge.push((px + perp_x * half_w, py + perp_y * half_w));
+            let (sin_a, cos_a) = a_curr.sin_cos();
+            pts.push((cx + cos_a * r_curr, cy + sin_a * r_curr));
         }
 
-        let mut poly_pts = left_edge;
-        right_edge.reverse();
-        poly_pts.extend(right_edge);
-
-        let strand_col = mix(
-            Color::rgba(1.0, 0.95, 0.50, 0.90 + bs * 0.10),
-            Color::rgba(0.95, 0.25, 0.02, 0.65),
-            strand_i as f32 / FLARE_STRANDS as f32,
+        let arch_col = mix(
+            mix(Color::rgba(1.0, 0.95, 0.50, 0.95), glow_col, 0.5),
+            mix(p_col, accent_col, fv),
+            fv,
         );
-        c.set_fill(Fill::Solid(strand_col));
-        c.fill_polygon(&poly_pts);
+
+        c.set_stroke(Fill::Solid(arch_col));
+        c.set_line_width((2.5 + fv * 3.0) * user_scale);
+        c.set_shadow(arch_col, (12.0 + fv * 10.0) * user_scale);
+        c.stroke_polyline(&pts);
     }
 
     // -------------------------------------------------------------------------
-    // 2. GOLDEN SOLAR CORE
+    // 2. FLYING SOLAR PROMINENCE SPARKS & CORONA EMBERS
     // -------------------------------------------------------------------------
-    let sun_r = base_r * (0.85 + be * 0.15);
-    let sun_grad = Fill::radial_gradient(
+    for s_i in 0..PROMINENCE_SPARKS {
+        let s_f = s_i as f32;
+        let angle = (s_f / PROMINENCE_SPARKS as f32) * TAU - frame_time * 0.20;
+
+        let bin_k = (s_i * step_f / (PROMINENCE_SPARKS / bar_count.max(1)).max(1))
+            .min(freq.len().saturating_sub(1));
+        let fv = freq[bin_k] as f32 / 255.0;
+
+        let spark_r = base_r * (1.10 + fv * 0.90 * sensitivity + be * 0.30) + (s_f * 5.0).sin() * (15.0 * user_scale);
+        let spark_cx = cx + angle.cos() * spark_r;
+        let spark_cy = cy + angle.sin() * spark_r;
+
+        let spark_sz = (2.0 + (s_i % 3) as f32 * 1.5 + fv * 3.0) * user_scale;
+        let spark_col = mix(Color::rgba(1.0, 1.0, 1.0, 0.95), glow_col, (s_i % 3) as f32 / 3.0);
+
+        c.set_fill(Fill::Solid(spark_col));
+        c.set_shadow(spark_col, (8.0 + fv * 6.0) * user_scale);
+        c.fill_circle(spark_cx, spark_cy, spark_sz);
+    }
+
+    // -------------------------------------------------------------------------
+    // 3. INTENSE GLOWING SOLAR CORE AT CENTER
+    // -------------------------------------------------------------------------
+    let core_r = base_r * (0.85 + be * 0.15 + bs * 0.05);
+    let sun_core = Fill::radial_gradient(
         cx,
         cy,
         0.0,
         cx,
         cy,
-        sun_r,
+        core_r,
         &[
-            (0.0, Color::rgba(1.0, 0.98, 0.85, 1.0)),
-            (0.35, Color::rgba(1.0, 0.70, 0.10, 0.95)),
-            (0.75, Color::rgba(0.92, 0.30, 0.02, 0.85)),
-            (1.0, Color::TRANSPARENT),
+            (0.0, Color::rgba(1.0, 1.0, 0.90, 0.98)),
+            (0.35, Color::rgba(1.0, 0.65, 0.05, 0.90)),
+            (0.75, mix(p_col, Color::hex("#d01500"), 0.8)),
+            (1.0, Color::hex("#080201")),
         ],
     );
-    c.set_fill(sun_grad);
-    c.set_shadow(Color::rgba(1.0, 0.60, 0.0, 0.95), 20.0);
-    c.fill_circle(cx, cy, sun_r);
 
-    // -------------------------------------------------------------------------
-    // 3. SOLAR PROMINENCE SPARKS
-    // -------------------------------------------------------------------------
-    c.set_shadow(Color::TRANSPARENT, 0.0);
-    for s_i in 0..PROMINENCE_SPARKS {
-        let s_t = ((frame_time * 0.40 + s_i as f32 * 0.08) % 1.0).clamp(0.0, 1.0);
-        let s_r = base_r + s_t * (width * 0.40);
-        let s_ang = s_i as f32 * 0.75 + frame_time * 0.15;
-
-        let sx = cx + s_ang.cos() * s_r;
-        let sy = cy + s_ang.sin() * s_r;
-
-        let s_sz = (4.0 * (1.0 - s_t) + 1.0).clamp(1.0, 5.5);
-        let s_col = Color::rgba(1.0, 0.85, 0.30, (1.0 - s_t) * 0.90);
-
-        c.set_fill(Fill::Solid(s_col));
-        c.fill_ellipse(sx, sy, s_sz, s_sz);
-    }
+    c.set_fill(sun_core);
+    c.set_shadow(Color::rgba(1.0, 0.50, 0.0, 0.95), (25.0 + bs * 15.0) * user_scale);
+    c.fill_circle(cx, cy, core_r);
 
     c.set_global_alpha(1.0);
     c.restore();
