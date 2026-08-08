@@ -12,10 +12,10 @@ name = "audiowave_studio_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-slint-build = "1.9"
+slint-build = "1.17"
 
 [dependencies]
-slint = { version = "1.9", default-features = false, features = ["std", "compat-1-2", "backend-winit-x11", "backend-winit-wayland", "renderer-femtovg"] }
+slint = { version = "1.17", default-features = false, features = ["std", "compat-1-2", "backend-winit-x11", "backend-winit-wayland", "renderer-femtovg"] }
 rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -23,8 +23,11 @@ symphonia = { version = "0.5", features = ["mp3", "wav", "flac", "ogg", "isomp4"
 realfft = "3.4"
 image = "0.25"
 wgpu = "23"
-three-d = "0.17"
-three-d-asset = "0.7"
+# Lightweight zero-dependency linear algebra for the native 3D engine
+# (Camera + Scene3D). Replaces the OpenGL-based `three-d`/`three-d-asset`
+# crates, which did not fit the headless wgpu export pipeline (see the
+# 3D-engine notes in src/renderers/three_d_engine.rs).
+glam = "0.33"
 bytemuck = { version = "1", features = ["derive"] }
 ab_glyph = "0.2"
 # HarfBuzz shaping for proper Arabic (RTL, joined letter forms).

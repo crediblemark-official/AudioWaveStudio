@@ -369,6 +369,7 @@ pub fn bind_app_callbacks(
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_toggle_play_clicked(move || {
+        guarded("toggle_play", || {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         if s.audio_player.is_playing() {
             s.audio_player.pause();
@@ -376,25 +377,33 @@ pub fn bind_app_callbacks(
                 w.set_is_playing(false);
             }
         } else {
-            if s.audio_player.play().is_ok() {
-                if let Some(w) = window_handle.upgrade() {
-                    w.set_is_playing(true);
+            match s.audio_player.play() {
+                Ok(_) => {
+                    if let Some(w) = window_handle.upgrade() {
+                        w.set_is_playing(true);
+                    }
                 }
-            } else if let Some(w) = window_handle.upgrade() {
-                push_toast(
-                    &w,
-                    &mut s,
-                    ToastKind::Error,
-                    "Playback failed — load a track first",
-                );
+                Err(e) => {
+                    if let Some(w) = window_handle.upgrade() {
+                        w.set_is_playing(false);
+                        push_toast(
+                            &w,
+                            &mut s,
+                            ToastKind::Error,
+                            format!("Playback failed: {e}"),
+                        );
+                    }
+                }
             }
         }
+        });
     });
 
     // BIND CALLBACK: STOP
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_stop_clicked(move || {
+        guarded("stop", || {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         s.audio_player.stop();
         if let Some(w) = window_handle.upgrade() {
@@ -402,22 +411,26 @@ pub fn bind_app_callbacks(
             w.set_playback_progress(0.0);
             w.set_current_time_str(slint::SharedString::from("00:00"));
         }
+        });
     });
 
     // BIND CALLBACK: SEEK
     let state_clone = state.clone();
     window.on_seek_position(move |pct| {
+        guarded("seek", || {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         let dur = s.audio_player.get_duration_sec();
         if dur > 0.0 {
             s.audio_player.seek(pct as f64 * dur);
         }
+        });
     });
 
     // BIND CALLBACK: VOLUME
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_volume_changed(move |vol| {
+        guarded("volume", || {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         s.audio_player.set_volume(vol);
         s.is_muted = vol <= 0.001;
@@ -426,12 +439,14 @@ pub fn bind_app_callbacks(
             w.set_is_muted(vol <= 0.001);
             w.set_volume(vol);
         }
+        });
     });
 
     // BIND CALLBACK: MUTE TOGGLE
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_mute_toggle_clicked(move || {
+        guarded("mute_toggle", || {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         if s.is_muted {
             let restore = s.prev_volume;
@@ -449,6 +464,7 @@ pub fn bind_app_callbacks(
                 w.set_volume(0.0);
             }
         }
+        });
     });
 
     // BIND CALLBACK: LISTEN (live mic capture)

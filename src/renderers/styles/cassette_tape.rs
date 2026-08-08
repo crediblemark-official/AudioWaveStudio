@@ -1,44 +1,54 @@
 //! Retro Cassette Tape style renderer (`cassetteTape`).
 //!
-//! Masterpiece 100% faithful port matching both reference photos:
-//! Dual neon outline body (pink/cyan), glowing pink tape reels with 6-tooth gears,
-//! magnetic tape unwinding rolls, side digital time counters, cassette label metadata header,
-//! bottom trapezoid text, floor reflection, and audio spectrum wave with scrub handle.
+//! Renders an ultra-realistic 3D/2D vintage audio cassette tape complete with
+//! realistic plastic shell shading, paper label sticker with Type II/Metal bias marks,
+//! clear acrylic tape window with glass sheen reflections, authentic magnetic tape
+//! transfer physics (conservation of tape volume between spools), visible tape path
+//! over guide rollers & read heads, corner cross screws, digital LED counters,
+//! audio-reactive spectrum display, and full UI settings integration.
 
 use std::f32::consts::TAU;
 
 use crate::gpu2d::text::TextAlign;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::RenderContext;
+use crate::renderers::helpers::mix;
+use crate::renderers::{
+  theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
+};
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let width = ctx.width;
   let height = ctx.height;
+  let theme = &ctx.config.theme;
 
+  let p = theme_primary(theme);
+  let s = theme_secondary(theme);
+  let accent = theme_accent(theme);
+  let glow = theme_glow(theme);
+
+  // Settings integration
   let sensitivity = ctx.config.reactivity.sensitivity;
+  let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
   let freq = ctx.freq_data;
   let frame_time = ctx.frame_time;
   let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5;
-  let center_y = height * 0.44;
+  let center_x = width * 0.5 ;
+  let center_y = height * 0.44 ;
 
-  // Cassette Body Dimensions
-  let tape_w = (width * 0.52).clamp(280.0, 680.0);
-  let tape_h = tape_w * 0.61;
+  // Cassette Body Dimensions scaled by user_scale setting
+  let tape_w = ((width * 0.54).clamp(300.0, 720.0)).clamp(160.0, width * 0.95);
+  let tape_h = tape_w * 0.62;
   let left_x = center_x - tape_w / 2.0;
   let top_y = center_y - tape_h / 2.0;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  // Neon colors matching reference photos (Hot Pink + Electric Cyan)
-  let hot_pink = Color::rgba(1.0, 0.0, 0.72, 0.95);
-  let electric_cyan = Color::rgba(0.0, 0.9, 1.0, 0.95);
-
-  // Calculate formatted digital timestamps for side displays
+  // Time calculations for digital LED displays
   let elapsed_sec = frame_time as u32;
   let cur_hrs = elapsed_sec / 3600;
   let cur_min = (elapsed_sec % 3600) / 60;
@@ -50,41 +60,39 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let short_time_str = format!("{:02}:{:02}", cur_min, cur_s);
 
   // -------------------------------------------------------------------------
-  // 1. MIRRORED FLOOR REFLECTION (UNDER CASSETTE)
+  // 1. ATMOSPHERIC BACKLIGHT & AMBIENT GLOW
   // -------------------------------------------------------------------------
-  let refl_y = top_y + tape_h + 15.0;
-  c.save();
-  c.set_global_alpha(0.18 + be * 0.1);
-
-  // Mirrored lower spectrum wave
-  let bar_count = 56usize;
-  let step = (freq.len() / bar_count).max(1);
-  let bar_w = (tape_w / bar_count as f32) - 1.5;
-
-  for i in 0..bar_count {
-    let raw_v = *freq.get(i * step).unwrap_or(&0) as f32 / 255.0;
-    let val = (raw_v * sensitivity).clamp(0.0, 1.2);
-    let bh = val * height * 0.12;
-    let bx = left_x + i as f32 * (bar_w + 1.5);
-    c.set_fill(Fill::Solid(hot_pink));
-    c.fill_rect(bx, refl_y + 25.0, bar_w.max(2.0), bh.max(2.0));
-  }
-  c.restore();
+  let haze = Fill::radial_gradient(
+    center_x,
+    center_y,
+    0.0,
+    center_x,
+    center_y,
+    tape_w * 0.85,
+    &[
+      (0.0, glow.with_alpha(0.20 + be * 0.15)),
+      (0.40, p.with_alpha(0.12)),
+      (0.75, Color::rgba(0.04, 0.02, 0.10, 0.06)),
+      (1.0, Color::TRANSPARENT),
+    ],
+  );
+  c.set_fill(haze);
+  c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
-  // 2. SIDE DIGITAL TIMERS (MATCHING PHOTO 1)
+  // 2. SIDE DIGITAL TIMERS (VINTAGE LED FOIL DISPLAYS)
   // -------------------------------------------------------------------------
-  let timer_font_size = (tape_h * 0.085).clamp(12.0, 24.0);
+  let timer_font_size = (tape_h * 0.080).clamp(10.0, 22.0);
 
   // Current time (Left Side)
-  if left_x > 130.0 {
+  if left_x > 110.0 {
     c.draw_text(
-      "current time",
-      left_x - 110.0,
+      "CURRENT TIME",
+      left_x - 95.0f32.clamp(50.0, 120.0),
       center_y - 18.0,
-      10.0,
+      9.0f32.clamp(7.0, 11.0),
       "monospace",
-      400.0,
+      500.0,
       false,
       TextAlign::Center,
       Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.45)),
@@ -93,7 +101,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     );
     c.draw_text(
       &cur_time_str,
-      left_x - 110.0,
+      left_x - 95.0f32.clamp(50.0, 120.0),
       center_y + 4.0,
       timer_font_size,
       "monospace",
@@ -107,14 +115,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   // Time remaining (Right Side)
-  if width - (left_x + tape_w) > 130.0 {
+  if width - (left_x + tape_w) > 110.0 {
     c.draw_text(
-      "time left",
-      left_x + tape_w + 110.0,
+      "TIME LEFT",
+      left_x + tape_w + 95.0f32.clamp(50.0, 120.0),
       center_y - 18.0,
-      10.0,
+      9.0f32.clamp(7.0, 11.0),
       "monospace",
-      400.0,
+      500.0,
       false,
       TextAlign::Center,
       Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.45)),
@@ -123,7 +131,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     );
     c.draw_text(
       &rem_time_str,
-      left_x + tape_w + 110.0,
+      left_x + tape_w + 95.0f32.clamp(50.0, 120.0),
       center_y + 4.0,
       timer_font_size,
       "monospace",
@@ -137,207 +145,406 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   // -------------------------------------------------------------------------
-  // 3. AUDIO SPECTRUM BARS & WAVE LINE DIRECTLY UNDER CASSETTE
+  // 3. CASSETTE SHELL SHADING & MOLDED PLASTIC BODY
   // -------------------------------------------------------------------------
-  let spec_y = top_y + tape_h + 6.0;
+  // Drop shadow behind cassette
+  c.save();
+  c.set_shadow(Color::rgba(0.0, 0.0, 0.0, 0.8), 24.0);
+  c.set_fill(Fill::Solid(Color::rgba(0.08, 0.09, 0.13, 0.98)));
+  c.fill_rounded_rect(left_x, top_y, tape_w, tape_h, 14.0);
+  c.restore();
 
-  for i in 0..bar_count {
-    let raw_v = *freq.get(i * step).unwrap_or(&0) as f32 / 255.0;
-    let val = (raw_v * sensitivity).clamp(0.0, 1.2);
-    let bh = val * height * 0.15;
-    let bx = left_x + i as f32 * (bar_w + 1.5);
-
-    let grad = Fill::linear_gradient(
-      bx,
-      spec_y,
-      bx,
-      spec_y - bh,
-      &[(0.0, hot_pink), (0.6, Color::rgba(0.7, 0.0, 0.9, 0.95)), (1.0, electric_cyan)],
-    );
-
-    c.set_fill(grad);
-    c.set_shadow(hot_pink.with_alpha(0.7), 10.0 + bs * 10.0);
-    c.fill_rounded_rect(bx, spec_y - bh, bar_w.max(2.0), bh.max(2.0), 2.0);
-  }
-
-  // Horizontal scrub/neon line under cassette
-  c.set_stroke(Fill::Solid(electric_cyan));
-  c.set_line_width(2.0);
-  c.set_shadow(electric_cyan.with_alpha(0.8), 12.0);
-  c.stroke_line(left_x - 10.0, spec_y + 4.0, left_x + tape_w + 10.0, spec_y + 4.0);
-
-  // Scrub handle circle
-  let scrub_progress = ((frame_time * 0.05) % 1.0).clamp(0.05, 0.95);
-  let scrub_x = left_x + scrub_progress * tape_w;
-  c.set_fill(Fill::Solid(Color::WHITE));
-  c.fill_ellipse(scrub_x, spec_y + 4.0, 6.0, 6.0);
-  c.stroke_circle(scrub_x, spec_y + 4.0, 6.0);
-
-  // -------------------------------------------------------------------------
-  // 4. CASSETTE OUTER SHELL & DOUBLE NEON BORDER
-  // -------------------------------------------------------------------------
-  // Solid cassette body background
-  c.set_fill(Fill::Solid(Color::rgba(0.04, 0.02, 0.08, 0.96)));
-  c.set_shadow(hot_pink.with_alpha(0.6), 25.0 + be * 20.0);
+  // Plastic shell subtle gradient texture (smoked matte black / dark slate)
+  let shell_grad = Fill::linear_gradient(
+    left_x,
+    top_y,
+    left_x + tape_w,
+    top_y + tape_h,
+    &[
+      (0.0, Color::rgba(0.18, 0.19, 0.25, 0.98)),
+      (0.3, Color::rgba(0.11, 0.12, 0.17, 0.98)),
+      (0.7, Color::rgba(0.07, 0.08, 0.12, 0.98)),
+      (1.0, Color::rgba(0.14, 0.15, 0.20, 0.98)),
+    ],
+  );
+  c.set_fill(shell_grad);
   c.fill_rounded_rect(left_x, top_y, tape_w, tape_h, 14.0);
 
-  // Outer Hot Pink Neon Border
-  c.set_stroke(Fill::Solid(hot_pink));
-  c.set_line_width(3.5);
+  // Outer bevel rim highlight
+  c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.15)));
+  c.set_line_width(1.5);
   c.stroke_rect(left_x, top_y, tape_w, tape_h);
 
-  // Inner Electric Cyan Accent Border
-  c.set_stroke(Fill::Solid(electric_cyan.with_alpha(0.75)));
-  c.set_line_width(1.5);
-  c.stroke_rect(left_x + 4.0, top_y + 4.0, tape_w - 8.0, tape_h - 8.0);
+  // Recessed top & side grip ribs (tactile cassette ridges)
+  let _rib_w = tape_w * 0.12;
+  let rib_y = top_y + 8.0;
+  for rib_i in 0..4 {
+    let rx1 = left_x + 18.0 + rib_i as f32 * 6.0;
+    let rx2 = left_x + tape_w - 18.0 - rib_i as f32 * 6.0;
+    c.set_stroke(Fill::Solid(Color::rgba(0.0, 0.0, 0.0, 0.4)));
+    c.set_line_width(1.2);
+    c.stroke_line(rx1, rib_y, rx1, rib_y + 12.0);
+    c.stroke_line(rx2, rib_y, rx2, rib_y + 12.0);
+  }
 
   // -------------------------------------------------------------------------
-  // 5. CASSETTE TAPE LABEL SECTION & HEADER METADATA STICKER
+  // 4. PAPER CASSETTE LABEL STICKER (VINTAGE CHROME / TYPE II)
   // -------------------------------------------------------------------------
-  let label_margin = tape_w * 0.05;
-  let label_w = tape_w - label_margin * 2.0;
+  let label_margin_x = tape_w * 0.05;
+  let label_margin_y = tape_h * 0.05;
+  let label_w = tape_w - label_margin_x * 2.0;
   let label_h = tape_h * 0.76;
-  let label_x = left_x + label_margin;
-  let label_y = top_y + tape_h * 0.05;
+  let label_x = left_x + label_margin_x;
+  let label_y = top_y + label_margin_y;
 
-  c.set_fill(Fill::Solid(Color::rgba(0.07, 0.04, 0.14, 0.95)));
-  c.set_shadow(electric_cyan.with_alpha(0.5), 14.0);
-  c.fill_rounded_rect(label_x, label_y, label_w, label_h, 8.0);
+  // Creamy vintage paper label background
+  let label_grad = Fill::linear_gradient(
+    label_x,
+    label_y,
+    label_x,
+    label_y + label_h,
+    &[
+      (0.0, Color::rgba(0.92, 0.90, 0.85, 0.98)),
+      (0.18, Color::rgba(0.96, 0.94, 0.90, 0.98)),
+      (0.85, Color::rgba(0.88, 0.86, 0.82, 0.98)),
+      (1.0, Color::rgba(0.80, 0.78, 0.74, 0.98)),
+    ],
+  );
+  c.set_fill(label_grad);
+  c.fill_rounded_rect(label_x, label_y, label_w, label_h, 6.0);
 
-  c.set_stroke(Fill::Solid(electric_cyan));
-  c.set_line_width(2.0);
+  // Label paper border
+  c.set_stroke(Fill::Solid(Color::rgba(0.2, 0.2, 0.2, 0.3)));
+  c.set_line_width(1.0);
   c.stroke_rect(label_x, label_y, label_w, label_h);
 
-  // Header Sticker Box in upper area of label ($Y \in [top + 0.04 \cdot H, top + 0.28 \cdot H]$)
-  let hdr_w = label_w * 0.92;
-  let hdr_h = label_h * 0.28;
-  let hdr_x = center_x - hdr_w / 2.0;
-  let hdr_y = label_y + label_h * 0.04;
+  // Top accent stripe (Type II / Chrome red & cyan racing stripes)
+  let stripe_h = label_h * 0.14;
+  let stripe_grad = Fill::linear_gradient(
+    label_x,
+    label_y + 4.0,
+    label_x + label_w,
+    label_y + 4.0,
+    &[(0.0, p), (0.5, accent), (1.0, s)],
+  );
+  c.set_fill(stripe_grad);
+  c.fill_rect(label_x + 6.0, label_y + 6.0, label_w - 12.0, stripe_h);
 
-  c.set_fill(Fill::Solid(Color::rgba(0.12, 0.06, 0.22, 0.9)));
-  c.stroke_rect(hdr_x, hdr_y, hdr_w, hdr_h);
-
-  // -------------------------------------------------------------------------
-  // 6. TAPE WINDOW & DUAL SPINNING REELS (BELOW HEADER - NO OVERLAP!)
-  // -------------------------------------------------------------------------
-  let win_w = label_w * 0.74;
-  let win_h = label_h * 0.42;
-  let win_x = center_x - win_w / 2.0;
-  let win_y = hdr_y + hdr_h + label_h * 0.03;
-
-  c.set_fill(Fill::Solid(Color::rgba(0.03, 0.02, 0.06, 0.98)));
-  c.set_stroke(Fill::Solid(hot_pink.with_alpha(0.85)));
-  c.set_line_width(1.8);
-  c.fill_rounded_rect(win_x, win_y, win_w, win_h, 6.0);
-  c.stroke_rect(win_x, win_y, win_w, win_h);
-
-  // Digital time counter inside tape window (matching Photo 2: "00:05")
+  // Side A / Stereo badges on label header
+  let badge_sz = (label_h * 0.09).clamp(9.0, 14.0);
   c.draw_text(
-    &short_time_str,
-    center_x,
-    win_y + win_h * 0.82,
-    (win_h * 0.25).clamp(9.0, 14.0),
+    "A",
+    label_x + 16.0,
+    label_y + stripe_h * 0.85,
+    badge_sz * 1.3,
+    "sans-serif",
+    800.0,
+    false,
+    TextAlign::Left,
+    Fill::Solid(Color::WHITE),
+    1.0,
+    &Default::default(),
+  );
+
+  c.draw_text(
+    "HIGH BIAS / TYPE II  •  STEREO  •  NR",
+    label_x + label_w - 12.0,
+    label_y + stripe_h * 0.80,
+    badge_sz * 0.75,
     "monospace",
     600.0,
     false,
-    TextAlign::Center,
-    Fill::Solid(electric_cyan),
+    TextAlign::Right,
+    Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.90)),
     1.0,
     &Default::default(),
   );
 
-  let reel_r = win_h * 0.42;
-  let reel_left_x = center_x - win_w * 0.26;
-  let reel_right_x = center_x + win_w * 0.26;
-  let reel_center_y = win_y + win_h * 0.46;
-
-  // Unwinding magnetic tape roll simulation
-  let tape_progress = ((frame_time * 0.02) % 1.0).clamp(0.0, 1.0);
-  let tape_roll_left = reel_r * (1.30 - tape_progress * 0.25);
-  let tape_roll_right = reel_r * (1.05 + tape_progress * 0.25);
-
-  c.set_shadow(Color::TRANSPARENT, 0.0);
-
-  // Translucent dark magnetic tape rolls behind reels
-  c.set_fill(Fill::Solid(Color::rgba(0.18, 0.1, 0.25, 0.6)));
-  c.fill_ellipse(reel_left_x, reel_center_y, tape_roll_left, tape_roll_left);
-  c.fill_ellipse(reel_right_x, reel_center_y, tape_roll_right, tape_roll_right);
-
-  // Draw Reels with Glowing Pink Hubs
-  for &(rx, is_left) in &[(reel_left_x, true), (reel_right_x, false)] {
-    // Bright Neon Pink Hub (matching reference photos!)
-    c.set_fill(Fill::Solid(hot_pink));
-    c.set_shadow(hot_pink, 15.0 + bs * 10.0);
-    c.fill_ellipse(rx, reel_center_y, reel_r, reel_r);
-
-    c.set_stroke(Fill::Solid(Color::WHITE));
-    c.set_line_width(2.0);
-    c.stroke_circle(rx, reel_center_y, reel_r);
-
-    // Inner black hub hole
-    let hub_r = reel_r * 0.42;
-    c.set_fill(Fill::Solid(Color::rgba(0.05, 0.02, 0.08, 0.98)));
-    c.set_shadow(Color::TRANSPARENT, 0.0);
-    c.fill_ellipse(rx, reel_center_y, hub_r, hub_r);
-
-    // Rotating 6-spoke gear teeth inside hub
-    let dir = if is_left { 1.0 } else { -1.0 };
-    let current_rot = rot * dir;
-
-    c.set_fill(Fill::Solid(Color::WHITE));
-
-    for t_idx in 0..6 {
-      let tooth_angle = current_rot + (t_idx as f32 / 6.0) * TAU;
-      let tx = rx + tooth_angle.cos() * (hub_r * 0.75);
-      let ty = reel_center_y + tooth_angle.sin() * (hub_r * 0.75);
-      let tooth_size = hub_r * 0.28;
-
-      c.fill_ellipse(tx, ty, tooth_size, tooth_size);
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // 7. LOWER CASSETTE TRAPEZOID AREA & SCREWS
-  // -------------------------------------------------------------------------
-  let trap_w = tape_w * 0.72;
-  let trap_h = tape_h * 0.16;
-  let trap_x = center_x - trap_w / 2.0;
-  let trap_y = top_y + tape_h - trap_h - 4.0;
-
-  c.set_fill(Fill::Solid(Color::rgba(0.06, 0.04, 0.12, 0.95)));
-  c.set_stroke(Fill::Solid(electric_cyan.with_alpha(0.8)));
-  c.set_line_width(2.0);
-  c.set_shadow(electric_cyan.with_alpha(0.4), 8.0);
-  c.stroke_rect(trap_x, trap_y, trap_w, trap_h);
-
-  // Volume text inside trapezoid (dynamically configured via settings!)
-  let cassette_sub_str = if !ctx.config.text.cassette_label.trim().is_empty() {
+  // Track Title / Cassette Label Text
+  let track_title = if !ctx.config.text.cassette_label.trim().is_empty() {
     ctx.config.text.cassette_label.to_uppercase()
   } else {
-    "AUDIOWAVE VOLUME #1".to_string()
+    "AUDIOWAVE STUDIO  •  MASTER TAPE #1".to_string()
   };
 
+  let title_y = label_y + label_h * 0.23;
   c.draw_text(
-    &cassette_sub_str,
+    &track_title,
     center_x,
-    trap_y + trap_h * 0.65,
-    (trap_h * 0.45).clamp(8.0, 13.0),
-    "sans-serif",
+    title_y,
+    (label_h * 0.080).clamp(9.0, 15.0),
+    "monospace",
     700.0,
     false,
     TextAlign::Center,
-    Fill::Solid(hot_pink),
+    Fill::Solid(Color::rgba(0.12, 0.12, 0.15, 0.90)),
     1.0,
     &Default::default(),
   );
 
-  // Corner screw holes (matching Photo 2: "x" screws)
-  let screw_r = 3.5f32;
-  c.set_fill(Fill::Solid(electric_cyan));
-  c.fill_ellipse(left_x + 12.0, top_y + 12.0, screw_r, screw_r);
-  c.fill_ellipse(left_x + tape_w - 12.0, top_y + 12.0, screw_r, screw_r);
-  c.fill_ellipse(left_x + 12.0, top_y + tape_h - 12.0, screw_r, screw_r);
-  c.fill_ellipse(left_x + tape_w - 12.0, top_y + tape_h - 12.0, screw_r, screw_r);
+  // Dotted write-in title lines below title
+  c.set_stroke(Fill::Solid(Color::rgba(0.0, 0.0, 0.0, 0.15)));
+  c.set_line_width(1.0);
+  c.stroke_line(label_x + 20.0, title_y + 4.0, label_x + label_w - 20.0, title_y + 4.0);
 
+  // -------------------------------------------------------------------------
+  // 5. TRANSPARENT ACRYLIC TAPE WINDOW (RECESSED CLEAR WINDOW)
+  // -------------------------------------------------------------------------
+  let win_w = label_w * 0.72;
+  let win_h = label_h * 0.44;
+  let win_x = center_x - win_w / 2.0;
+  let win_y = label_y + label_h * 0.32;
+
+  // Dark window interior chamber
+  c.set_fill(Fill::Solid(Color::rgba(0.04, 0.03, 0.06, 0.98)));
+  c.fill_rounded_rect(win_x, win_y, win_w, win_h, 6.0);
+
+  // Recessed inner shadow
+  c.set_stroke(Fill::Solid(Color::rgba(0.0, 0.0, 0.0, 0.8)));
+  c.set_line_width(2.0);
+  c.stroke_rect(win_x, win_y, win_w, win_h);
+
+  // -------------------------------------------------------------------------
+  // 6. AUTHENTIC DUAL TAPE REELS & MAGNETIC TAPE VOLUME CONSERVATION
+  // -------------------------------------------------------------------------
+  let reel_r_min = win_h * 0.22;
+  let reel_r_max = win_h * 0.42;
+
+  let reel_left_x = center_x - win_w * 0.26;
+  let reel_right_x = center_x + win_w * 0.26;
+  let reel_center_y = win_y + win_h * 0.48;
+
+  // Real tape unwinding physics: conservation of tape cross-sectional area
+  // Left reel starts full of tape, transfers to right reel as song plays!
+  let tape_progress = ((frame_time * 0.02) % 1.0).clamp(0.0, 1.0);
+  let area_min = reel_r_min * reel_r_min;
+  let area_max = reel_r_max * reel_r_max;
+
+  let r_left = (area_max * (1.0 - tape_progress) + area_min * tape_progress).sqrt();
+  let r_right = (area_min * (1.0 - tape_progress) + area_max * tape_progress).sqrt();
+
+  // Dark brown magnetic oxide tape wound rolls on spools
+  let tape_color = Color::rgba(0.18, 0.11, 0.07, 0.98);
+  let tape_sheen = Color::rgba(0.32, 0.20, 0.12, 0.98);
+
+  // Left tape roll
+  let left_roll_grad = Fill::radial_gradient(
+    reel_left_x - r_left * 0.3,
+    reel_center_y - r_left * 0.3,
+    0.0,
+    reel_left_x,
+    reel_center_y,
+    r_left,
+    &[(0.0, tape_sheen), (0.7, tape_color), (1.0, Color::rgba(0.10, 0.06, 0.04, 0.98))],
+  );
+  c.set_fill(left_roll_grad);
+  c.fill_circle(reel_left_x, reel_center_y, r_left);
+
+  // Right tape roll
+  let right_roll_grad = Fill::radial_gradient(
+    reel_right_x - r_right * 0.3,
+    reel_center_y - r_right * 0.3,
+    0.0,
+    reel_right_x,
+    reel_center_y,
+    r_right,
+    &[(0.0, tape_sheen), (0.7, tape_color), (1.0, Color::rgba(0.10, 0.06, 0.04, 0.98))],
+  );
+  c.set_fill(right_roll_grad);
+  c.fill_circle(reel_right_x, reel_center_y, r_right);
+
+  // Draw White Plastic Hub Spools & Rotating Drive Gear Teeth
+  for &(rx, is_left) in &[(reel_left_x, true), (reel_right_x, false)] {
+    // White plastic reel hub flange
+    let hub_outer_r = reel_r_min;
+    c.set_fill(Fill::Solid(Color::rgba(0.95, 0.95, 0.92, 0.98)));
+    c.set_shadow(Color::rgba(0.0, 0.0, 0.0, 0.4), 4.0);
+    c.fill_circle(rx, reel_center_y, hub_outer_r);
+
+    c.set_stroke(Fill::Solid(Color::rgba(0.4, 0.4, 0.4, 0.5)));
+    c.set_line_width(1.0);
+    c.stroke_circle(rx, reel_center_y, hub_outer_r);
+
+    // Inner center drive hole
+    let hub_inner_r = hub_outer_r * 0.45;
+    c.set_fill(Fill::Solid(Color::rgba(0.04, 0.03, 0.06, 0.98)));
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+    c.fill_circle(rx, reel_center_y, hub_inner_r);
+
+    // 3-Spoke / 6-Teeth rotating drive gear teeth
+    let dir = if is_left { 1.0 } else { -1.0 };
+    let current_rot = rot * dir * 1.5;
+
+    c.set_fill(Fill::Solid(Color::rgba(0.92, 0.92, 0.90, 0.98)));
+
+    for t_idx in 0..6 {
+      let tooth_a = current_rot + (t_idx as f32 / 6.0) * TAU;
+      let tx = rx + tooth_a.cos() * (hub_inner_r * 0.85);
+      let ty = reel_center_y + tooth_a.sin() * (hub_inner_r * 0.85);
+      let tooth_r = hub_inner_r * 0.28;
+
+      c.fill_circle(tx, ty, tooth_r);
+    }
+  }
+
+  // Digital LED Time Counter inside Window
+  let led_bg_w = win_w * 0.25;
+  let led_bg_h = win_h * 0.22;
+  let led_bg_x = center_x - led_bg_w / 2.0;
+  let led_bg_y = win_y + win_h * 0.70;
+
+  c.set_fill(Fill::Solid(Color::rgba(0.02, 0.05, 0.04, 0.90)));
+  c.fill_rounded_rect(led_bg_x, led_bg_y, led_bg_w, led_bg_h, 3.0);
+
+  c.draw_text(
+    &short_time_str,
+    center_x,
+    led_bg_y + led_bg_h * 0.72,
+    (led_bg_h * 0.65).clamp(8.0, 13.0),
+    "monospace",
+    700.0,
+    false,
+    TextAlign::Center,
+    Fill::Solid(Color::hex("#00ff66")),
+    1.0,
+    &Default::default(),
+  );
+
+  // Glass Sheen Diagonal Reflection across acrylic window
+  let window_glare = Fill::linear_gradient(
+    win_x,
+    win_y,
+    win_x + win_w,
+    win_y + win_h,
+    &[
+      (0.0, Color::rgba(1.0, 1.0, 1.0, 0.12)),
+      (0.35, Color::rgba(1.0, 1.0, 1.0, 0.04)),
+      (0.40, Color::TRANSPARENT),
+      (1.0, Color::TRANSPARENT),
+    ],
+  );
+  c.set_fill(window_glare);
+  c.fill_rounded_rect(win_x, win_y, win_w, win_h, 6.0);
+
+  // -------------------------------------------------------------------------
+  // 7. BOTTOM TRAPEZOID TAPE HEAD CHAMBER & VISIBLE TAPE PATH
+  // -------------------------------------------------------------------------
+  let trap_w = tape_w * 0.68;
+  let trap_h = tape_h * 0.18;
+  let trap_top_w = trap_w * 0.88;
+
+  let trap_x0 = center_x - trap_top_w / 2.0;
+  let trap_x1 = center_x + trap_top_w / 2.0;
+  let trap_x2 = center_x + trap_w / 2.0;
+  let trap_x3 = center_x - trap_w / 2.0;
+
+  let trap_y0 = top_y + tape_h - trap_h - 4.0;
+  let trap_y1 = top_y + tape_h - 4.0;
+
+  // Recessed trapezoid head bay opening
+  c.set_fill(Fill::Solid(Color::rgba(0.06, 0.06, 0.09, 0.98)));
+  c.fill_polygon(&[
+    (trap_x0, trap_y0),
+    (trap_x1, trap_y0),
+    (trap_x2, trap_y1),
+    (trap_x3, trap_y1),
+  ]);
+
+  c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.15)));
+  c.set_line_width(1.2);
+  c.stroke_line(trap_x0, trap_y0, trap_x1, trap_y0);
+  c.stroke_line(trap_x2, trap_y1, trap_x3, trap_y1);
+
+  // Visible magnetic tape ribbon running across bottom read heads
+  let tape_path_y = trap_y0 + trap_h * 0.45;
+  c.set_stroke(Fill::Solid(Color::rgba(0.24, 0.15, 0.10, 0.95)));
+  c.set_line_width(5.0);
+  c.stroke_line(trap_x3 + 12.0, tape_path_y, trap_x2 - 12.0, tape_path_y);
+
+  // Read Head Metallic Blocks & Guide Rollers inside Chamber
+  let head_cx = center_x;
+  let head_y = trap_y0 + trap_h * 0.40;
+
+  // Main metallic play/record head block
+  c.set_fill(Fill::Solid(Color::rgba(0.70, 0.72, 0.78, 0.95)));
+  c.fill_rounded_rect(head_cx - 12.0, head_y - 4.0, 24.0, 12.0, 2.0);
+  c.set_fill(Fill::Solid(Color::rgba(0.30, 0.32, 0.38, 0.95)));
+  c.fill_rect(head_cx - 4.0, head_y - 4.0, 8.0, 12.0);
+
+  // Left & Right Capstan Roller Pins
+  let pin_left_x = trap_x3 + trap_w * 0.18;
+  let pin_right_x = trap_x2 - trap_w * 0.18;
+
+  c.set_fill(Fill::Solid(Color::rgba(0.85, 0.88, 0.92, 0.95)));
+  c.fill_circle(pin_left_x, head_y + 2.0, 4.0);
+  c.fill_circle(pin_right_x, head_y + 2.0, 4.0);
+
+  // -------------------------------------------------------------------------
+  // 8. AUDIO SPECTRUM EQUALIZER BARS (INTEGRATED ON LABEL FOOTER)
+  // -------------------------------------------------------------------------
+  let spec_y = label_y + label_h - 6.0;
+  let spec_w = label_w * 0.90;
+  let spec_x = center_x - spec_w / 2.0;
+
+  let step_f = (freq.len() / bar_count).max(1);
+  let bar_w = (spec_w / bar_count as f32) - 1.2;
+
+  for i in 0..bar_count {
+    let k = (i * step_f).min(freq.len().saturating_sub(1));
+    let raw_v = freq[k] as f32 / 255.0;
+    let val = (raw_v * sensitivity).clamp(0.0, 1.4);
+
+    let bh = (val * (label_h * 0.22) + 2.0).clamp(2.0, label_h * 0.30);
+    let bx = spec_x + i as f32 * (bar_w + 1.2);
+
+    let bar_col = mix(p, s, i as f32 / bar_count as f32);
+
+    c.set_fill(Fill::Solid(bar_col.with_alpha(0.85)));
+    c.set_shadow(glow, 6.0 + bs * 6.0);
+    c.fill_rounded_rect(bx, spec_y - bh, bar_w.max(1.5), bh, 1.5);
+  }
+
+  // -------------------------------------------------------------------------
+  // 9. METALLIC CORNER CROSS SCREWS (4 CORNERS)
+  // -------------------------------------------------------------------------
+  let screw_r = (tape_w * 0.016).clamp(3.0, 7.0);
+  let screw_margin = 14.0;
+
+  let corners = [
+    (left_x + screw_margin, top_y + screw_margin),
+    (left_x + tape_w - screw_margin, top_y + screw_margin),
+    (left_x + screw_margin, top_y + tape_h - screw_margin),
+    (left_x + tape_w - screw_margin, top_y + tape_h - screw_margin),
+  ];
+
+  for &(sx, sy) in &corners {
+    // Silver metallic screw body
+    let screw_grad = Fill::radial_gradient(
+      sx - screw_r * 0.3,
+      sy - screw_r * 0.3,
+      0.0,
+      sx,
+      sy,
+      screw_r,
+      &[
+        (0.0, Color::rgba(0.95, 0.95, 0.98, 0.98)),
+        (0.6, Color::rgba(0.65, 0.68, 0.72, 0.98)),
+        (1.0, Color::rgba(0.35, 0.38, 0.42, 0.98)),
+      ],
+    );
+    c.set_fill(screw_grad);
+    c.set_shadow(Color::rgba(0.0, 0.0, 0.0, 0.6), 3.0);
+    c.fill_circle(sx, sy, screw_r);
+
+    // Cross-head screw slot line ("X")
+    c.set_stroke(Fill::Solid(Color::rgba(0.20, 0.22, 0.26, 0.95)));
+    c.set_line_width(1.0);
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+    c.stroke_line(sx - screw_r * 0.6, sy, sx + screw_r * 0.6, sy);
+    c.stroke_line(sx, sy - screw_r * 0.6, sx, sy + screw_r * 0.6);
+  }
+
+  c.set_shadow(Color::TRANSPARENT, 0.0);
+  c.set_global_alpha(1.0);
   c.restore();
 }

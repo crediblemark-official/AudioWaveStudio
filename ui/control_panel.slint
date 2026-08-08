@@ -17,7 +17,7 @@ component StyleVisualIcon inherits Rectangle {
         Rectangle { width: 3px; height: 14px; border-radius: 1px; background: root.icon-color; }
     }
 
-    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" : HorizontalLayout {
+    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" || root.style-id == "radialRipple3D" || root.style-id == "vinylRecord" || root.style-id == "orbitSpike" || root.style-id == "cyberRing3D" || root.style-id == "dualPortalBridge" || root.style-id == "cyberBlackHole" || root.style-id == "supernovaBurst" || root.style-id == "quantumEye" || root.style-id == "chronoReactor" || root.style-id == "solarFlareCrown" || root.style-id == "warpDrive" || root.style-id == "neonBiohazard" || root.style-id == "neonLotus" || root.style-id == "holographicVinyl" || root.style-id == "acousticCymascope" : HorizontalLayout {
         alignment: center;
         cross-axis-alignment: center;
         Rectangle {
@@ -35,7 +35,7 @@ component StyleVisualIcon inherits Rectangle {
         }
     }
 
-    if root.style-id == "oscilloscope" || root.style-id == "minimal" || root.style-id == "auroraWave" : HorizontalLayout {
+    if root.style-id == "oscilloscope" || root.style-id == "minimal" || root.style-id == "auroraWave" || root.style-id == "particleWave3D" || root.style-id == "waterfall3D" : HorizontalLayout {
         spacing: 1px;
         alignment: center;
         cross-axis-alignment: center;
@@ -64,7 +64,7 @@ component StyleVisualIcon inherits Rectangle {
         }
     }
 
-    if root.style-id == "waveformFill" || root.style-id == "flameFire" || root.style-id == "api3D" : HorizontalLayout {
+    if root.style-id == "waveformFill" || root.style-id == "api3D" : HorizontalLayout {
         spacing: 2px;
         alignment: center;
         cross-axis-alignment: end;
@@ -74,7 +74,7 @@ component StyleVisualIcon inherits Rectangle {
         Rectangle { width: 4px; height: 10px; background: root.icon-color; }
     }
 
-    if root.style-id == "spiralGalaxy" || root.style-id == "threeD" || root.style-id == "neonCity3D" || root.style-id == "speaker3D" || root.style-id == "speakerTrio" || root.style-id == "speakerSplatter" : HorizontalLayout {
+    if root.style-id == "spiralGalaxy" || root.style-id == "threeD" || root.style-id == "neonCity3D" || root.style-id == "speaker3D" || root.style-id == "speakerTrio" || root.style-id == "speakerSplatter" || root.style-id == "cassetteTape" || root.style-id == "turntable" || root.style-id == "retroRadio" || root.style-id == "djController" || root.style-id == "speakerExplosion" || root.style-id == "hologramStage" || root.style-id == "cylinderMatrix3D" : HorizontalLayout {
         spacing: 3px;
         alignment: center;
         cross-axis-alignment: center;
@@ -90,7 +90,6 @@ component StyleVisualIcon inherits Rectangle {
 component StyleCard inherits Rectangle {
     in property <string> style-id: "";
     in property <string> label: "";
-    in property <string> icon: "";
     in property <string> current: "";
     in-out property <bool> has-hover: ta.has-hover;
     callback style-clicked(string);
@@ -272,6 +271,14 @@ component ColorCanvas2D inherits Rectangle {
     in-out property <float> val-y: 0.1;
     callback changed(string);
 
+    // Live color computed from the pointer state (HSV -> RGB), used by the
+    // preview badge and rendered inside the sat/val box. Degrees for `hsv()`
+    // are 0..360, s/v/a are 0..1.
+    in-out property <color> spectrum-color:
+        root.val-y > 0.90 ? #000000
+        : root.sat-x < 0.10 && root.val-y < 0.10 ? #ffffff
+        : hsv(root.hue-pos * 360.0, root.sat-x.clamp(0.0, 1.0), (1.0 - root.val-y).clamp(0.0, 1.0), 1.0);
+
     height: 160px;
 
     HorizontalLayout {
@@ -286,14 +293,9 @@ component ColorCanvas2D inherits Rectangle {
             border-color: #ffffff33;
             clip: true;
 
-            // Pure Hue Base Background Color
-            background: root.hue-pos <= 0.15 ? #ff0000
-                      : root.hue-pos <= 0.30 ? #ffff00
-                      : root.hue-pos <= 0.45 ? #00ff00
-                      : root.hue-pos <= 0.60 ? #00f0ff
-                      : root.hue-pos <= 0.75 ? #3b82f6
-                      : root.hue-pos <= 0.90 ? #ec4899
-                      : #ff0000;
+            // Pure Hue Base Background Color — continuous hue (not stepped
+            // bands) so dragging is smooth and matches the computed RGB above.
+            background: hsv(root.hue-pos * 360.0, 1.0, 1.0);
 
             // Saturation Overlay: White to Transparent (Left to Right)
             Rectangle {
@@ -387,25 +389,50 @@ component ColorCanvas2D inherits Rectangle {
         }
     }
 
+    // ---- Accurate HSV -> RGB -> hex conversion ----
+    // hue-pos in 0..1 -> degrees for HSV; sat-x = saturation (0=right edge
+    // white, 1=full), val-y = bottom-black (value = 1 - val-y).
+    function ch-rr(c: float, x: float, m: float, i: float) -> float {
+        return (i == 0 ? c : i == 1 ? x : i == 2 ? 0.0 : i == 3 ? 0.0 : i == 4 ? x : c) + m;
+    }
+    function ch-gg(c: float, x: float, m: float, i: float) -> float {
+        return (i == 0 ? x : i == 1 ? c : i == 2 ? c : i == 3 ? x : i == 4 ? 0.0 : 0.0) + m;
+    }
+    function ch-bb(c: float, x: float, m: float, i: float) -> float {
+        return (i == 0 ? 0.0 : i == 1 ? 0.0 : i == 2 ? x : i == 3 ? c : i == 4 ? c : x) + m;
+    }
+    function clamp-01(v: float) -> float { return v < 0.0 ? 0.0 : v > 1.0 ? 1.0 : v; }
+
+    // Integer 0..255 -> two hex chars (#RRGGBB).
+    function hex-digit(d: float) -> string {
+        return d == 0 ? "0" : d == 1 ? "1" : d == 2 ? "2" : d == 3 ? "3" : d == 4 ? "4"
+            : d == 5 ? "5" : d == 6 ? "6" : d == 7 ? "7" : d == 8 ? "8" : d == 9 ? "9"
+            : d == 10 ? "a" : d == 11 ? "b" : d == 12 ? "c" : d == 13 ? "d" : d == 14 ? "e" : "f";
+    }
+    function hex2(v: float) -> string {
+        let n = Math.round(v);
+        return hex-digit(Math.floor(n / 16.0)) + hex-digit(n - Math.floor(n / 16.0) * 16.0);
+    }
+
     function update-color() {
-        if (root.val-y > 0.90) {
+        // Corner snaps: pure black at very bottom, pure white at very top-left.
+        if (root.val-y > 0.94) {
             root.hex-val = "#000000";
-        } else if (root.sat-x < 0.10 && root.val-y < 0.10) {
+        } else if (root.sat-x < 0.08 && root.val-y < 0.08) {
             root.hex-val = "#ffffff";
-        } else if (root.hue-pos <= 0.15) {
-            root.hex-val = "#ef4444";
-        } else if (root.hue-pos <= 0.30) {
-            root.hex-val = "#ffe600";
-        } else if (root.hue-pos <= 0.45) {
-            root.hex-val = "#10b981";
-        } else if (root.hue-pos <= 0.60) {
-            root.hex-val = "#00f0ff";
-        } else if (root.hue-pos <= 0.75) {
-            root.hex-val = "#3b82f6";
-        } else if (root.hue-pos <= 0.90) {
-            root.hex-val = "#ec4899";
         } else {
-            root.hex-val = "#ef4444";
+            let v = 1.0 - root.val-y;
+            let s = root.sat-x;
+            let h = root.hue-pos * 360.0;
+            let c = v * s;
+            let hp = h / 60.0;
+            let sect = Math.floor(hp);
+            let x = c * (1.0 - Math.abs(Math.mod(hp, 2.0) - 1.0));
+            let m = v - c;
+            let r = root.clamp-01(root.ch-rr(c, x, m, sect));
+            let g = root.clamp-01(root.ch-gg(c, x, m, sect));
+            let b = root.clamp-01(root.ch-bb(c, x, m, sect));
+            root.hex-val = "#" + hex2(r * 255.0) + hex2(g * 255.0) + hex2(b * 255.0);
         }
         root.changed(root.hex-val);
     }
@@ -440,7 +467,10 @@ component ColorPickerField inherits Rectangle {
 
             Rectangle { horizontal-stretch: 1; }
 
-            // Live Color Box Badge
+            // Live Color Box Badge — reflects the CURRENT color. Known preset hex
+// strings map to a real color; for any other (custom/typed) value the badge
+// tracks the live HSV->RGB color the user is dragging on the canvas (a plain
+// `#RRGGBB` string cannot be re-parsed to a color at runtime in Slint).
             Rectangle {
                 width: 26px;
                 height: 20px;
@@ -462,12 +492,13 @@ component ColorPickerField inherits Rectangle {
                           : root.hex-val == "#ff6b6b" ? #ff6b6b
                           : root.hex-val == "#84cc16" ? #84cc16
                           : root.hex-val == "#ffffff" ? #ffffff
-                          : #000000;
+                          : root.hex-val == "#000000" ? #000000
+                          : color-canvas-badge.spectrum-color;
             }
         }
 
         // FULL 2D COLOR PICKER CANVAS (Sat/Val 2D Box + Vertical Rainbow Bar)
-        ColorCanvas2D {
+        color-canvas-badge := ColorCanvas2D {
             hex-val: root.hex-val;
             changed(c) => {
                 root.hex-val = c;
@@ -643,57 +674,89 @@ export component ControlPanel inherits Rectangle {
                 if (root.active-tab == "style") : VerticalLayout {
                     spacing: 10px;
 
-                    // 2-column grid of 19 style cards (legacy .style-grid)
+                    // 2-column grid of 32 style cards (legacy .style-grid)
                     GridLayout {
                         spacing: 8px;
 
-                        StyleCard { row: 0; col: 0; style-id: "spectrum"; label: "Spectrum Bars"; icon: "📊"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 0; col: 1; style-id: "radial"; label: "Radial Ring"; icon: "💿"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 0; col: 0; style-id: "spectrum"; label: "Spectrum Bars"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 0; col: 1; style-id: "radial"; label: "Radial Ring"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 1; col: 0; style-id: "oscilloscope"; label: "Oscilloscope"; icon: "📡"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 1; col: 1; style-id: "equalizer"; label: "Matrix Equalizer"; icon: "🎚️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 1; col: 0; style-id: "oscilloscope"; label: "Oscilloscope"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 1; col: 1; style-id: "equalizer"; label: "Matrix Equalizer"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 2; col: 0; style-id: "minimal"; label: "Minimal Wave"; icon: "➖"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 2; col: 1; style-id: "waveformFill"; label: "Waveform Fill"; icon: "🌊"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 2; col: 0; style-id: "minimal"; label: "Minimal Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 2; col: 1; style-id: "waveformFill"; label: "Waveform Fill"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 3; col: 0; style-id: "circularBars"; label: "Circular Bars"; icon: "🎯"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 3; col: 1; style-id: "smoothSpectrum"; label: "Smooth Spectrum"; icon: "📈"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 3; col: 0; style-id: "circularBars"; label: "Circular Bars"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 3; col: 1; style-id: "smoothSpectrum"; label: "Smooth Spectrum"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 4; col: 0; style-id: "pulseRings"; label: "Pulse Rings"; icon: "💫"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 4; col: 1; style-id: "vuMeter"; label: "VU Meter"; icon: "🎛️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 4; col: 0; style-id: "pulseRings"; label: "Pulse Rings"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 4; col: 1; style-id: "vuMeter"; label: "VU Meter"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 5; col: 0; style-id: "auroraWave"; label: "Aurora Wave"; icon: "🌌"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 5; col: 1; style-id: "flameFire"; label: "Flame Fire"; icon: "🔥"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 5; col: 0; style-id: "auroraWave"; label: "Aurora Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 5; col: 1; style-id: "spiralGalaxy"; label: "Spiral Galaxy"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 6; col: 0; style-id: "spiralGalaxy"; label: "Spiral Galaxy"; icon: "🌀"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 6; col: 1; style-id: "threeD"; label: "3D Blocks"; icon: "🧊"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 6; col: 0; style-id: "threeD"; label: "3D Blocks"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 6; col: 1; style-id: "api3D"; label: "Fire 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 7; col: 0; style-id: "api3D"; label: "Fire 3D"; icon: "🌋"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 7; col: 1; style-id: "neonCity3D"; label: "Neon City 3D"; icon: "🌆"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 7; col: 0; style-id: "neonCity3D"; label: "Neon City 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 7; col: 1; style-id: "speaker3D"; label: "Speaker 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 8; col: 0; style-id: "speaker3D"; label: "Speaker 3D"; icon: "🔊"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 8; col: 1; style-id: "speakerTrio"; label: "Speaker Trio"; icon: "🎵"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 8; col: 0; style-id: "speakerTrio"; label: "Speaker Trio"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 8; col: 1; style-id: "speakerSplatter"; label: "Speaker Splatter"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 9; col: 0; style-id: "speakerSplatter"; label: "Speaker Splatter"; icon: "🎶"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 9; col: 1; style-id: "radialRipple3D"; label: "3D Radial Ripple"; icon: "🌊"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 9; col: 0; style-id: "radialRipple3D"; label: "3D Radial Ripple"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 9; col: 1; style-id: "waterfall3D"; label: "3D Waterfall"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 10; col: 0; style-id: "waterfall3D"; label: "3D Waterfall"; icon: "⛰️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 10; col: 1; style-id: "cassetteTape"; label: "Retro Cassette"; icon: "📻"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 10; col: 0; style-id: "cassetteTape"; label: "Retro Cassette"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 10; col: 1; style-id: "vinylRecord"; label: "Vinyl Record"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 11; col: 0; style-id: "vinylRecord"; label: "Vinyl Record"; icon: "🛞"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 11; col: 1; style-id: "turntable"; label: "Turntable"; icon: "🎛️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 11; col: 0; style-id: "turntable"; label: "Turntable"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 11; col: 1; style-id: "retroRadio"; label: "Retro Radio"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 12; col: 0; style-id: "retroRadio"; label: "Retro Radio"; icon: "📻"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 12; col: 1; style-id: "djController"; label: "DJ Controller"; icon: "🎛️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 12; col: 0; style-id: "djController"; label: "DJ Controller"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 12; col: 1; style-id: "speakerExplosion"; label: "Speaker Explosion"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 13; col: 0; style-id: "speakerExplosion"; label: "Speaker Explosion"; icon: "🔊"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 13; col: 1; style-id: "orbitSpike"; label: "Orbit Spike"; icon: "💫"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 13; col: 0; style-id: "orbitSpike"; label: "Orbit Spike"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 13; col: 1; style-id: "cyberRing3D"; label: "Cyber Ring 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 14; col: 0; style-id: "cyberRing3D"; label: "Cyber Ring 3D"; icon: "🔮"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 14; col: 1; style-id: "hologramStage"; label: "Hologram Stage"; icon: "🏟️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 14; col: 0; style-id: "hologramStage"; label: "Hologram Stage"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 14; col: 1; style-id: "dualPortalBridge"; label: "Dual Portal Bridge"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
-                        StyleCard { row: 15; col: 0; style-id: "dualPortalBridge"; label: "Dual Portal Bridge"; icon: "🌈"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 15; col: 1; style-id: "dualWaveHorizon"; label: "Dual Wave Horizon"; icon: "〰️"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 15; col: 0; style-id: "particleWave3D"; label: "Particle Wave 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 15; col: 1; style-id: "cylinderMatrix3D"; label: "3D Cylinder Matrix"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 16; col: 0; style-id: "cyberHorizon"; label: "Cyber Horizon"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 16; col: 1; style-id: "cyberBlackHole"; label: "Cyber Black Hole"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 17; col: 0; style-id: "supernovaBurst"; label: "Supernova Burst"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 17; col: 1; style-id: "quantumEye"; label: "Quantum Eye"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 18; col: 0; style-id: "chronoReactor"; label: "Chrono Reactor"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 18; col: 1; style-id: "solarFlareCrown"; label: "Solar Flare Crown"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 19; col: 0; style-id: "warpDrive"; label: "Warp Drive"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 19; col: 1; style-id: "neonBiohazard"; label: "Neon Biohazard"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 20; col: 0; style-id: "neonLotus"; label: "Neon Lotus"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 20; col: 1; style-id: "holographicVinyl"; label: "Holographic Vinyl"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 21; col: 0; style-id: "acousticCymascope"; label: "Acoustic Cymascope"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 21; col: 1; style-id: "synthwaveHighway3D"; label: "Synthwave Highway 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 22; col: 0; style-id: "mercuryFluid"; label: "Mercury Fluid Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 22; col: 1; style-id: "neonMetropolis3D"; label: "Neon Metropolis 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 23; col: 0; style-id: "matrixRain"; label: "Matrix Data Rain"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 23; col: 1; style-id: "quantumRibbon"; label: "Quantum Ribbon 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 24; col: 0; style-id: "audioPrism3D"; label: "Audio Prism 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 24; col: 1; style-id: "vaporwaveDeck3D"; label: "Vaporwave Deck 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 25; col: 0; style-id: "nebulaCloud3D"; label: "Nebula Cloud 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 25; col: 1; style-id: "cyberTunnel3D"; label: "Cyber Tunnel 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 26; col: 0; style-id: "laserWall"; label: "Laser Equalizer Wall"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
                     }
 
                     SliderRow {
@@ -839,6 +902,7 @@ export component ControlPanel inherits Rectangle {
                         height: 34px;
                         model: ["Cyberpunk", "Synthwave", "Emerald", "Violet", "Gold", "Custom"];
                         current-value: root.theme-name;
+                        current-index: root.theme-name == "Cyberpunk" ? 0 : root.theme-name == "Synthwave" ? 1 : root.theme-name == "Emerald" ? 2 : root.theme-name == "Violet" ? 3 : root.theme-name == "Gold" ? 4 : 5;
                         selected(val) => { root.theme-name = val; root.theme-preset-selected(val); }
                     }
                     Button {
@@ -902,6 +966,7 @@ export component ControlPanel inherits Rectangle {
                         height: 34px;
                         model: ["Solid", "Gradient", "Custom Image", "Grid", "Aurora", "Noise", "Bokeh", "Starfield", "Nebula", "Psychedelic"];
                         current-value: root.bg-mode;
+                        current-index: root.bg-mode == "Solid" ? 0 : root.bg-mode == "Gradient" ? 1 : root.bg-mode == "Custom Image" ? 2 : root.bg-mode == "Grid" ? 3 : root.bg-mode == "Aurora" ? 4 : root.bg-mode == "Noise" ? 5 : root.bg-mode == "Bokeh" ? 6 : root.bg-mode == "Starfield" ? 7 : root.bg-mode == "Nebula" ? 8 : 9;
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
                     }
 
@@ -1149,6 +1214,7 @@ export component ControlPanel inherits Rectangle {
                             height: 34px;
                             model: ["Float", "Bounce", "Wave", "Static", "Confined"];
                             current-value: root.particle-style;
+                            current-index: root.particle-style == "Float" ? 0 : root.particle-style == "Bounce" ? 1 : root.particle-style == "Wave" ? 2 : root.particle-style == "Static" ? 3 : 4;
                             selected(val) => { root.particle-style = val; root.config-changed(); }
                         }
                         SliderRow {
@@ -1194,6 +1260,7 @@ export component ControlPanel inherits Rectangle {
                             height: 34px;
                             model: ["Float", "Bounce", "Spiral", "Wave", "Burst", "Confined"];
                             current-value: root.music-note-style;
+                            current-index: root.music-note-style == "Float" ? 0 : root.music-note-style == "Bounce" ? 1 : root.music-note-style == "Spiral" ? 2 : root.music-note-style == "Wave" ? 3 : root.music-note-style == "Burst" ? 4 : 5;
                             selected(val) => { root.music-note-style = val; root.config-changed(); }
                         }
                         SliderRow {
@@ -1282,6 +1349,7 @@ export component ControlPanel inherits Rectangle {
                             height: 34px;
                             model: ["None", "Shake", "Glitch", "Vignette", "Pulse", "Spotlight", "Strobe", "Scanline", "Chromatic Aberration", "Zoom", "Invert", "Bars", "Shockwave", "Pixelate", "Tilt", "Heat Haze", "Hue Shift"];
                             current-value: root.main-effect;
+                            current-index: root.main-effect == "None" ? 0 : root.main-effect == "Shake" ? 1 : root.main-effect == "Glitch" ? 2 : root.main-effect == "Vignette" ? 3 : root.main-effect == "Pulse" ? 4 : root.main-effect == "Spotlight" ? 5 : root.main-effect == "Strobe" ? 6 : root.main-effect == "Scanline" ? 7 : root.main-effect == "Chromatic Aberration" ? 8 : root.main-effect == "Zoom" ? 9 : root.main-effect == "Invert" ? 10 : root.main-effect == "Bars" ? 11 : root.main-effect == "Shockwave" ? 12 : root.main-effect == "Pixelate" ? 13 : root.main-effect == "Tilt" ? 14 : root.main-effect == "Heat Haze" ? 15 : 16;
                             selected(val) => { root.main-effect = val; root.config-changed(); }
                         }
 
@@ -1539,6 +1607,7 @@ export component ControlPanel inherits Rectangle {
                         height: 34px;
                         model: ["Bottom Center", "Top Center", "Center", "Bottom Left", "Left Middle", "Right Middle"];
                         current-value: root.text-preset;
+                        current-index: root.text-preset == "Bottom Center" ? 0 : root.text-preset == "Top Center" ? 1 : root.text-preset == "Center" ? 2 : root.text-preset == "Bottom Left" ? 3 : root.text-preset == "Left Middle" ? 4 : 5;
                         selected(val) => {
                             root.text-preset = val;
                             if (val == "Bottom Center") {

@@ -168,6 +168,7 @@ export component ExportModal inherits Rectangle {
                         ComboBox {
                             model: ["16:9", "9:16", "1:1"];
                             current-value: root.export-aspect-ratio;
+                            current-index: root.export-aspect-ratio == "16:9" ? 0 : root.export-aspect-ratio == "9:16" ? 1 : 2;
                             selected(val) => { root.export-aspect-ratio = val; }
                         }
                     }
@@ -178,6 +179,7 @@ export component ExportModal inherits Rectangle {
                         ComboBox {
                             model: ["720p", "1080p", "4K"];
                             current-value: root.export-resolution;
+                            current-index: root.export-resolution == "720p" ? 0 : root.export-resolution == "1080p" ? 1 : 2;
                             selected(val) => { root.export-resolution = val; }
                         }
                     }
@@ -188,6 +190,7 @@ export component ExportModal inherits Rectangle {
                         ComboBox {
                             model: ["30 FPS", "60 FPS"];
                             current-value: root.export-fps == 60 ? "60 FPS" : "30 FPS";
+                            current-index: root.export-fps == 60 ? 1 : 0;
                             selected(val) => { root.export-fps = val == "60 FPS" ? 60 : 30; }
                         }
                     }
@@ -198,6 +201,7 @@ export component ExportModal inherits Rectangle {
                         ComboBox {
                             model: ["mp4", "webm"];
                             current-value: root.export-format;
+                            current-index: root.export-format == "mp4" ? 0 : 1;
                             selected(val) => { root.export-format = val; }
                         }
                     }
@@ -208,6 +212,7 @@ export component ExportModal inherits Rectangle {
                         ComboBox {
                             model: ["Auto", "H.264", "HEVC (H.265)", "AV1"];
                             current-value: root.export-encoder;
+                            current-index: root.export-encoder == "Auto" ? 0 : root.export-encoder == "H.264" ? 1 : root.export-encoder == "HEVC (H.265)" ? 2 : 3;
                             selected(val) => { root.export-encoder = val; }
                         }
                     }
@@ -218,6 +223,7 @@ export component ExportModal inherits Rectangle {
                         ComboBox {
                             model: ["256", "512", "1024", "2048"];
                             current-value: root.export-fft-size;
+                            current-index: root.export-fft-size == 256 ? 0 : root.export-fft-size == 512 ? 1 : root.export-fft-size == 1024 ? 2 : 3;
                             selected(val) => {
                                 root.export-fft-size = val == "256" ? 256 : val == "512" ? 512 : val == "1024" ? 1024 : 2048;
                             }

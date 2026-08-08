@@ -1,71 +1,78 @@
 import { Slider } from "std-widgets.slint";
 
 // Legacy `.btn-play`: 36px gold-gradient circle with a soft glow, hover scale.
-component PlayBtn {
+component PlayBtn inherits Rectangle {
     in property <bool> playing: false;
     callback clicked();
 
-    Rectangle {
-        width: 36px;
-        height: 36px;
-        border-radius: 18px;
-        background: @linear-gradient(135deg, #ffd700, #d4af37);
-        border-width: 0px;
-        // Legacy `.btn-play` glow — drop-shadow equivalents of `box-shadow: 0 0 12px rgba(255,215,0,0.4)`
-        drop-shadow-blur: 12px;
-        drop-shadow-color: #ffd70066;
+    width: 36px;
+    height: 36px;
+    border-radius: 18px;
+    background: @linear-gradient(135deg, #ffd700, #d4af37);
+    border-width: 0px;
+    drop-shadow-blur: ta.has-hover ? 14px : 10px;
+    drop-shadow-color: #ffd70066;
 
-        ta := TouchArea {
-            width: parent.width;
-            height: parent.height;
-            mouse-cursor: pointer;
-            clicked => { root.clicked(); }
-        }
+    transform-scale-x: ta.has-hover ? 1.06 : 1.0;
+    transform-scale-y: ta.has-hover ? 1.06 : 1.0;
+    transform-origin: { x: self.width / 2, y: self.height / 2 };
+    animate transform-scale-x { duration: 120ms; easing: ease-out; }
+    animate transform-scale-y { duration: 120ms; easing: ease-out; }
 
-        Text {
-            text: root.playing ? "⏸" : "▶";
-            color: #000000;
-            font-size: 16px;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
 
-        Tooltip {
-            Text { text: root.playing ? "Pause" : "Play"; font-size: 11px; color: #f8fafc; }
-        }
+    Text {
+        text: root.playing ? "⏸" : "▶";
+        color: #000000;
+        font-size: 16px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    Tooltip {
+        Text { text: root.playing ? "Pause" : "Play"; font-size: 11px; color: #f8fafc; }
     }
 }
 
 // Legacy `.btn-control`: 28px circle, faint white fill, hover brightens.
-component ControlBtn {
+component ControlBtn inherits Rectangle {
     in property <string> icon: "";
     in property <string> tip: "";
     callback clicked();
 
-    Rectangle {
-        width: 28px;
-        height: 28px;
-        border-radius: 14px;
-        background: ta.has-hover ? #ffffff33 : #ffffff14;
+    width: 28px;
+    height: 28px;
+    border-radius: 14px;
+    background: ta.has-hover ? #ffffff33 : #ffffff14;
 
-        ta := TouchArea {
-            width: parent.width;
-            height: parent.height;
-            mouse-cursor: pointer;
-            clicked => { root.clicked(); }
-        }
+    transform-scale-x: ta.has-hover ? 1.06 : 1.0;
+    transform-scale-y: ta.has-hover ? 1.06 : 1.0;
+    transform-origin: { x: self.width / 2, y: self.height / 2 };
+    animate transform-scale-x { duration: 120ms; easing: ease-out; }
+    animate transform-scale-y { duration: 120ms; easing: ease-out; }
 
-        Text {
-            text: root.icon;
-            color: ta.has-hover ? #f8fafc : #a3a3a3;
-            font-size: 13px;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-        }
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
 
-        Tooltip {
-            Text { text: root.tip; font-size: 11px; color: #f8fafc; }
-        }
+    Text {
+        text: root.icon;
+        color: ta.has-hover ? #f8fafc : #a3a3a3;
+        font-size: 13px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    Tooltip {
+        Text { text: root.tip; font-size: 11px; color: #f8fafc; }
     }
 }
 

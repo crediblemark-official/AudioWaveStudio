@@ -207,8 +207,27 @@ export component Navbar inherits Rectangle {
                 text: root.is-listening ? "⏹ Stop Listen" : "🎧 Listen";
                 clicked => {
                     if (root.is-listening) { root.stop-listen-clicked(); }
-                    else if (root.mic-devices.length > 1) { root.show-mic-picker = !root.show-mic-picker; }
                     else { root.listen-clicked(); }
+                }
+            }
+
+            if (root.mic-devices.length > 1) : Rectangle {
+                width: 24px;
+                height: 32px;
+                border-radius: 6px;
+                background: mic-arrow-ta.has-hover ? #ffd70033 : #ffffff12;
+
+                mic-arrow-ta := TouchArea {
+                    mouse-cursor: pointer;
+                    clicked => { root.show-mic-picker = !root.show-mic-picker; }
+                }
+
+                Text {
+                    text: "▼";
+                    font-size: 10px;
+                    color: root.show-mic-picker ? #ffd700 : #cbd5e1;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
                 }
             }
 

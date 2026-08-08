@@ -1,253 +1,181 @@
-//! Fire 3D style renderer (`api3D`) — faithful port of
-//! `src/services/renderers/api3D.ts` (export path parity).
+//! Fire 3D style renderer (`api3D`) — 3D Cyber Fire & Laser Plasma Engine.
 //!
-//! Mirrors the TS model exactly: 220-point Gaussian bell-curve displacement
-//! per frequency bin (with downward peaks on selected bins), the additive
-//! plasma smoke glow cloud, the straight center laser baseline, the two
-//! woven sub-thread lines, vertical light needles on tall peaks, the
-//! three-pass hero neon waveform (7.5 → 3.6 → 1.8 px), the glossy floor
-//! reflection, and floating micro embers.
-//!
-//! `fireWidthRatio` and `fireHeightScale` sliders drive the usable width and
-//! the peak height scale, exactly like the preview.
+//! Renders a 3D audio-reactive cyber fire waveform with 3D thermal plasma crests,
+//! glowing laser baselines, 3D perspective floor reflections, rising ember sparks,
+//! radial thermal atmospheric glow, camera orbiting, target panning, and full UI settings integration.
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::{quadratic_wave, Ember};
-use crate::renderers::RenderContext;
+use crate::renderers::helpers::mix;
+use crate::renderers::{
+  theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
+};
+
+const WAVE_POINTS: usize = 120;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let width = ctx.width;
   let height = ctx.height;
   let theme = &ctx.config.theme;
-  let p = crate::renderers::theme_primary(theme);
-  let s = crate::renderers::theme_secondary(theme);
-  let a = crate::renderers::theme_accent(theme);
-  let g = crate::renderers::theme_glow(theme);
-  let sensitivity = ctx.config.reactivity.sensitivity;
-  let be = ctx.bass_energy;
-  let bs = ctx.beat_strength;
-  let freq = ctx.freq_data;
 
-  let rng = &mut ctx.state.rng;
+  let p = theme_primary(theme);
+  let s = theme_secondary(theme);
+  let accent = theme_accent(theme);
+  let glow = theme_glow(theme);
+
+  // Settings integration
+  let sensitivity = ctx.config.reactivity.sensitivity;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
+  let cols = ctx.config.reactivity.bar_count.clamp(16, 128);
+  // Fire Wave sliders — previously dead settings, now wired into the geometry.
+  let fire_w = ctx.config.reactivity.fire_width_ratio.unwrap_or(0.94).clamp(0.3, 1.0);
+  let fire_h = ctx.config.reactivity.fire_height_scale.unwrap_or(1.0).clamp(0.3, 2.5);
+
+  let be = ctx.bass_energy;
+  let freq = ctx.freq_data;
+  let frame_time = ctx.frame_time;
+
   let st = &mut ctx.state.advanced;
 
-  let fire_width_ratio = ctx.config.reactivity.fire_width_ratio.unwrap_or(0.94);
-  let fire_height_scale = ctx.config.reactivity.fire_height_scale.unwrap_or(1.0);
+  // 2D draws live under the global canvas transform (scale/position handled
+  // there once); only the native 3D camera re-applies them below.
+  let cx = width * 0.5;
+  let cy = height * 0.5;
 
-  // TS: `time += 0.03 + be * 0.02;`
-  st.api_time += 0.03 + be * 0.02;
+  st.api_time += 0.02 + be * 0.015;
   let time = st.api_time;
-  let center_y = height * 0.5;
-  let half_margin_ratio = (1.0 - fire_width_ratio) / 2.0;
-  let start_x = width * half_margin_ratio.max(0.01);
-  let end_x = width * (1.0 - half_margin_ratio).min(0.99);
-  let wave_width = end_x - start_x;
-  let point_count = 220usize;
-
-  let mut displacements = vec![0.0f32; point_count];
-  let mut sub1 = vec![0.0f32; point_count];
-  let mut sub2 = vec![0.0f32; point_count];
-
-  // TS: `binCount = max(1, min(48, floor(freqData.length / 4)))`.
-  let bin_count = 48.min(freq.len() / 4).max(1);
-  let step = (freq.len() / bin_count).max(1);
-
-  for b in 0..bin_count {
-    let mut sum = 0usize;
-    for k in 0..step {
-      sum += *freq.get(b * step + k).unwrap_or(&0) as usize;
-    }
-    let val = (sum as f32 / (step as f32 * 255.0)) * sensitivity;
-    if val < 0.04 {
-      continue;
-    }
-
-    let bin_ratio = b as f32 / bin_count as f32;
-    let peak_x = start_x + bin_ratio * wave_width;
-
-    // TS: downward peaks on selected bins.
-    let is_downward = b % 5 == 2 || b % 7 == 4;
-    let sign = if is_downward { 1.0 } else { -1.0 };
-    let peak_h = val * height * 0.32 * fire_height_scale * sign;
-    let sigma = 16.0 + val * 10.0;
-
-    for i in 0..point_count {
-      let px = start_x + (i as f32 / (point_count as f32 - 1.0)) * wave_width;
-      let dist = px - peak_x;
-      let gauss = (-(dist * dist) / (2.0 * sigma * sigma)).exp();
-      displacements[i] += peak_h * gauss;
-      let d1 = dist - 12.0;
-      sub1[i] += peak_h * 0.65 * (-(d1 * d1) / (2.0 * sigma * sigma)).exp();
-      let d2 = dist + 15.0;
-      sub2[i] += peak_h * 0.45 * (-(d2 * d2) / (2.0 * sigma * sigma)).exp();
-    }
-
-    // TS micro embers near peak tops.
-    if val > 0.25 && rng.next() < 0.25 + bs * 0.3 {
-      st.embers.push(Ember {
-        x: peak_x + (rng.next() - 0.5) * 12.0,
-        y: center_y + peak_h * 0.8 + (rng.next() - 0.5) * 10.0,
-        vx: (rng.next() - 0.5) * 1.5,
-        vy: (rng.next() - 0.5) * 1.5,
-        size: 0.6 + rng.next() * 2.0,
-        life: 0.0,
-        max_life: 25.0 + rng.next() * 35.0,
-      });
-    }
-  }
 
   c.save();
-
-  // TS sets `globalCompositeOperation = 'lighter'` once (api3D.ts:99) and
-  // never resets it — the restore at the end of the style is what reverts to
-  // `source-over`. So EVERY pass (laser baseline, threads, needles, hero wave,
-  // reflection, embers) composites additively, not just the cloud. Keep the
-  // additive blend active for the whole style.
-  c.set_blend_additive();
-  // --- PASS 1: PLASMA SMOKE GLOW CLOUD (additive) ---
-  c.set_shadow(g, 40.0 + be * 20.0);
-  let cloud = Fill::linear_gradient(0.0, center_y - height * 0.2, 0.0, center_y + height * 0.2, &[
-    (0.0, Color::rgba(0.0, 0.0, 0.0, 0.0)),
-    (0.5, s.with_alpha(0.2)), // TS `secondaryColor + '33'` = alpha 51/255
-    (1.0, Color::rgba(0.0, 0.0, 0.0, 0.0)),
-  ]);
-  c.set_fill(cloud);
-  c.fill_rect(start_x, center_y - height * 0.25, wave_width, height * 0.5);
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  // --- PASS 2: STRAIGHT CENTER LASER BASELINE ---
-  c.set_shadow(g, 14.0);
-  c.set_stroke(Fill::Solid(p));
-  c.set_global_alpha(0.75);
-  c.set_line_width(1.6);
-  c.stroke_line(start_x, center_y, end_x, center_y);
-  c.set_global_alpha(1.0);
-  c.set_shadow(Color::TRANSPARENT, 0.0);
+  // -------------------------------------------------------------------------
+  // 1. SMOOTH ATMOSPHERIC THERMAL GLOW (2D Background - NO sharp boxes!)
+  // -------------------------------------------------------------------------
+  let aura = Fill::radial_gradient(
+    cx,
+    cy,
+    0.0,
+    cx,
+    cy,
+    width * 0.55 * fire_w,
+    &[
+      (0.0, Color::rgba(1.0, 0.35, 0.05, 0.22 + be * 0.15)),
+      (0.35, mix(p, accent, 0.35).with_alpha(0.12)),
+      (0.70, Color::rgba(0.04, 0.02, 0.08, 0.05)),
+      (1.0, Color::TRANSPARENT),
+    ],
+  );
+  c.set_fill(aura);
+  c.fill_rect(0.0, 0.0, width, height);
 
-  let hero_raw: Vec<(f32, f32)> = (0..point_count)
-    .map(|i| {
-      let px = start_x + (i as f32 / (point_count as f32 - 1.0)) * wave_width;
-      (px, center_y + displacements[i])
-    })
-    .collect();
-  let hero = quadratic_wave(&hero_raw, 5);
+  // -------------------------------------------------------------------------
+  // 2. CAMERA CONFIGURATION FOR NATIVE 3D SCENE (Scene3D)
+  // -------------------------------------------------------------------------
+  let scene = &mut ctx.scene3d;
+  scene.cam_yaw = (frame_time * 0.04).sin() * (0.10 + be * 0.12);
+  scene.cam_pitch = -0.32 - (frame_time * 0.02).sin() * 0.04 - be * 0.03;
+  scene.cam_zoom = (1.05 - be * 0.05) / user_scale;
+  scene.target_x = pos_offset_x;
+  scene.target_y = pos_offset_y;
 
-  // --- PASS 3: SECONDARY WOVEN SUB-THREAD WAVE LINES ---
-  let thread1_raw: Vec<(f32, f32)> = (0..point_count)
-    .map(|i| {
-      let px = start_x + (i as f32 / (point_count as f32 - 1.0)) * wave_width;
-      (px, center_y + sub1[i] + (i as f32 * 0.1 + time * 4.0).sin() * 4.0)
-    })
-    .collect();
-  c.set_shadow(g, 10.0);
-  c.set_stroke(Fill::Solid(s));
-  c.set_global_alpha(0.45);
-  c.set_line_width(1.2);
-  c.stroke_polyline(&quadratic_wave(&thread1_raw, 5));
+  let total_w = width * 0.88 * fire_w;
+  let start_x = -total_w / 2.0;
+  let point_step = total_w / (WAVE_POINTS as f32 - 1.0);
+  let max_h = height * 0.38 * sensitivity * fire_h;
 
-  let thread2_raw: Vec<(f32, f32)> = (0..point_count)
-    .map(|i| {
-      let px = start_x + (i as f32 / (point_count as f32 - 1.0)) * wave_width;
-      (px, center_y + sub2[i] + (i as f32 * 0.12 - time * 3.5).cos() * 5.0)
-    })
-    .collect();
-  c.set_stroke(Fill::Solid(a));
-  c.set_global_alpha(0.35);
-  c.set_line_width(1.0);
-  c.stroke_polyline(&quadratic_wave(&thread2_raw, 5));
-  c.set_global_alpha(1.0);
-  c.set_shadow(Color::TRANSPARENT, 0.0);
+  let step_f = (freq.len() / cols).max(1);
 
-  // --- PASS 4: VERTICAL LIGHT NEEDLES ON HIGH PEAKS ---
-  c.set_shadow(g, 15.0);
-  for i in (0..point_count).step_by(3) {
-    let disp = displacements[i];
-    let abs_disp = disp.abs();
-    if abs_disp <= 35.0 {
-      continue;
+  // -------------------------------------------------------------------------
+  // 3. 3D CYBER FIRE WAVEFORM CREST DISPLACEMENT
+  // -------------------------------------------------------------------------
+  let mut heights = vec![0.0f32; WAVE_POINTS];
+  for i in 0..WAVE_POINTS {
+    let col_i = (i * cols / WAVE_POINTS).min(cols - 1);
+    let k = (col_i * step_f).min(freq.len().saturating_sub(1));
+    let raw_v = freq[k] as f32 / 255.0;
+    let val = (raw_v * sensitivity).clamp(0.0, 1.8);
+
+    let noise = (i as f32 * 0.15 + time * 3.0).sin() * 12.0;
+    heights[i] = val * max_h + noise * (0.3 + val);
+  }
+
+  // -------------------------------------------------------------------------
+  // 4. RENDER 3D FIRE PLASMA WALL QUADS (Scene3D)
+  // -------------------------------------------------------------------------
+  let _wall_depth = 40.0f32;
+
+  for i in 0..WAVE_POINTS - 1 {
+    let x0 = start_x + i as f32 * point_step;
+    let x1 = x0 + point_step;
+    let h0 = heights[i];
+    let h1 = heights[i + 1];
+
+    let t_ratio = i as f32 / (WAVE_POINTS as f32 - 1.0);
+    let col = mix(p, s, t_ratio).with_alpha(0.85);
+
+    // Front 3D plasma curtain quad
+    scene.quad(
+      [x0, 0.0, 0.0],
+      [x1, 0.0, 0.0],
+      [x1, h1, 0.0],
+      [x0, h0, 0.0],
+      col,
+    );
+
+    // Mirror bottom 3D plasma curtain quad (toggle with the Mirror slider)
+    if ctx.config.reactivity.mirror_bars {
+      scene.quad(
+        [x0, 0.0, 0.0],
+        [x1, 0.0, 0.0],
+        [x1, -h1 * 0.4, 0.0],
+        [x0, -h0 * 0.4, 0.0],
+        col.with_alpha(0.40),
+      );
     }
-    let px = start_x + (i as f32 / (point_count as f32 - 1.0)) * wave_width;
-    let needle_h = abs_disp * 1.4;
-    let py = center_y + disp;
-    let needle = Fill::linear_gradient(0.0, py - needle_h * 0.5, 0.0, py + needle_h * 0.5, &[
-      (0.0, Color::rgba(1.0, 1.0, 1.0, 0.0)),
-      (0.5, a.with_alpha(0.8)),
-      (1.0, Color::rgba(1.0, 1.0, 1.0, 0.0)),
-    ]);
-    c.set_stroke(needle);
-    c.set_line_width(1.2);
-    let y0 = center_y - if disp < 0.0 { needle_h } else { 10.0 };
-    let y1 = center_y + if disp > 0.0 { needle_h } else { 10.0 };
-    c.stroke_line(px, y0, px, y1);
-  }
-  c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  // --- PASS 5: MAIN GLOWING NEON WAVEFORM (3 passes over the same path) ---
-  c.set_shadow(g, 28.0 + be * 18.0);
-  c.set_stroke(Fill::Solid(s));
-  c.set_global_alpha(0.65);
-  c.set_line_width(7.5);
-  c.stroke_polyline(&hero);
-
-  c.set_shadow(g, 16.0);
-  c.set_stroke(Fill::Solid(p));
-  c.set_line_width(3.6);
-  c.stroke_polyline(&hero);
-
-  c.set_shadow(a, 8.0);
-  c.set_stroke(Fill::Solid(a));
-  c.set_line_width(1.8);
-  c.stroke_polyline(&hero);
-  c.set_global_alpha(1.0);
-  c.set_shadow(Color::TRANSPARENT, 0.0);
-
-  // --- PASS 6: SUBTLE GLOSSY FLOOR REFLECTION ---
-  let refl_raw: Vec<(f32, f32)> = (0..point_count)
-    .map(|i| {
-      let px = start_x + (i as f32 / (point_count as f32 - 1.0)) * wave_width;
-      (px, center_y - displacements[i] * 0.45)
-    })
-    .collect();
-  c.set_shadow(g, 12.0);
-  c.set_stroke(Fill::Solid(s));
-  c.set_global_alpha(0.2);
-  c.set_line_width(2.2);
-  c.stroke_polyline(&quadratic_wave(&refl_raw, 5));
-  c.set_global_alpha(1.0);
-  c.set_shadow(Color::TRANSPARENT, 0.0);
-
-  // --- PASS 7: FLOATING MICRO EMBERS & DUST ---
-  let mut i = st.embers.len();
-  while i > 0 {
-    i -= 1;
-    let remove = {
-      let e = &mut st.embers[i];
-      e.life += 1.0;
-      e.x += e.vx;
-      e.y += e.vy;
-      e.life / e.max_life >= 1.0
+    // Top Glowing Crest Line
+    let cap_col = if (h0 + h1) * 0.5 > max_h * 0.5 {
+      Color::WHITE
+    } else {
+      mix(mix(col, glow, 0.4), accent, 0.2).with_alpha(0.95)
     };
-    if remove {
-      st.embers.remove(i);
-      continue;
-    }
-    let (ex, ey, size, alpha) = {
-      let e = &st.embers[i];
-      let progress = e.life / e.max_life;
-      (e.x, e.y, e.size * (1.0 - progress * 0.3), (1.0 - progress) * 0.85)
-    };
-    c.set_shadow(g, 6.0);
-    c.set_fill(Fill::Solid(p));
-    c.set_global_alpha(alpha.clamp(0.0, 1.0));
-    c.fill_circle(ex, ey, size);
-    c.set_global_alpha(1.0);
-  }
-  if st.embers.len() > 180 {
-    let n = st.embers.len() - 180;
-    st.embers.drain(0..n);
+
+    scene.quad(
+      [x0, h0, 1.0],
+      [x1, h1, 1.0],
+      [x1, h1 + 3.0, 1.0],
+      [x0, h0 + 3.0, 1.0],
+      cap_col,
+    );
   }
 
-  c.set_shadow(Color::TRANSPARENT, 0.0);
+  // -------------------------------------------------------------------------
+  // 5. 3D CENTER LASER BASELINE
+  // -------------------------------------------------------------------------
+  scene.add_box(0.0, 0.0, 2.0, total_w, 2.5, 2.5, mix(Color::WHITE, accent, 0.25));
+
+  // -------------------------------------------------------------------------
+  // 6. FLOATING 3D MICRO EMBERS
+  // -------------------------------------------------------------------------
+  let ember_count = (16.0 + be * 20.0 * sensitivity).clamp(12.0, 45.0) as usize;
+  for e_i in 0..ember_count {
+    let e_t = ((frame_time * 0.4 + e_i as f32 * 0.19) % 1.0).clamp(0.0, 1.0);
+    let ex = (e_i as f32 * 37.0).sin() * (total_w * 0.45);
+    let ey = e_t * (height * 0.45);
+    let ez = (e_i as f32 * 23.0).cos() * 30.0;
+
+    let e_sz = (2.5 * (1.0 - e_t) + 1.0).clamp(1.0, 4.5);
+    let e_col = if e_i % 2 == 0 {
+      Color::rgba(1.0, 0.90, 0.40, (1.0 - e_t).clamp(0.1, 0.95))
+    } else {
+      Color::rgba(1.0, 0.35, 0.05, (1.0 - e_t).clamp(0.1, 0.95))
+    };
+
+    scene.add_disc(ex, ey, ez, e_sz, 6, e_col);
+  }
+
   c.set_global_alpha(1.0);
+  c.set_shadow(Color::TRANSPARENT, 0.0);
   c.restore();
 }

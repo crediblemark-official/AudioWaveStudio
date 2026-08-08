@@ -44,6 +44,12 @@ impl AudioPlayer {
             return Ok(());
         }
 
+        // If the previous playback finished naturally (position sits at the
+        // end), pressing play again restarts the track from the beginning.
+        if self.duration_sec > 0.0 && self.accumulated_sec >= self.duration_sec {
+            self.accumulated_sec = 0.0;
+        }
+
         self.kill_process();
 
         let start_sec = self.accumulated_sec;
@@ -51,18 +57,7 @@ impl AudioPlayer {
 
         // Launch system audio player process
         let vol_str = format!("{:.2}", self.volume);
-        let child = if let Ok(c) = Command::new("pw-play")
-            .arg("--volume")
-            .arg(&vol_str)
-            .arg(&file_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        {
-            println!("[AudioPlayer] Playing via pw-play: {}", file_path);
-            Some(c)
-        } else if let Ok(c) = Command::new("ffplay")
+        let child = if let Ok(c) = Command::new("ffplay")
             .env("SDL_AUDIO_DRIVER", "pulse")
             .arg("-nodisp")
             .arg("-autoexit")
@@ -78,16 +73,19 @@ impl AudioPlayer {
             .stderr(Stdio::null())
             .spawn()
         {
-            println!("[AudioPlayer] Playing via ffplay: {}", file_path);
+            println!("[AudioPlayer] Playing via ffplay (start_sec={:.2}s): {}", start_sec, file_path);
             Some(c)
-        } else if let Ok(c) = Command::new("paplay")
+        } else if let Ok(c) = Command::new("mpv")
+            .arg("--no-video")
+            .arg(format!("--start={:.2}", start_sec))
+            .arg(format!("--volume={}", vol_pct))
             .arg(&file_path)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
         {
-            println!("[AudioPlayer] Playing via paplay: {}", file_path);
+            println!("[AudioPlayer] Playing via mpv (start_sec={:.2}s): {}", start_sec, file_path);
             Some(c)
         } else if let Ok(c) = Command::new("afplay")
             .arg("-ss")
@@ -98,14 +96,46 @@ impl AudioPlayer {
             .stderr(Stdio::null())
             .spawn()
         {
-            println!("[AudioPlayer] Playing via afplay: {}", file_path);
+            println!("[AudioPlayer] Playing via afplay (start_sec={:.2}s): {}", start_sec, file_path);
+            Some(c)
+        } else if let Ok(c) = Command::new("pw-play")
+            .arg("--volume")
+            .arg(&vol_str)
+            .arg(&file_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            println!("[AudioPlayer] Playing via pw-play (start_sec={:.2}s): {}", start_sec, file_path);
+            Some(c)
+        } else if let Ok(c) = Command::new("paplay")
+            .arg(&file_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            println!("[AudioPlayer] Playing via paplay (start_sec={:.2}s): {}", start_sec, file_path);
             Some(c)
         } else {
             eprintln!("[AudioPlayer] Failed to launch audio process for: {}", file_path);
             None
         };
 
-        self.child_process = child;
+        let Some(child) = child else {
+            // No audio backend could be spawned — report the failure instead of
+            // pretending playback started (the UI must not flip to "⏸" while
+            // nothing is actually playing).
+            self.child_process = None;
+            self.start_instant = None;
+            self.is_playing = false;
+            return Err(
+                "No audio player available — install ffplay, mpv, pw-play or paplay".to_string(),
+            );
+        };
+
+        self.child_process = Some(child);
         self.start_instant = Some(Instant::now());
         self.is_playing = true;
         Ok(())
@@ -188,7 +218,14 @@ impl AudioPlayer {
             if let Some(instant) = self.start_instant {
                 let current = self.accumulated_sec + instant.elapsed().as_secs_f64();
                 if current >= self.duration_sec && self.duration_sec > 0.0 {
-                    self.stop();
+                    // Natural end of track: stop the child but keep the position
+                    // pinned at the end so the progress bar stays at 100% (a
+                    // plain `stop()` would reset accumulated_sec to 0 and make
+                    // the bar snap back to the start on the next frame).
+                    self.accumulated_sec = self.duration_sec;
+                    self.kill_process();
+                    self.is_playing = false;
+                    self.start_instant = None;
                     return self.duration_sec;
                 }
                 return current;

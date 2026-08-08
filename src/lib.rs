@@ -321,7 +321,7 @@ pub fn run() {
         // the app: the frame is skipped and the animation continues.
         let frame_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         idle_clock += 0.016;
-        let (audio_opt, time_sec, duration_sec, _is_playing, config) = {
+        let (audio_opt, time_sec, duration_sec, is_playing, config) = {
             let mut s = poison_proof(&state_clone);
             let time_sec = s.audio_player.get_current_time_sec();
             let duration_sec = s.audio_player.get_duration_sec();
@@ -336,6 +336,12 @@ pub fn run() {
                 w.set_playback_progress(pct);
                 w.set_current_time_str(slint::SharedString::from(format_time(time_sec)));
             }
+
+            // Sync the play/pause button with the player's real state every
+            // frame: `get_current_time_sec` flips the player to stopped when a
+            // track ends naturally, and only this loop can tell the UI about it
+            // (click callbacks only fire on user input).
+            w.set_is_playing(is_playing);
 
             // Mic liveness: if capture produced no samples within ~1.5s, the stream
             // died silently (device busy / permission) — auto-stop and report it.
@@ -518,7 +524,15 @@ pub fn run() {
         }
     });
 
-    window.run().expect("Failed to run Slint event loop");
+    // The event loop runs until the window is closed. A windowing error (e.g.
+    // the X11/Wayland dispatcher hitting an IO error, which winit surfaces as
+    // `ExitFailure(1)`) must NOT panic the process: a panic here would skip the
+    // shutdown cleanup below and leave the ffplay/pw-play child playing audio
+    // after the app is gone (the "audio masih muter" bug class this file keeps
+    // fighting). Log it and fall through to the same cleanup as a normal close.
+    if let Err(e) = window.run() {
+        eprintln!("[EventLoop] Window event loop ended with an error: {e}");
+    }
 
     // Event loop ended (window closed). Stop audio + mic EXPLICITLY as a safety
     // net in case the close handler was bypassed (e.g. window-manager close or

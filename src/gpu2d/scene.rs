@@ -749,7 +749,8 @@ impl GpuCanvas {
   }
 
   pub fn fill_rounded_rect(&mut self, x: f32, y: f32, w: f32, h: f32, r: f32) {
-    let r = r.clamp(0.0, w.min(h) / 2.0);
+    let max_r = (w.min(h) / 2.0).max(0.0);
+    let r = r.clamp(0.0, max_r);
     if r <= 0.0 {
       self.fill_rect(x, y, w, h);
       return;
@@ -776,7 +777,8 @@ impl GpuCanvas {
 
   /// Canvas roundRect with only the top corners rounded (bars).
   pub fn fill_rounded_rect_top(&mut self, x: f32, y: f32, w: f32, h: f32, r: f32) {
-    let r = r.clamp(0.0, w.min(h) / 2.0);
+    let max_r = (w.min(h) / 2.0).max(0.0);
+    let r = r.clamp(0.0, max_r);
     if r <= 0.0 {
       self.fill_rect(x, y, w, h);
       return;
@@ -794,7 +796,8 @@ impl GpuCanvas {
 
   /// Canvas roundRect with only the bottom corners rounded (mirror bars).
   pub fn fill_rounded_rect_bottom(&mut self, x: f32, y: f32, w: f32, h: f32, r: f32) {
-    let r = r.clamp(0.0, w.min(h) / 2.0);
+    let max_r = (w.min(h) / 2.0).max(0.0);
+    let r = r.clamp(0.0, max_r);
     if r <= 0.0 {
       self.fill_rect(x, y, w, h);
       return;
@@ -1412,7 +1415,15 @@ impl GpuCanvas {
 
   // --- output ---
 
-  pub fn finish(mut self) -> Mesh {
+  pub fn finish(self) -> Mesh {
+    self.finish_with(super::scene3d::Scene3D::new())
+  }
+
+  /// Flush geometry and produce the frame mesh, attaching the native 3D scene
+  /// built alongside the canvas (styles push 3D geometry into the `Scene3D`
+  /// handed to `RenderContext`). `GpuRenderer` draws `scene3d` in a
+  /// depth-tested pass right after this 2D mesh.
+  pub fn finish_with(mut self, scene3d: super::scene3d::Scene3D) -> Mesh {
     // Flush any remaining geometry into the final batch.
     self.flush_batch();
     Mesh {
@@ -1421,6 +1432,7 @@ impl GpuCanvas {
       clear: self.clear,
       atlases: self.atlases,
       batches: self.batches,
+      scene3d,
     }
   }
 }
@@ -1472,6 +1484,9 @@ pub struct Mesh {
   pub clear: Color,
   pub atlases: Vec<AtlasUpload>,
   pub batches: Vec<DrawBatch>,
+  /// Native 3D scene drawn after this 2D mesh (depth-tested). Empty for
+  /// styles that only use the 2D canvas.
+  pub scene3d: super::scene3d::Scene3D,
 }
 
 impl Mesh {

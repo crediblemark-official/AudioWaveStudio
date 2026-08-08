@@ -25,8 +25,48 @@ pub enum VisualizerStyle {
   VuMeter,
   #[serde(rename = "auroraWave")]
   AuroraWave,
-  #[serde(rename = "flameFire")]
-  FlameFire,
+  #[serde(rename = "cyberHorizon")]
+  CyberHorizon,
+  #[serde(rename = "cyberBlackHole")]
+  CyberBlackHole,
+  #[serde(rename = "supernovaBurst")]
+  SupernovaBurst,
+  #[serde(rename = "quantumEye")]
+  QuantumEye,
+  #[serde(rename = "chronoReactor")]
+  ChronoReactor,
+  #[serde(rename = "solarFlareCrown")]
+  SolarFlareCrown,
+  #[serde(rename = "warpDrive")]
+  WarpDrive,
+  #[serde(rename = "neonBiohazard")]
+  NeonBiohazard,
+  #[serde(rename = "neonLotus")]
+  NeonLotus,
+  #[serde(rename = "holographicVinyl")]
+  HolographicVinyl,
+  #[serde(rename = "acousticCymascope")]
+  AcousticCymascope,
+  #[serde(rename = "synthwaveHighway3D")]
+  SynthwaveHighway3D,
+  #[serde(rename = "mercuryFluid")]
+  MercuryFluid,
+  #[serde(rename = "neonMetropolis3D")]
+  NeonMetropolis3D,
+  #[serde(rename = "matrixRain")]
+  MatrixRain,
+  #[serde(rename = "quantumRibbon")]
+  QuantumRibbon,
+  #[serde(rename = "audioPrism3D")]
+  AudioPrism3D,
+  #[serde(rename = "vaporwaveDeck3D")]
+  VaporwaveDeck3D,
+  #[serde(rename = "nebulaCloud3D")]
+  NebulaCloud3D,
+  #[serde(rename = "cyberTunnel3D")]
+  CyberTunnel3D,
+  #[serde(rename = "laserWall")]
+  LaserWall,
   #[serde(rename = "spiralGalaxy")]
   SpiralGalaxy,
   #[serde(rename = "threeD")]
@@ -65,8 +105,10 @@ pub enum VisualizerStyle {
   HologramStage,
   #[serde(rename = "dualPortalBridge")]
   DualPortalBridge,
-  #[serde(rename = "dualWaveHorizon")]
-  DualWaveHorizon,
+  #[serde(rename = "particleWave3D")]
+  ParticleWave3D,
+  #[serde(rename = "cylinderMatrix3D")]
+  CylinderMatrix3D,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

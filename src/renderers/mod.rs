@@ -16,7 +16,7 @@ pub mod text;
 use crate::config::{
   AudioReactivitySettings, BackgroundEffect, BackgroundFillType, ColorTheme, VisualizerConfig,
 };
-use crate::gpu2d::{Color, Fill, GpuCanvas};
+use crate::gpu2d::{Color, Fill, GpuCanvas, Scene3D};
 
 // ---------------------------------------------------------------------------
 // Deterministic RNG (mulberry32) so exports are reproducible per session.
@@ -154,6 +154,10 @@ pub struct RenderContext<'a> {
   pub rotation_angle: f32,
   pub frame_time: f32,
   pub state: &'a mut RenderState,
+  /// Native 3D scene (see `crate::gpu2d::scene3d`). Styles that support true
+  /// 3D push geometry here; `GpuRenderer` draws it in a depth-tested pass
+  /// right after the 2D canvas.
+  pub scene3d: &'a mut Scene3D,
 }
 
 // ---------------------------------------------------------------------------
@@ -485,6 +489,7 @@ pub enum FramePass {
 
 pub fn draw_frame_pass(
   c: &mut GpuCanvas,
+  scene3d: &mut Scene3D,
   state: &mut RenderState,
   config: &VisualizerConfig,
   freq: &[u8],
@@ -507,6 +512,7 @@ pub fn draw_frame_pass(
     rotation_angle: state.rotation_angle,
     frame_time,
     state,
+    scene3d,
   };
 
   let bg_only = config.screen_effects.background_only.unwrap_or(true);
@@ -604,7 +610,8 @@ pub fn draw_frame(
   is_playing: bool,
 ) {
   let env = advance_envelope(state, config, freq, frame_time, is_playing);
-  draw_frame_pass(c, state, config, freq, time, frame_time, &env, FramePass::All);
+  let mut scene3d = Scene3D::new();
+  draw_frame_pass(c, &mut scene3d, state, config, freq, time, frame_time, &env, FramePass::All);
 }
 
 pub fn render_frame_to_rgb(

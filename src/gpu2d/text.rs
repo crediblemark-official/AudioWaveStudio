@@ -284,7 +284,9 @@ fn font_set() -> Option<&'static FontSet> {
 }
 
 pub fn is_arabic_text(text: &str) -> bool {
-  text.chars().any(|ch| matches!(ch, '\u{0600}'..='\u{06FF}' | '\u{0750}'..='\u{077F}' | '\u{08A0}'..='\u{08FF}'))
+  let has_arabic = text.chars().any(|ch| matches!(ch, '\u{0600}'..='\u{06FF}' | '\u{0750}'..='\u{077F}' | '\u{08A0}'..='\u{08FF}'));
+  let has_ascii_alnum = text.chars().any(|ch| ch.is_ascii_alphanumeric());
+  has_arabic && !has_ascii_alnum
 }
 
 /// Pick a cached font for a family name + weight (600+ = bold).
@@ -519,6 +521,7 @@ fn rasterize_linear(
   let mut max_iy = f32::MIN;
 
   for p in &placed {
+    if p.gid.0 == 0 { continue; }
     let glyph = p.gid.with_scale(scale);
     let Some(og) = font.arc.outline_glyph(glyph) else { continue };
     let bounds = og.px_bounds();
@@ -603,6 +606,7 @@ fn rasterize_shaped(
   let mut max_ix = f32::MIN;
   let mut max_iy = f32::MIN;
   for (i, g) in glyphs.iter().enumerate() {
+    if g.gid.0 == 0 { continue; }
     let mut y = g.y_offset;
     if opts.wave {
       let t = opts.wave_time * 5.0 + (opts.char_index_start + i) as f32 * 0.6;

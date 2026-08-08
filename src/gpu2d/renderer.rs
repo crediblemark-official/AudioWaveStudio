@@ -1,7 +1,13 @@
 //! GpuRenderer — wgpu device/queue that rasterizes a GpuCanvas mesh to RGBA.
 
 use super::scene::{Mesh, Vertex};
+use super::scene3d::Scene3D;
 use bytemuck::{Pod, Zeroable};
+use glam::Mat4;
+
+const THREE_D_SHADER_SRC: &str = include_str!("three_d_shader.wgsl");
+/// Depth-buffer format used by the native 3D scene pass.
+const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
 pub const TEXTURE_LAYERS: u32 = 24;
 /// Atlas array-layer size. 2048 keeps a >1080p background photo near 1:1 for
@@ -87,6 +93,56 @@ fn vertex_layout() -> Vec<wgpu::VertexAttribute> {
   ]
 }
 
+// --- Native 3D scene (Scene3D) vertex/uniform types ---
+
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[repr(C)]
+struct RawVertex3 {
+  position: [f32; 3],
+  normal: [f32; 3],
+  color: [f32; 4],
+}
+
+impl From<&super::scene3d::V3> for RawVertex3 {
+  fn from(v: &super::scene3d::V3) -> Self {
+    RawVertex3 { position: v.position, normal: v.normal, color: v.color }
+  }
+}
+
+fn vertex_layout_3d() -> Vec<wgpu::VertexAttribute> {
+  vec![
+    wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x3, offset: 0, shader_location: 0 },
+    wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x3, offset: 12, shader_location: 1 },
+    wgpu::VertexAttribute { format: wgpu::VertexFormat::Float32x4, offset: 24, shader_location: 2 },
+  ]
+}
+
+/// Uniform block for the 3D pipeline, matching `three_d_shader.wgsl`:
+/// `view_proj` (mat4), `light_dir`, `light_col`, `ambient` (vec4 each).
+/// glam::Mat4 is column-major, so a `[f32; 16]` copies straight through.
+#[derive(Clone, Copy, Debug, Pod, Zeroable)]
+#[repr(C)]
+struct RawCamUniform {
+  view_proj: [f32; 16],
+  light_dir: [f32; 4],
+  light_col: [f32; 4],
+  ambient: [f32; 4],
+}
+
+impl RawCamUniform {
+  fn new(view_proj: Mat4) -> RawCamUniform {
+    // Light from the upper-left-front, biased toward the viewer (+z) so the
+    // faces that face the camera get lit.
+    let light_dir = glam::Vec3::new(-0.4, 0.7, 0.8).normalize();
+    RawCamUniform {
+      view_proj: view_proj.to_cols_array(),
+      light_dir: [light_dir.x, light_dir.y, light_dir.z, 0.0],
+      light_col: [0.72, 0.72, 0.85, 1.0],
+      ambient: [0.4, 0.4, 0.52, 0.55],
+    }
+  }
+}
+
 pub struct GpuRenderer {
   device: wgpu::Device,
   queue: wgpu::Queue,
@@ -133,6 +189,15 @@ pub struct GpuRenderer {
   post_pipeline: wgpu::RenderPipeline,
   post_params_buf: wgpu::Buffer,
   post_bind_group: wgpu::BindGroup,
+  // Native 3D scene pass (Scene3D), depth-tested after the 2D scene.
+  depth_view: wgpu::TextureView,
+  vert_buf_3d: Option<wgpu::Buffer>,
+  vert_cap_3d: usize,
+  idx_buf_3d: Option<wgpu::Buffer>,
+  idx_cap_3d: usize,
+  cam_buf: wgpu::Buffer,
+  cam_bind_group: wgpu::BindGroup,
+  pipeline_3d: wgpu::RenderPipeline,
 }
 
 impl GpuRenderer {
@@ -550,6 +615,105 @@ impl GpuRenderer {
       ],
     });
 
+    // --- Native 3D scene pass (Scene3D) ---
+    let depth_texture = device.create_texture(&wgpu::TextureDescriptor {
+      label: Some("3D Depth"),
+      size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
+      mip_level_count: 1,
+      sample_count: 1,
+      dimension: wgpu::TextureDimension::D2,
+      format: DEPTH_FORMAT,
+      usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+      view_formats: &[],
+    });
+    let depth_view = depth_texture.create_view(&Default::default());
+
+    let shader_3d = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+      label: Some("three_d"),
+      source: wgpu::ShaderSource::Wgsl(THREE_D_SHADER_SRC.into()),
+    });
+    let cam_bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+      label: Some("3D BGL"),
+      entries: &[wgpu::BindGroupLayoutEntry {
+        binding: 0,
+        visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+        ty: wgpu::BindingType::Buffer {
+          ty: wgpu::BufferBindingType::Uniform,
+          has_dynamic_offset: false,
+          min_binding_size: None,
+        },
+        count: None,
+      }],
+    });
+    let pipeline_layout_3d = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+      label: Some("3D PL"),
+      bind_group_layouts: &[&cam_bind_group_layout],
+      push_constant_ranges: &[],
+    });
+    let pipeline_3d = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+      label: Some("three_d pipeline"),
+      layout: Some(&pipeline_layout_3d),
+      vertex: wgpu::VertexState {
+        module: &shader_3d,
+        entry_point: Some("vs_main"),
+        buffers: &[wgpu::VertexBufferLayout {
+          array_stride: std::mem::size_of::<RawVertex3>() as u64,
+          step_mode: wgpu::VertexStepMode::Vertex,
+          attributes: &vertex_layout_3d(),
+        }],
+        compilation_options: Default::default(),
+      },
+      fragment: Some(wgpu::FragmentState {
+        module: &shader_3d,
+        entry_point: Some("fs_main"),
+        targets: &[Some(wgpu::ColorTargetState {
+          format: wgpu::TextureFormat::Rgba8Unorm,
+          blend: Some(wgpu::BlendState {
+            color: wgpu::BlendComponent {
+              src_factor: wgpu::BlendFactor::SrcAlpha,
+              dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+              operation: wgpu::BlendOperation::Add,
+            },
+            alpha: wgpu::BlendComponent {
+              src_factor: wgpu::BlendFactor::One,
+              dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+              operation: wgpu::BlendOperation::Add,
+            },
+          }),
+          write_mask: wgpu::ColorWrites::ALL,
+        })],
+        compilation_options: Default::default(),
+      }),
+      primitive: wgpu::PrimitiveState {
+        topology: wgpu::PrimitiveTopology::TriangleList,
+        // No culling: the styles build every face explicitly and want the
+        // inside of hollow shapes (rings, open boxes) visible too.
+        cull_mode: None,
+        ..Default::default()
+      },
+      depth_stencil: Some(wgpu::DepthStencilState {
+        format: DEPTH_FORMAT,
+        depth_write_enabled: true,
+        depth_compare: wgpu::CompareFunction::Less,
+        stencil: wgpu::StencilState::default(),
+        bias: wgpu::DepthBiasState::default(),
+      }),
+      multisample: wgpu::MultisampleState::default(),
+      multiview: None,
+      cache: None,
+    });
+    let cam_buf = device.create_buffer(&wgpu::BufferDescriptor {
+      label: Some("3D Cam"),
+      size: std::mem::size_of::<RawCamUniform>() as u64,
+      usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+      mapped_at_creation: false,
+    });
+    let cam_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+      label: Some("3D BG"),
+      layout: &cam_bind_group_layout,
+      entries: &[wgpu::BindGroupEntry { binding: 0, resource: cam_buf.as_entire_binding() }],
+    });
+
     let max_img_dim = device.limits().max_texture_dimension_2d.min(8192);
 
     Ok(Self {
@@ -582,6 +746,14 @@ impl GpuRenderer {
       post_pipeline,
       post_params_buf,
       post_bind_group,
+      depth_view,
+      vert_buf_3d: None,
+      vert_cap_3d: 0,
+      idx_buf_3d: None,
+      idx_cap_3d: 0,
+      cam_buf,
+      cam_bind_group,
+      pipeline_3d,
     })
   }
 
@@ -794,6 +966,94 @@ impl GpuRenderer {
     }
   }
 
+  /// Persistent vertex/index buffers for the 3D scene, grown on demand and
+  /// rewritten each frame via `queue.write_buffer` (same strategy as
+  /// `ensure_geometry`).
+  fn ensure_geometry_3d(&mut self, scene: &Scene3D) {
+    let vneed = scene.verts().len();
+    if self.vert_cap_3d < vneed {
+      self.vert_buf_3d = Some(self.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("verts3d"),
+        size: (vneed.max(1) * std::mem::size_of::<RawVertex3>()) as u64,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+      }));
+      self.vert_cap_3d = vneed;
+    }
+    if vneed > 0 {
+      let verts: Vec<RawVertex3> = scene.verts().iter().map(RawVertex3::from).collect();
+      self
+        .queue
+        .write_buffer(self.vert_buf_3d.as_ref().unwrap(), 0, bytemuck::cast_slice(&verts));
+    }
+
+    let ineed = scene.idx().len();
+    if self.idx_cap_3d < ineed {
+      self.idx_buf_3d = Some(self.device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("idx3d"),
+        size: (ineed.max(1) * std::mem::size_of::<u32>()) as u64,
+        usage: wgpu::BufferUsages::INDEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+      }));
+      self.idx_cap_3d = ineed;
+    }
+    if ineed > 0 {
+      self
+        .queue
+        .write_buffer(self.idx_buf_3d.as_ref().unwrap(), 0, bytemuck::cast_slice(scene.idx()));
+    }
+  }
+
+  /// Record the native 3D pass into `target`: uploads the scene geometry +
+  /// camera uniform, clears depth to 1.0 and draws the triangles on top of the
+  /// current frame contents (the caller keeps the colour attachment with
+  /// `LoadOp::Load`, so the 2D background/style underneath is preserved).
+  fn record_scene_3d(&mut self, enc: &mut wgpu::CommandEncoder, scene: &Scene3D, target: SceneTarget) {
+    if scene.is_empty() {
+      return;
+    }
+    self.ensure_geometry_3d(scene);
+
+    let view_proj = crate::renderers::three_d_engine::view_proj(
+      self.width,
+      self.height,
+      scene.cam_yaw,
+      scene.cam_pitch,
+      scene.cam_zoom,
+      scene.target_x,
+      scene.target_y,
+    );
+    let uniforms = RawCamUniform::new(view_proj);
+    self
+      .queue
+      .write_buffer(&self.cam_buf, 0, bytemuck::bytes_of(&uniforms));
+
+    let view = match target {
+      SceneTarget::Frame => &self.texture_view,
+      SceneTarget::Post => &self.post_texture_view,
+    };
+    let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
+      label: Some("three_d pass"),
+      color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+        view,
+        resolve_target: None,
+        ops: wgpu::Operations { load: wgpu::LoadOp::Load, store: wgpu::StoreOp::Store },
+      })],
+      depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+        view: &self.depth_view,
+        depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(1.0), store: wgpu::StoreOp::Store }),
+        stencil_ops: None,
+      }),
+      ..Default::default()
+    });
+
+    pass.set_pipeline(&self.pipeline_3d);
+    pass.set_bind_group(0, &self.cam_bind_group, &[]);
+    pass.set_vertex_buffer(0, self.vert_buf_3d.as_ref().unwrap().slice(..));
+    pass.set_index_buffer(self.idx_buf_3d.as_ref().unwrap().slice(..), wgpu::IndexFormat::Uint32);
+    pass.draw_indexed(0..scene.idx().len() as u32, 0, 0..1);
+  }
+
   /// Record the scene pass: upload atlases, build geometry and draw the frame
   /// into `self.texture`. Caller submits the encoder after adding copies/post.
   fn record_scene(&mut self, enc: &mut wgpu::CommandEncoder, mesh: &Mesh) {
@@ -904,6 +1164,7 @@ impl GpuRenderer {
       label: Some("frame enc"),
     });
     self.record_scene(&mut enc, mesh);
+    self.record_scene_3d(&mut enc, &mesh.scene3d, SceneTarget::Frame);
     self.copy_to_staging(&mut enc, slot, &self.texture);
     self.queue.submit(std::iter::once(enc.finish()));
   }
@@ -965,8 +1226,10 @@ impl GpuRenderer {
       label: Some("frame fg over enc"),
     });
     // Composite the foreground (style/particles/notes/text) over the fx'd
-    // background without clearing.
+    // background without clearing, then draw the native 3D scene on top with a
+    // real depth buffer.
     self.record_scene_over(&mut enc, fg_mesh, SceneTarget::Post);
+    self.record_scene_3d(&mut enc, &fg_mesh.scene3d, SceneTarget::Post);
     self.copy_to_staging(&mut enc, slot, &self.post_texture);
     self.queue.submit(std::iter::once(enc.finish()));
   }
@@ -993,6 +1256,7 @@ impl GpuRenderer {
       label: Some("frame fx enc"),
     });
     self.record_scene(&mut enc, mesh);
+    self.record_scene_3d(&mut enc, &mesh.scene3d, SceneTarget::Frame);
 
     {
       let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {

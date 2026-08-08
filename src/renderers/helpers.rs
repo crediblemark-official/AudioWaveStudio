@@ -91,8 +91,6 @@ pub struct AdvancedState {
   pub sparks: Vec<Spark>,
   pub motes: Vec<LightMote>,
   pub peaks: Vec<Peak>,
-  pub three_d_prev_beat: f32,
-  pub three_d_rot: f32,
   pub embers: Vec<Ember>,
   pub api_time: f32,
   pub frame_history: Vec<Vec<u8>>,
@@ -111,8 +109,6 @@ impl Default for AdvancedState {
       sparks: Vec::new(),
       motes: Vec::new(),
       peaks: Vec::new(),
-      three_d_prev_beat: 0.0,
-      three_d_rot: 0.0,
       embers: Vec::new(),
       api_time: 0.0,
       frame_history: Vec::new(),
@@ -179,4 +175,22 @@ pub fn quadratic_wave(raw: &[(f32, f32)], steps: u32) -> Vec<(f32, f32)> {
     prev_end = end;
   }
   out
+}
+
+/// Draws the user's Radial Center Image (uploaded to a persistent atlas layer)
+/// as a circular texture centered at (cx, cy) with radius `r`. Returns `true`
+/// when an image was drawn — callers fall back to their own disc otherwise.
+pub fn draw_radial_center_image(
+  c: &mut GpuCanvas,
+  ctx: &crate::renderers::RenderContext,
+  cx: f32,
+  cy: f32,
+  r: f32,
+) -> bool {
+  if let Some(img) = &ctx.state.radial_center_image {
+    c.push_circular_textured_quad(img.layer, cx, cy, r, [0.0, 0.0, 1.0, 1.0], Color::WHITE);
+    true
+  } else {
+    false
+  }
 }

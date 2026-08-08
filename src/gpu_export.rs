@@ -6,7 +6,7 @@
 use crate::audio_decoder::AudioData;
 use crate::config::VisualizerConfig;
 use crate::fft_analyzer::FftAnalyzer;
-use crate::gpu2d::{GpuCanvas, GpuRenderer, IMAGE_LAYER, RADIAL_CENTER_IMAGE_LAYER};
+use crate::gpu2d::{GpuCanvas, GpuRenderer, IMAGE_LAYER, RADIAL_CENTER_IMAGE_LAYER, Scene3D};
 use crate::renderers::{advance_envelope, draw_frame_pass, BackgroundImage, FramePass, RenderState};
 use base64::{Engine as _, engine::general_purpose};
 use serde::Serialize;
@@ -215,25 +215,28 @@ pub fn export_gpu(
         // layer only, then draw the style/particles/text over it (mirrors
         // canvasRenderer drawFrame).
         let mut bg_canvas = GpuCanvas::new(width, height);
+        let mut bg_scene = Scene3D::new();
         draw_frame_pass(
-          &mut bg_canvas, &mut rstate, &config, &freq_u8, &time_u8, frame_time, &env,
+          &mut bg_canvas, &mut bg_scene, &mut rstate, &config, &freq_u8, &time_u8, frame_time, &env,
           FramePass::BackgroundOnly,
         );
-        let bg_mesh = bg_canvas.finish();
+        let bg_mesh = bg_canvas.finish_with(bg_scene);
         let mut fg_canvas = GpuCanvas::new(width, height);
+        let mut fg_scene = Scene3D::new();
         draw_frame_pass(
-          &mut fg_canvas, &mut rstate, &config, &freq_u8, &time_u8, frame_time, &env,
+          &mut fg_canvas, &mut fg_scene, &mut rstate, &config, &freq_u8, &time_u8, frame_time, &env,
           FramePass::ForegroundOnly,
         );
-        let fg_mesh = fg_canvas.finish();
+        let fg_mesh = fg_canvas.finish_with(fg_scene);
         gpu.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx.as_ref().unwrap(), slot);
       } else {
         let mut canvas = GpuCanvas::new(width, height);
+        let mut scene3d = Scene3D::new();
         draw_frame_pass(
-          &mut canvas, &mut rstate, &config, &freq_u8, &time_u8, frame_time, &env,
+          &mut canvas, &mut scene3d, &mut rstate, &config, &freq_u8, &time_u8, frame_time, &env,
           FramePass::All,
         );
-        let mesh = canvas.finish();
+        let mesh = canvas.finish_with(scene3d);
         match fx {
           Some(fx) => gpu.render_into_fx(&mesh, &fx, slot),
           None => gpu.render_into(&mesh, slot),
@@ -425,25 +428,28 @@ pub fn render_preview_frame_inner(
   if fx.is_some() && bg_only {
     // backgroundOnly: effect applies to the background layer only.
     let mut bg_canvas = GpuCanvas::new(width, height);
+    let mut bg_scene = Scene3D::new();
     draw_frame_pass(
-      &mut bg_canvas, &mut rstate, config, freq_data, time_data, frame_time, &env,
+      &mut bg_canvas, &mut bg_scene, &mut rstate, config, freq_data, time_data, frame_time, &env,
       FramePass::BackgroundOnly,
     );
-    let bg_mesh = bg_canvas.finish();
+    let bg_mesh = bg_canvas.finish_with(bg_scene);
     let mut fg_canvas = GpuCanvas::new(width, height);
+    let mut fg_scene = Scene3D::new();
     draw_frame_pass(
-      &mut fg_canvas, &mut rstate, config, freq_data, time_data, frame_time, &env,
+      &mut fg_canvas, &mut fg_scene, &mut rstate, config, freq_data, time_data, frame_time, &env,
       FramePass::ForegroundOnly,
     );
-    let fg_mesh = fg_canvas.finish();
+    let fg_mesh = fg_canvas.finish_with(fg_scene);
     engine.renderer.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx.as_ref().unwrap(), 0);
   } else {
     let mut canvas = GpuCanvas::new(width, height);
+    let mut scene3d = Scene3D::new();
     draw_frame_pass(
-      &mut canvas, &mut rstate, config, freq_data, time_data, frame_time, &env,
+      &mut canvas, &mut scene3d, &mut rstate, config, freq_data, time_data, frame_time, &env,
       FramePass::All,
     );
-    let mesh = canvas.finish();
+    let mesh = canvas.finish_with(scene3d);
     match fx {
       Some(fx) => engine.renderer.render_into_fx(&mesh, &fx, 0),
       None => engine.renderer.render_into(&mesh, 0),

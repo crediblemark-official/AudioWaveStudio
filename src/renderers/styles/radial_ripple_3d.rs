@@ -6,6 +6,7 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
+use crate::renderers::helpers::draw_radial_center_image;
 use crate::renderers::RenderContext;
 
 const RING_COUNT: usize = 32;
@@ -18,16 +19,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
   let freq = ctx.freq_data;
-  let st = &mut ctx.state.advanced;
-
-  // Maintain spectrum history for outward ripple propagation
-  if st.frame_history.first().map(|f| f.len()) != Some(freq.len()) {
-    st.frame_history.clear();
-  }
-  st.frame_history.insert(0, freq.to_vec());
-  if st.frame_history.len() > RING_COUNT {
-    st.frame_history.pop();
-  }
 
   let center_x = width * 0.48;
   let center_y = height * 0.62;
@@ -38,6 +29,20 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
+
+  // User Radial Center Image at the ripple core (if set)
+  draw_radial_center_image(c, ctx, center_x, center_y, 34.0);
+
+  let st = &mut ctx.state.advanced;
+
+  // Maintain spectrum history for outward ripple propagation
+  if st.frame_history.first().map(|f| f.len()) != Some(freq.len()) {
+    st.frame_history.clear();
+  }
+  st.frame_history.insert(0, freq.to_vec());
+  if st.frame_history.len() > RING_COUNT {
+    st.frame_history.pop();
+  }
 
   let num_rings = st.frame_history.len();
   let step = (freq.len() / (RING_POINTS / 2)).max(1);

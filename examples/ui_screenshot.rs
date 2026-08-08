@@ -96,7 +96,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Onboarding empty state / drag-drop highlight states (has-track defaults
     // to false). For --drop, also wire + fire the audio-file-dropped callback
     // to prove the Rust binding exists and receives the dropped path.
-    if empty {
+    if !empty {
+        app.set_has_track(true);
+    } else {
         // has-track stays false: the EmptyStateOverlay shows over the canvas.
         println!("empty state: has-track={} drop-hover={}", app.get_has_track(), app.get_drop_hover());
     }

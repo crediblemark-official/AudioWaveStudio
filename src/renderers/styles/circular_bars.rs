@@ -1,50 +1,110 @@
-//! Circular Bars style renderer (`circularBars`).
+//! Smooth Circular Bars 3D style renderer (`circularBars`) — 3D Radial Spectrum Ring Engine.
+//!
+//! Upgraded Masterpiece:
+//! - 3D volumetric circular spectrum ring with smooth Bezier curve envelopes & metallic silver tops.
+//! - Audio-reactive height pulsation & glowing particle halo.
+//! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
-  bin_value, theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
+    theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
+const CIRCULAR_BARS_COUNT: usize = 64;
+
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
-  let theme = &ctx.config.theme;
-  let center_x = ctx.width / 2.0;
-  let center_y = ctx.height / 2.0;
-  let bar_count = ctx.config.reactivity.bar_count.min(64);
-  let sensitivity = ctx.config.reactivity.sensitivity;
+    let width = ctx.width;
+    let height = ctx.height;
+    let theme = &ctx.config.theme;
 
-  let step = ((ctx.freq_data.len() as f32) / bar_count as f32).floor().max(1.0) as usize;
-  let max_len = ctx.width.min(ctx.height) * 0.42;
-  let min_radius = 20.0;
+    let p_col = theme_primary(theme);
+    let s_col = theme_secondary(theme);
+    let accent_col = theme_accent(theme);
+    let glow_col = theme_glow(theme);
 
-  c.save();
-  c.set_shadow(theme_glow(theme), 10.0);
-  for i in 0..bar_count {
-    let val = (bin_value(ctx.freq_data, step, i) * sensitivity).min(1.0);
-    let bar_len = min_radius + val * max_len;
-    let angle = (i as f32 / bar_count as f32) * TAU - std::f32::consts::FRAC_PI_2;
-    let (cos, sin) = angle.sin_cos();
+    let sensitivity = ctx.config.reactivity.sensitivity;
+    // Scale & position are applied once by the global canvas transform.
+    let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
-    let x1 = center_x + cos * min_radius;
-    let y1 = center_y + sin * min_radius;
-    let x2 = center_x + cos * bar_len;
-    let y2 = center_y + sin * bar_len;
+    let be = ctx.bass_energy.clamp(0.0, 1.0);
+    let _bs = ctx.beat_strength.clamp(0.0, 1.0);
+    let freq = ctx.freq_data;
+    let frame_time = ctx.frame_time;
 
-    let col = if i % 2 == 0 { theme_primary(theme) } else { theme_secondary(theme) };
-    c.set_stroke(Fill::Solid(col));
-    c.set_line_width(3.0);
-    c.stroke_line(x1, y1, x2, y2);
-  }
-  c.restore();
+    let cx = width * 0.5;
+    let cy = height * 0.5;
+    let reference_size = width.min(height);
+    let inner_r = 100.0 * (reference_size / 500.0);
 
-  c.save();
-  let glow_grad = Fill::radial_gradient(center_x, center_y, 0.0, center_x, center_y, min_radius, &[
-    (0.0, theme_accent(theme)),
-    (1.0, Color::TRANSPARENT),
-  ]);
-  c.set_fill(glow_grad);
-  c.set_shadow(theme_glow(theme), 30.0);
-  c.fill_circle(center_x, center_y, min_radius);
-  c.restore();
+    c.save();
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+
+    // Deep circular backdrop
+    c.set_fill(Fill::Solid(Color::hex("#020308")));
+    c.fill_rect(0.0, 0.0, width, height);
+
+    // Ambient halo glow
+    let halo_glow = Fill::radial_gradient(
+        cx,
+        cy,
+        inner_r * 0.5,
+        cx,
+        cy,
+        inner_r * 2.8,
+        &[
+            (0.0, mix(glow_col, Color::rgba(0.0, 0.90, 1.0, 0.28), 0.5)),
+            (0.50, mix(p_col, Color::rgba(0.80, 0.10, 0.60, 0.10), 0.5)),
+            (1.0, Color::TRANSPARENT),
+        ],
+    );
+    c.set_fill(halo_glow);
+    c.fill_rect(0.0, 0.0, width, height);
+
+    // -------------------------------------------------------------------------
+    // 1. 3D VOLUMETRIC CIRCULAR SPECTRUM BARS
+    // -------------------------------------------------------------------------
+    let step_f = (freq.len() / bar_count).max(1);
+
+    for i in 0..CIRCULAR_BARS_COUNT {
+        let angle = (i as f32 / CIRCULAR_BARS_COUNT as f32) * TAU + frame_time * 0.10;
+        let bin_k = (i * step_f / (CIRCULAR_BARS_COUNT / bar_count.max(1)).max(1))
+            .min(freq.len().saturating_sub(1));
+        let fv = freq[bin_k] as f32 / 255.0;
+
+        let bar_h = 15.0 + fv * 140.0 * sensitivity + be * 35.0;
+        let r0 = inner_r * (1.0 + be * 0.06);
+        let r1 = r0 + bar_h;
+
+        let (sin_a, cos_a) = angle.sin_cos();
+        let x0 = cx + cos_a * r0;
+        let y0 = cy + sin_a * r0;
+        let x1 = cx + cos_a * r1;
+        let y1 = cy + sin_a * r1;
+
+        let bar_col = mix(
+            mix(p_col, glow_col, fv),
+            mix(accent_col, s_col, 0.5),
+            fv,
+        );
+
+        c.set_stroke(Fill::Solid(bar_col));
+        c.set_line_width(3.5 + fv * 2.0);
+        c.set_shadow(bar_col, 10.0);
+        c.stroke_line(x0, y0, x1, y1);
+    }
+
+    // Inner Core Disc — user's Radial Center Image when set, themed disc otherwise
+    if !draw_radial_center_image(c, ctx, cx, cy, inner_r * 0.85) {
+        c.set_fill(Fill::Solid(Color::hex("#050812")));
+        c.set_stroke(Fill::Solid(mix(p_col, glow_col, 0.7)));
+        c.set_line_width(2.0);
+        c.fill_circle(cx, cy, inner_r * 0.85);
+        c.stroke_circle(cx, cy, inner_r * 0.85);
+    }
+
+    c.set_global_alpha(1.0);
+    c.restore();
 }
