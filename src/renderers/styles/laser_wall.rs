@@ -1,9 +1,9 @@
-//! Acoustic Laser Equalizer Wall style renderer (`laserWall`) — Concert Stage Engine.
+//! Acoustic Laser Equalizer Wall style renderer (`laserWall`) — Concert Stage Laser Engine.
 //!
-//! Masterpiece 3D Concert Stage:
-//! - Full 3D retained geometry scene built using `ctx.scene3d`.
-//! - 48 3D volumetric LED wall equalizer pillars spanning the full stage width.
-//! - 24 glowing 3D cross-beam lasers shooting diagonally into the dark concert sky.
+//! Masterpiece Concert Stage Laser Show:
+//! - 48 3D volumetric LED wall equalizer pillars spanning the stage arena.
+//! - 24 high-power concert laser beams shooting across the arena with white-hot intense laser cores & wide volumetric neon bloom!
+//! - Audio-reactive laser fans, rhythmic angle scanning & base lens flare emitters.
 //! - Translucent 3D mirror floor reflections below the stage floor.
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
@@ -14,7 +14,7 @@ use crate::renderers::{
 };
 
 const LED_PILLARS_3D: usize = 48;
-const CROSS_LASERS: usize = 24;
+const SCAN_LASERS: usize = 24;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
@@ -37,27 +37,27 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx = width * 0.5 + pos_offset_x;
+    let cy = height * 0.5 - pos_offset_y;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep midnight concert stage backdrop
+    // Deep midnight concert arena backdrop
     c.set_fill(Fill::Solid(Color::hex("#010207")));
     c.fill_rect(0.0, 0.0, width, height);
 
-    // Concert stage laser thermal aura
+    // Concert stage laser thermal haze
     let stage_glow = Fill::radial_gradient(
         cx,
         cy + height * 0.15,
         0.0,
         cx,
         cy + height * 0.15,
-        width * 0.70,
+        width * 0.70 * user_scale,
         &[
-            (0.0, mix(glow_col, Color::rgba(1.0, 0.10, 0.50, 0.30), 0.5)),
-            (0.45, mix(p_col, Color::rgba(0.0, 0.85, 1.0, 0.12), 0.5)),
+            (0.0, mix(glow_col, Color::rgba(1.0, 0.10, 0.60, 0.35 + be * 0.15), 0.5)),
+            (0.45, mix(p_col, Color::rgba(0.0, 0.85, 1.0, 0.15), 0.5)),
             (1.0, Color::TRANSPARENT),
         ],
     );
@@ -89,17 +89,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     for i in 0..LED_PILLARS_3D {
         let i_f = i as f32;
-        let t_p = (i_f - LED_PILLARS_3D as f32 * 0.5 + 0.5) / LED_PILLARS_3D as f32; // -0.5..0.5
+        let t_p = (i_f - LED_PILLARS_3D as f32 * 0.5 + 0.5) / LED_PILLARS_3D as f32;
         let x_pos = t_p * stage_w;
-
-        // Recess the edges backward -> a concave arena wall, not a flat row
         let z_pos = -(t_p * t_p) * arc_depth * 4.0;
 
         let bin_k = (i * step_f / (LED_PILLARS_3D / bar_count.max(1)).max(1))
             .min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let pillar_h = (20.0 + fv * 300.0 * sensitivity + be * 45.0).clamp(15.0, 420.0) * user_scale;
+        let pillar_h = (20.0 + fv * 280.0 * sensitivity + be * 45.0).clamp(15.0, 420.0) * user_scale;
 
         let pillar_col = mix(
             mix(p_col, glow_col, fv),
@@ -107,7 +105,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             fv,
         );
 
-        // Lean the pillar slightly toward the stage center (inward V-wall)
         let tilt = t_p * max_tilt;
 
         // Main 3D LED Box
@@ -117,7 +114,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         scene.add_box(0.0, 0.0, 0.0, col_w, pillar_h, col_w, pillar_col);
         scene.pop();
 
-        // 3D Translucent Mirror Reflection Below Stage (mirrors the lean)
+        // 3D Translucent Floor Reflection
         let ref_h = pillar_h * 0.40;
         let ref_col = Color::rgba(pillar_col.r, pillar_col.g, pillar_col.b, 0.22);
         scene.push();
@@ -125,41 +122,63 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         scene.rotate_z(tilt);
         scene.add_box(0.0, 0.0, 0.0, col_w * 0.95, ref_h, col_w * 0.95, ref_col);
         scene.pop();
-
-        // White-hot cap light on strong bars
-        if fv > 0.7 || bs > 0.4 {
-            scene.push();
-            scene.translate(x_pos, base_y + pillar_h + 2.0 * user_scale, z_pos);
-            scene.rotate_z(tilt);
-            scene.add_box(0.0, 0.0, 0.0, col_w * 0.9, 6.0 * user_scale, col_w * 0.9, Color::WHITE.with_alpha(0.9));
-            scene.pop();
-        }
     }
 
     // -------------------------------------------------------------------------
-    // 3. 24 CROSS-BEAM 3D LASER RAYS SHOOTING INTO THE SKY
+    // 3. 24 REAL VOLUMETRIC HIGH-POWER CONCERT LASER BEAMS & SCANNING FANS
     // -------------------------------------------------------------------------
-    for l_i in 0..CROSS_LASERS {
+    let laser_start_y = cy + height * 0.15;
+    let step_laser_x = width * 0.90 / SCAN_LASERS as f32;
+
+    for l_i in 0..SCAN_LASERS {
         let l_f = l_i as f32;
-        let l_x = (l_f - CROSS_LASERS as f32 * 0.5 + 0.5) * (stage_w / CROSS_LASERS as f32);
+        let emitter_x = (cx - width * 0.45) + l_f * step_laser_x + step_laser_x * 0.5;
 
         let bin_k = (l_i * 2 * step_f).min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let laser_h = (280.0 + fv * 160.0 * sensitivity + be * 60.0) * user_scale;
-        let tilt_ang = ((l_f * 0.35 + frame_time * 1.2).sin() * 0.40).clamp(-0.6, 0.6);
+        // Dynamic laser fan scanning angle
+        let sweep_speed = 0.8 + (l_i % 5) as f32 * 0.15;
+        let scan_angle = ((l_f * 0.30 + frame_time * sweep_speed).sin() * 0.55).clamp(-0.8, 0.8);
 
-        let laser_col = mix(
-            mix(accent_col, Color::rgba(1.0, 0.10, 0.60, 0.90 + bs * 0.10), 0.6),
-            glow_col,
-            (l_i % 2) as f32,
+        let laser_length = (height * 0.95 + fv * 200.0 * sensitivity + be * 80.0) * user_scale;
+        let end_x = emitter_x + scan_angle.sin() * laser_length;
+        let end_y = laser_start_y - scan_angle.cos() * laser_length;
+
+        let neon_color = mix(
+            mix(accent_col, Color::rgba(1.0, 0.0, 0.55, 0.85), (l_i % 3) as f32 / 3.0),
+            mix(glow_col, Color::rgba(0.0, 0.95, 1.0, 0.85), (l_i % 2) as f32),
+            fv,
         );
 
-        scene.push();
-        scene.translate(l_x, base_y + laser_h * 0.5, -20.0 * user_scale);
-        scene.rotate_z(tilt_ang);
-        scene.add_box(0.0, 0.0, 0.0, 4.0 * user_scale, laser_h, 4.0 * user_scale, laser_col);
-        scene.pop();
+        // A. Base Laser Emitter Flare (Concert Projector Lens)
+        let flare = Fill::radial_gradient(
+            emitter_x,
+            laser_start_y,
+            0.0,
+            emitter_x,
+            laser_start_y,
+            (14.0 + fv * 10.0 + be * 8.0) * user_scale,
+            &[
+                (0.0, Color::rgba(1.0, 1.0, 1.0, 0.95)),
+                (0.40, neon_color),
+                (1.0, Color::TRANSPARENT),
+            ],
+        );
+        c.set_fill(flare);
+        c.fill_circle(emitter_x, laser_start_y, (14.0 + fv * 10.0 + be * 8.0) * user_scale);
+
+        // B. Outer Volumetric Laser Neon Halo (Wide Soft Glow)
+        c.set_line_width((10.0 + fv * 8.0 + bs * 4.0) * user_scale);
+        c.set_stroke(Fill::Solid(Color::rgba(neon_color.r, neon_color.g, neon_color.b, 0.25 + fv * 0.20)));
+        c.set_shadow(neon_color, (16.0 + fv * 12.0) * user_scale);
+        c.stroke_line(emitter_x, laser_start_y, end_x, end_y);
+
+        // C. Intense White-Hot Core Laser Beam (Real High-Power Laser Line)
+        c.set_line_width((2.2 + fv * 2.0) * user_scale);
+        c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.95)));
+        c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.90), 6.0 * user_scale);
+        c.stroke_line(emitter_x, laser_start_y, end_x, end_y);
     }
 
     c.set_global_alpha(1.0);
