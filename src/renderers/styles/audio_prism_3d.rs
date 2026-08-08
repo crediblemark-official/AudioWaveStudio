@@ -2,8 +2,9 @@
 //!
 //! Masterpiece 3D Crystal Refraction:
 //! - Full 3D retained geometry scene built using `ctx.scene3d`.
-//! - Rotating 3D crystal prism core floating in 3D perspective space.
-//! - 36 spectral audio rainbow rays refracting dynamically out of the crystal faces.
+//! - Large rotating 3D crystalline pyramid prism core with specular glass reflections.
+//! - 32 spectral rainbow audio light beams refracting dynamically out of the crystal faces.
+//! - Audio-reactive rainbow light dispersion & crystal aura flares.
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use std::f32::consts::TAU;
@@ -14,7 +15,7 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const REFRACTED_RAYS: usize = 36;
+const REFRACTED_BEAMS: usize = 32;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
@@ -33,7 +34,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
-    let _bs = ctx.beat_strength.clamp(0.0, 1.0);
+    let bs = ctx.beat_strength.clamp(0.0, 1.0);
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
@@ -54,10 +55,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         0.0,
         cx,
         cy,
-        width * 0.65 * user_scale,
+        width * 0.70 * user_scale,
         &[
-            (0.0, mix(glow_col, Color::rgba(0.0, 0.90, 1.0, 0.35 + be * 0.15), 0.5)),
+            (0.0, mix(glow_col, Color::rgba(0.0, 0.90, 1.0, 0.35 + be * 0.20), 0.5)),
             (0.40, mix(accent_col, Color::rgba(1.0, 0.10, 0.70, 0.15), 0.5)),
+            (0.80, mix(s_col, Color::rgba(0.10, 0.0, 0.30, 0.04), 0.5)),
             (1.0, Color::TRANSPARENT),
         ],
     );
@@ -70,50 +72,75 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let scene = &mut ctx.scene3d;
     scene.clear();
 
-    scene.cam_yaw = frame_time * 0.30;
-    scene.cam_pitch = -0.18 + (frame_time * 0.12).sin() * 0.08;
-    scene.cam_zoom = (0.95 - be * 0.04) / user_scale;
+    scene.cam_yaw = (frame_time * 0.15).sin() * 0.10;
+    scene.cam_pitch = -0.16 + (frame_time * 0.08).sin() * 0.04;
+    scene.cam_zoom = (0.95 - be * 0.05) / user_scale;
     scene.target_x = pos_offset_x;
     scene.target_y = pos_offset_y;
 
-    // A. Floating 3D Crystal Prism Core
-    let prism_sz = (55.0 + be * 20.0 * sensitivity) * user_scale;
-    scene.push();
-    scene.rotate_y(frame_time * 0.8);
-    scene.add_box(0.0, 0.0, 0.0, prism_sz, prism_sz * 1.5, prism_sz, mix(p_col, Color::rgba(1.0, 1.0, 1.0, 0.90), 0.6));
-    scene.pop();
+    // Floating 3D Crystalline Prism Core (Octahedron Glass Layers)
+    let prism_sz = (90.0 + be * 25.0 * sensitivity) * user_scale;
+    let rotation = frame_time * 0.60;
 
-    // B. 36 3D Refracted Spectral Rainbow Rays
+    for layer in 0..6 {
+        let l_f = layer as f32;
+        let l_sz = prism_sz * (1.0 - l_f * 0.14);
+        let l_y = (l_f - 2.5) * 18.0 * user_scale;
+
+        scene.push();
+        scene.translate(0.0, l_y, 0.0);
+        scene.rotate_y(rotation + l_f * 0.10);
+        scene.add_box(
+            0.0,
+            0.0,
+            0.0,
+            l_sz,
+            14.0 * user_scale,
+            l_sz,
+            mix(p_col, Color::rgba(0.95, 0.98, 1.0, 0.90), l_f / 6.0),
+        );
+        scene.pop();
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. 32 REFRACTED SPECTRAL RAINBOW LIGHT BEAMS
+    // -------------------------------------------------------------------------
     let step_f = (freq.len() / bar_count).max(1);
 
-    for r_i in 0..REFRACTED_RAYS {
-        let r_f = r_i as f32;
-        let angle = (r_f / REFRACTED_RAYS as f32) * TAU + frame_time * 0.25;
+    for b in 0..REFRACTED_BEAMS {
+        let b_f = b as f32;
+        let angle = (b_f / REFRACTED_BEAMS as f32) * TAU + frame_time * 0.12;
 
-        let bin_k = (r_i * step_f / (REFRACTED_RAYS / bar_count.max(1)).max(1))
+        let bin_k = (b * step_f / (REFRACTED_BEAMS / bar_count.max(1)).max(1))
             .min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let ray_len = (80.0 + fv * 200.0 * sensitivity + be * 40.0) * user_scale;
-        let r0 = prism_sz * 0.8;
-        let r_center = r0 + ray_len * 0.5;
+        let ray_len = (30.0 + fv * 160.0 * sensitivity + be * 40.0) * user_scale;
+        let r0 = prism_sz * 0.65;
+        let r1 = r0 + ray_len;
 
-        let rx = angle.cos() * r_center;
-        let ry = (angle * 2.0).sin() * 20.0 * user_scale;
-        let rz = angle.sin() * r_center;
+        let (sin_a, cos_a) = angle.sin_cos();
+        let x0 = cx + cos_a * r0;
+        let y0 = cy + sin_a * r0;
+        let x1 = cx + cos_a * r1;
+        let y1 = cy + sin_a * r1;
 
         let ray_col = mix(
-            mix(p_col, glow_col, r_f / REFRACTED_RAYS as f32),
-            mix(accent_col, s_col, (r_i % 3) as f32 / 3.0),
+            mix(p_col, glow_col, b_f / REFRACTED_BEAMS as f32),
+            mix(accent_col, s_col, (b % 4) as f32 / 4.0),
             fv,
         );
 
-        scene.push();
-        scene.translate(rx, ry, rz);
-        scene.rotate_y(angle);
-        scene.add_box(0.0, 0.0, 0.0, 5.0 * user_scale, 5.0 * user_scale, ray_len, ray_col);
-        scene.pop();
+        c.set_stroke(Fill::Solid(ray_col));
+        c.set_line_width((3.0 + fv * 4.0) * user_scale);
+        c.set_shadow(ray_col, (12.0 + fv * 8.0) * user_scale);
+        c.stroke_line(x0, y0, x1, y1);
     }
+
+    // Central Refraction Crystal Flare
+    c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.95)));
+    c.set_shadow(glow_col, (18.0 + bs * 10.0) * user_scale);
+    c.fill_circle(cx, cy, 14.0 * user_scale);
 
     c.set_global_alpha(1.0);
     c.restore();
