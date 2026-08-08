@@ -2,7 +2,8 @@
 //!
 //! Masterpiece Concert Stage Laser Show:
 //! - 48 3D volumetric LED wall equalizer pillars spanning the stage arena.
-//! - 24 high-power concert laser beams shooting across the arena with white-hot intense laser cores & wide volumetric neon bloom!
+//! - 24 high-power concert laser beams shooting across the arena with soft blurred fading tips (NO sharp flat cuts!).
+//! - Soft volumetric gradient blur & atmospheric haze dissolving laser tips seamlessly into space.
 //! - Audio-reactive laser fans, rhythmic angle scanning & base lens flare emitters.
 //! - Translucent 3D mirror floor reflections below the stage floor.
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
@@ -15,6 +16,7 @@ use crate::renderers::{
 
 const LED_PILLARS_3D: usize = 48;
 const SCAN_LASERS: usize = 24;
+const LASER_SEGMENTS: usize = 12;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
@@ -125,7 +127,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
 
     // -------------------------------------------------------------------------
-    // 3. 24 REAL VOLUMETRIC HIGH-POWER CONCERT LASER BEAMS & SCANNING FANS
+    // 3. 24 CONCERT LASER BEAMS WITH SOFT BLURRED FADING TIPS
     // -------------------------------------------------------------------------
     let laser_start_y = cy + height * 0.15;
     let step_laser_x = width * 0.90 / SCAN_LASERS as f32;
@@ -168,17 +170,51 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_fill(flare);
         c.fill_circle(emitter_x, laser_start_y, (14.0 + fv * 10.0 + be * 8.0) * user_scale);
 
-        // B. Outer Volumetric Laser Neon Halo (Wide Soft Glow)
-        c.set_line_width((10.0 + fv * 8.0 + bs * 4.0) * user_scale);
-        c.set_stroke(Fill::Solid(Color::rgba(neon_color.r, neon_color.g, neon_color.b, 0.25 + fv * 0.20)));
-        c.set_shadow(neon_color, (16.0 + fv * 12.0) * user_scale);
-        c.stroke_line(emitter_x, laser_start_y, end_x, end_y);
+        // B. Render Laser Beam in 12 Gradual Fading Segments (Soft Tip Blur!)
+        for seg in 0..LASER_SEGMENTS {
+            let t0 = seg as f32 / LASER_SEGMENTS as f32;
+            let t1 = (seg + 1) as f32 / LASER_SEGMENTS as f32;
 
-        // C. Intense White-Hot Core Laser Beam (Real High-Power Laser Line)
-        c.set_line_width((2.2 + fv * 2.0) * user_scale);
-        c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.95)));
-        c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.90), 6.0 * user_scale);
-        c.stroke_line(emitter_x, laser_start_y, end_x, end_y);
+            let x0 = emitter_x + (end_x - emitter_x) * t0;
+            let y0 = laser_start_y + (end_y - laser_start_y) * t0;
+            let x1 = emitter_x + (end_x - emitter_x) * t1;
+            let y1 = laser_start_y + (end_y - laser_start_y) * t1;
+
+            // Fade alpha gracefully from 1.0 down to 0.0 at the tip!
+            let fade = (1.0 - t0).powf(1.4);
+
+            // Volumetric Outer Neon Halo
+            let halo_col = Color::rgba(neon_color.r, neon_color.g, neon_color.b, (0.30 + fv * 0.20) * fade);
+            c.set_line_width((10.0 + fv * 8.0 + bs * 4.0) * (1.0 + t0 * 0.6) * user_scale); // Soft widening tip
+            c.set_stroke(Fill::Solid(halo_col));
+            c.set_shadow(halo_col, (16.0 * fade) * user_scale);
+            c.stroke_line(x0, y0, x1, y1);
+
+            // White-Hot Intense Core Laser Beam
+            let core_col = Color::rgba(1.0, 1.0, 1.0, 0.95 * fade);
+            c.set_line_width((2.2 + fv * 2.0) * (1.0 - t0 * 0.5) * user_scale);
+            c.set_stroke(Fill::Solid(core_col));
+            c.set_shadow(core_col, (6.0 * fade) * user_scale);
+            c.stroke_line(x0, y0, x1, y1);
+        }
+
+        // C. Soft Blurred Lens Halo at Laser Tip End (Soft Tip Blur Dissolve)
+        let tip_blur_r = (24.0 + fv * 16.0 + be * 10.0) * user_scale;
+        let tip_halo = Fill::radial_gradient(
+            end_x,
+            end_y,
+            0.0,
+            end_x,
+            end_y,
+            tip_blur_r,
+            &[
+                (0.0, Color::rgba(neon_color.r, neon_color.g, neon_color.b, 0.45)),
+                (0.50, Color::rgba(neon_color.r, neon_color.g, neon_color.b, 0.15)),
+                (1.0, Color::TRANSPARENT),
+            ],
+        );
+        c.set_fill(tip_halo);
+        c.fill_circle(end_x, end_y, tip_blur_r);
     }
 
     c.set_global_alpha(1.0);
