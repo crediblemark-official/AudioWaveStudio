@@ -42,10 +42,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep quantum space backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020107")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Quantum plasma atmospheric glow
     let amb_glow = Fill::radial_gradient(
         cx,

@@ -45,10 +45,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep vaporwave synthwave backdrop
-    c.set_fill(Fill::Solid(Color::hex("#080312")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Vaporwave sunset gradient glow
     let amb_glow = Fill::radial_gradient(
         cx,

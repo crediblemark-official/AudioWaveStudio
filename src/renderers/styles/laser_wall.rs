@@ -1,8 +1,8 @@
 //! Acoustic Laser Equalizer Wall style renderer (`laserWall`) — Concert Stage Laser Engine.
 //!
 //! Masterpiece Concert Stage Laser Show:
-//! - 48 3D volumetric LED wall equalizer pillars spanning the stage arena.
-//! - 24 high-power concert laser beams shooting across the arena with soft blurred fading tips (NO sharp flat cuts!).
+//! - 24 high-power concert laser beams shooting across the arena with soft blurred fading tips (rendered BEHIND the 3D spectrum wall!).
+//! - 48 3D volumetric LED wall equalizer pillars spanning the stage arena in front of the laser bases.
 //! - Soft volumetric gradient blur & atmospheric haze dissolving laser tips seamlessly into space.
 //! - Audio-reactive laser fans, rhythmic angle scanning & base lens flare emitters.
 //! - Translucent 3D mirror floor reflections below the stage floor.
@@ -45,10 +45,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep midnight concert arena backdrop
-    c.set_fill(Fill::Solid(Color::hex("#010207")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Concert stage laser thermal haze
     let stage_glow = Fill::radial_gradient(
         cx,
@@ -66,70 +62,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(stage_glow);
     c.fill_rect(0.0, 0.0, width, height);
 
-    // -------------------------------------------------------------------------
-    // 1. CONFIGURE NATIVE 3D CONCERT STAGE SCENE (Scene3D)
-    // -------------------------------------------------------------------------
-    let scene = &mut ctx.scene3d;
-    scene.clear();
-
-    scene.cam_yaw = (frame_time * 0.12).sin() * 0.08;
-    scene.cam_pitch = -0.16 - (frame_time * 0.06).sin() * 0.03 - be * 0.03;
-    scene.cam_zoom = (0.95 - be * 0.05) / user_scale;
-    scene.target_x = pos_offset_x;
-    scene.target_y = pos_offset_y;
-
-    let base_y = -110.0 * user_scale;
     let step_f = (freq.len() / bar_count).max(1);
-    let stage_w = 640.0 * user_scale;
-    let col_w = (stage_w / LED_PILLARS_3D as f32) * 0.82;
 
     // -------------------------------------------------------------------------
-    // 2. 48 LED WALL EQUALIZER PILLARS ON AN ARCED LEANING STAGE WALL
+    // 1. 24 CONCERT LASER BEAMS (RENDERED FIRST IN BACKGROUND)
     // -------------------------------------------------------------------------
-    let arc_depth = stage_w * 0.18;
-    let max_tilt = 0.20;
-
-    for i in 0..LED_PILLARS_3D {
-        let i_f = i as f32;
-        let t_p = (i_f - LED_PILLARS_3D as f32 * 0.5 + 0.5) / LED_PILLARS_3D as f32;
-        let x_pos = t_p * stage_w;
-        let z_pos = -(t_p * t_p) * arc_depth * 4.0;
-
-        let bin_k = (i * step_f / (LED_PILLARS_3D / bar_count.max(1)).max(1))
-            .min(freq.len().saturating_sub(1));
-        let fv = freq[bin_k] as f32 / 255.0;
-
-        let pillar_h = (20.0 + fv * 280.0 * sensitivity + be * 45.0).clamp(15.0, 420.0) * user_scale;
-
-        let pillar_col = mix(
-            mix(p_col, glow_col, fv),
-            mix(accent_col, s_col, (i % 4) as f32 / 4.0),
-            fv,
-        );
-
-        let tilt = t_p * max_tilt;
-
-        // Main 3D LED Box
-        scene.push();
-        scene.translate(x_pos, base_y + pillar_h * 0.5, z_pos);
-        scene.rotate_z(tilt);
-        scene.add_box(0.0, 0.0, 0.0, col_w, pillar_h, col_w, pillar_col);
-        scene.pop();
-
-        // 3D Translucent Floor Reflection
-        let ref_h = pillar_h * 0.40;
-        let ref_col = Color::rgba(pillar_col.r, pillar_col.g, pillar_col.b, 0.22);
-        scene.push();
-        scene.translate(x_pos, base_y - ref_h * 0.5, z_pos);
-        scene.rotate_z(tilt);
-        scene.add_box(0.0, 0.0, 0.0, col_w * 0.95, ref_h, col_w * 0.95, ref_col);
-        scene.pop();
-    }
-
-    // -------------------------------------------------------------------------
-    // 3. 24 CONCERT LASER BEAMS WITH SOFT BLURRED FADING TIPS
-    // -------------------------------------------------------------------------
-    let laser_start_y = cy + height * 0.15;
+    let laser_start_y = cy + height * 0.08;
     let step_laser_x = width * 0.90 / SCAN_LASERS as f32;
 
     for l_i in 0..SCAN_LASERS {
@@ -215,6 +153,61 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         );
         c.set_fill(tip_halo);
         c.fill_circle(end_x, end_y, tip_blur_r);
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. 48 LED WALL EQUALIZER PILLARS (RENDERED IN FRONT OF LASER BASES)
+    // -------------------------------------------------------------------------
+    let scene = &mut ctx.scene3d;
+    scene.clear();
+
+    scene.cam_yaw = (frame_time * 0.12).sin() * 0.08;
+    scene.cam_pitch = -0.16 - (frame_time * 0.06).sin() * 0.03 - be * 0.03;
+    scene.cam_zoom = (0.95 - be * 0.05) / user_scale;
+    scene.target_x = pos_offset_x;
+    scene.target_y = pos_offset_y;
+
+    let base_y = -110.0 * user_scale;
+    let stage_w = 640.0 * user_scale;
+    let col_w = (stage_w / LED_PILLARS_3D as f32) * 0.82;
+    let arc_depth = stage_w * 0.18;
+    let max_tilt = 0.20;
+
+    for i in 0..LED_PILLARS_3D {
+        let i_f = i as f32;
+        let t_p = (i_f - LED_PILLARS_3D as f32 * 0.5 + 0.5) / LED_PILLARS_3D as f32;
+        let x_pos = t_p * stage_w;
+        let z_pos = -(t_p * t_p) * arc_depth * 4.0;
+
+        let bin_k = (i * step_f / (LED_PILLARS_3D / bar_count.max(1)).max(1))
+            .min(freq.len().saturating_sub(1));
+        let fv = freq[bin_k] as f32 / 255.0;
+
+        let pillar_h = (20.0 + fv * 280.0 * sensitivity + be * 45.0).clamp(15.0, 420.0) * user_scale;
+
+        let pillar_col = mix(
+            mix(p_col, glow_col, fv),
+            mix(accent_col, s_col, (i % 4) as f32 / 4.0),
+            fv,
+        );
+
+        let tilt = t_p * max_tilt;
+
+        // Main 3D LED Box (In front of lasers!)
+        scene.push();
+        scene.translate(x_pos, base_y + pillar_h * 0.5, z_pos);
+        scene.rotate_z(tilt);
+        scene.add_box(0.0, 0.0, 0.0, col_w, pillar_h, col_w, pillar_col);
+        scene.pop();
+
+        // 3D Translucent Floor Reflection
+        let ref_h = pillar_h * 0.40;
+        let ref_col = Color::rgba(pillar_col.r, pillar_col.g, pillar_col.b, 0.22);
+        scene.push();
+        scene.translate(x_pos, base_y - ref_h * 0.5, z_pos);
+        scene.rotate_z(tilt);
+        scene.add_box(0.0, 0.0, 0.0, col_w * 0.95, ref_h, col_w * 0.95, ref_col);
+        scene.pop();
     }
 
     c.set_global_alpha(1.0);

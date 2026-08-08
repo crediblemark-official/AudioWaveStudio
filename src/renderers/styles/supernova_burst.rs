@@ -45,10 +45,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep cosmic space backdrop
-    c.set_fill(Fill::Solid(Color::hex("#03020a")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Radial supernova glow aura
     let super_glow = Fill::radial_gradient(
         cx,

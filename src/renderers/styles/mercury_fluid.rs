@@ -46,10 +46,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep liquid metal space backdrop
-    c.set_fill(Fill::Solid(Color::hex("#02050a")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Liquid mercury metallic ambient glow
     let mercury_glow = Fill::radial_gradient(
         cx,

@@ -43,10 +43,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep toxic cyber backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020a04")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Toxic green ambient glow
     let toxic_glow = Fill::radial_gradient(
         cx,

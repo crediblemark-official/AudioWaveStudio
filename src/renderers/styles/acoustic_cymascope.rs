@@ -45,10 +45,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep bioluminescent water backdrop
-    c.set_fill(Fill::Solid(Color::hex("#01090c")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Cymascope Ripple Ambient Glow
     let cym_glow = Fill::radial_gradient(
         cx,

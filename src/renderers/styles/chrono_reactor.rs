@@ -46,10 +46,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep dark metallic backdrop
-    c.set_fill(Fill::Solid(Color::hex("#05080c")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Arc Reactor Core Thermal Glow
     let reactor_glow = Fill::radial_gradient(
         cx,

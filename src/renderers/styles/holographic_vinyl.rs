@@ -42,10 +42,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep synthwave dark purple backdrop
-    c.set_fill(Fill::Solid(Color::hex("#0a0412")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     // Ambient Holographic Glow
     let holo_glow = Fill::radial_gradient(
         cx,

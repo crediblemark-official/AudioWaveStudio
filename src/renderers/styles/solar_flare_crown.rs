@@ -46,10 +46,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep warm cosmic space backdrop
-    c.set_fill(Fill::Solid(Color::hex("#080201")));
-    c.fill_rect(0.0, 0.0, width, height);
-
     let corona_glow = Fill::radial_gradient(
         cx,
         cy,
