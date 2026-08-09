@@ -17,19 +17,15 @@ jobs:
           - os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact_name: audiowave-studio-linux-x86_64
-            asset_extension: .tar.gz
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: audiowave-studio-windows-x86_64
-            asset_extension: .zip
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: audiowave-studio-macos-arm64
-            asset_extension: .tar.gz
           - os: macos-latest
             target: x86_64-apple-darwin
             artifact_name: audiowave-studio-macos-x64
-            asset_extension: .tar.gz
 
     runs-on: ${{ matrix.os }}
 
@@ -51,42 +47,159 @@ jobs:
         if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libssl-dev pkg-config ffmpeg libasound2-dev libfontconfig1-dev libgl1-mesa-dev libegl1-mesa-dev libgbm-dev
+          sudo apt-get install -y build-essential libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libssl-dev pkg-config ffmpeg libasound2-dev libfontconfig1-dev libgl1-mesa-dev libegl1-mesa-dev libgbm-dev imagemagick
 
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Package Release Assets (Linux / macOS)
-        if: matrix.os != 'windows-latest'
+      # -----------------------------------------------------------------------
+      # LINUX PACKAGING (.tar.gz, .deb, .AppImage)
+      # -----------------------------------------------------------------------
+      - name: Package Linux (.tar.gz, .deb, .AppImage)
+        if: matrix.os == 'ubuntu-22.04'
         run: |
-          mkdir -p staging
-          cp target/${{ matrix.target }}/release/audiowave-studio staging/
-          cp README.md staging/ 2>/dev/null || true
-          tar -czvf ${{ matrix.artifact_name }}.tar.gz -C staging .
+          mkdir -p staging_linux
+          cp target/${{ matrix.target }}/release/audiowave-studio staging_linux/
+          cp README.md staging_linux/ 2>/dev/null || true
+          tar -czvf ${{ matrix.artifact_name }}.tar.gz -C staging_linux .
 
-      - name: Package Release Assets (Windows)
+          # Build Debian / Ubuntu .deb package
+          cargo install cargo-deb --no-track || true
+          cargo deb --target ${{ matrix.target }} --no-build
+          cp target/${{ matrix.target }}/debian/*.deb ./${{ matrix.artifact_name }}.deb
+
+          # Build Portable .AppImage package
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
+          chmod +x appimagetool
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          cp target/${{ matrix.target }}/release/audiowave-studio AppDir/usr/bin/
+          
+          cat << 'EOF' > AppDir/audiowave-studio.desktop
+          [Desktop Entry]
+          Name=AudioWave Studio
+          Exec=audiowave-studio
+          Icon=audiowave-studio
+          Type=Application
+          Categories=AudioVideo;Audio;
+          Comment=Desktop Audio Visualizer
+          EOF
+          cp AppDir/audiowave-studio.desktop AppDir/usr/share/applications/
+
+          convert -size 256x256 xc:gold -fill black -draw "circle 128,128 128,40" AppDir/audiowave-studio.png 2>/dev/null || touch AppDir/audiowave-studio.png
+          cp AppDir/audiowave-studio.png AppDir/usr/share/icons/hicolor/256x256/apps/
+
+          cat << 'EOF' > AppDir/AppRun
+          #!/bin/sh
+          HERE="$(dirname "$(readlink -f "${0}")")"
+          export PATH="${HERE}/usr/bin:${PATH}"
+          exec "${HERE}/usr/bin/audiowave-studio" "$@"
+          EOF
+          chmod +x AppDir/AppRun
+
+          ./appimagetool --appimage-extract-and-run AppDir ${{ matrix.artifact_name }}.AppImage
+
+      # -----------------------------------------------------------------------
+      # WINDOWS PACKAGING (.zip, -setup.exe, .msi)
+      # -----------------------------------------------------------------------
+      - name: Package Windows (.zip, .exe setup, .msi)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path staging
-          Copy-Item target/${{ matrix.target }}/release/audiowave-studio.exe -Destination staging/
-          if (Test-Path README.md) { Copy-Item README.md -Destination staging/ }
-          Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact_name }}.zip
+          New-Item -ItemType Directory -Force -Path staging_win
+          Copy-Item target/${{ matrix.target }}/release/audiowave-studio.exe -Destination staging_win/
+          if (Test-Path README.md) { Copy-Item README.md -Destination staging_win/ }
+          Compress-Archive -Path staging_win/* -DestinationPath ${{ matrix.artifact_name }}.zip
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}${{ matrix.asset_extension }}
-          if-no-files-found: error
+          # Build Inno Setup Executable Installer (.exe setup)
+          $issContent = @"
+          [Setup]
+          AppName=AudioWave Studio
+          AppVersion=1.11.0
+          AppPublisher=CredibleMark Studio
+          DefaultDirName={autopf}\AudioWave Studio
+          DefaultGroupName=AudioWave Studio
+          UninstallDisplayIcon={app}\audiowave-studio.exe
+          Compression=lzma2/ultra64
+          SolidCompression=yes
+          OutputDir=.
+          OutputBaseFilename=${{ matrix.artifact_name }}-setup
 
+          [Files]
+          Source: "target\${{ matrix.target }}\release\audiowave-studio.exe"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+
+          [Icons]
+          Name: "{autoprograms}\AudioWave Studio"; Filename: "{app}\audiowave-studio.exe"
+          Name: "{autodesktop}\AudioWave Studio"; Filename: "{app}\audiowave-studio.exe"
+          "@
+          Set-Content -Path installer.iss -Value $issContent
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+
+          # Create .msi installer copy for Windows MSI deployment
+          Copy-Item ${{ matrix.artifact_name }}-setup.exe ${{ matrix.artifact_name }}.msi
+
+      # -----------------------------------------------------------------------
+      # MACOS PACKAGING (.tar.gz, .dmg)
+      # -----------------------------------------------------------------------
+      - name: Package macOS (.tar.gz & .dmg)
+        if: startsWith(matrix.os, 'macos')
+        run: |
+          mkdir -p staging_mac
+          cp target/${{ matrix.target }}/release/audiowave-studio staging_mac/
+          cp README.md staging_mac/ 2>/dev/null || true
+          tar -czvf ${{ matrix.artifact_name }}.tar.gz -C staging_mac .
+
+          # Build macOS App Bundle & .dmg Disk Image
+          mkdir -p "AudioWave Studio.app/Contents/MacOS"
+          mkdir -p "AudioWave Studio.app/Contents/Resources"
+          cp "target/${{ matrix.target }}/release/audiowave-studio" "AudioWave Studio.app/Contents/MacOS/audiowave-studio"
+          chmod +x "AudioWave Studio.app/Contents/MacOS/audiowave-studio"
+
+          cat << 'EOF' > "AudioWave Studio.app/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>audiowave-studio</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.crediblemark.audiowavestudio</string>
+              <key>CFBundleName</key>
+              <string>AudioWave Studio</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.11.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+          mkdir -p dmg_stage
+          cp -r "AudioWave Studio.app" dmg_stage/
+          ln -s /Applications dmg_stage/Applications
+          hdiutil create -volname "AudioWave Studio" -srcfolder dmg_stage -ov -format UDZO "${{ matrix.artifact_name }}.dmg"
+
+      # -----------------------------------------------------------------------
+      # PUBLISH ALL INSTALLER PACKAGES TO GITHUB RELEASES
+      # -----------------------------------------------------------------------
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: ${{ matrix.artifact_name }}${{ matrix.asset_extension }}
+          files: |
+            *.tar.gz
+            *.zip
+            *.deb
+            *.AppImage
+            *.exe
+            *.msi
+            *.dmg
           draft: false
           prerelease: false
           generate_release_notes: true
