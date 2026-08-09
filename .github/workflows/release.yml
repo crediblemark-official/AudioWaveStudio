@@ -56,26 +56,32 @@ jobs:
       # WINDOWS CODE SIGNING (Optional Authenticode via SignTool)
       # -----------------------------------------------------------------------
       - name: Windows Code Signing
-        if: matrix.os == 'windows-latest' && secrets.WINDOWS_CERTIFICATE_BASE64 != ''
+        if: matrix.os == 'windows-latest' && env.WIN_CERT != ''
+        env:
+          WIN_CERT: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WIN_PASS: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         shell: pwsh
         run: |
           $certPath = "$env:TEMP\cert.pfx"
-          [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}") | Set-Content -Path $certPath -Encoding Byte
-          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "target\${{ matrix.target }}\release\audiowave-studio.exe"
+          [System.Convert]::FromBase64String("$env:WIN_CERT") | Set-Content -Path $certPath -Encoding Byte
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "$env:WIN_PASS" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "target\${{ matrix.target }}\release\audiowave-studio.exe"
           Remove-Item -Path $certPath -Force
 
       # -----------------------------------------------------------------------
       # MACOS CODE SIGNING (Optional Apple Codesign)
       # -----------------------------------------------------------------------
       - name: macOS Code Signing Setup
-        if: startsWith(matrix.os, 'macos') && secrets.MACOS_CERTIFICATE_BASE64 != ''
+        if: startsWith(matrix.os, 'macos') && env.MAC_CERT != ''
+        env:
+          MAC_CERT: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MAC_PASS: ${{ secrets.MACOS_CERT_PASSWORD }}
         run: |
           KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
-          echo "${{ secrets.MACOS_CERTIFICATE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          echo "$MAC_CERT" | base64 --decode > $RUNNER_TEMP/certificate.p12
           security create-keychain -p "" $KEYCHAIN_PATH
           security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
           security unlock-keychain -p "" $KEYCHAIN_PATH
-          security import $RUNNER_TEMP/certificate.p12 -k $KEYCHAIN_PATH -P "${{ secrets.MACOS_CERT_PASSWORD }}" -T /usr/bin/codesign
+          security import $RUNNER_TEMP/certificate.p12 -k $KEYCHAIN_PATH -P "$MAC_PASS" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" $KEYCHAIN_PATH
 
       # -----------------------------------------------------------------------
@@ -131,6 +137,9 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Package Windows (.zip, .exe setup, .msi)
         if: matrix.os == 'windows-latest'
+        env:
+          WIN_CERT: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WIN_PASS: ${{ secrets.WINDOWS_CERT_PASSWORD }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path staging_win
@@ -167,11 +176,11 @@ jobs:
           Copy-Item ${{ matrix.artifact_name }}-setup.exe ${{ matrix.artifact_name }}.msi
 
           # Sign Installer Executables if Code Signing Cert is present
-          if ("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}" -ne "") {
+          if ("$env:WIN_CERT" -ne "") {
             $certPath = "$env:TEMP\cert.pfx"
-            [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}") | Set-Content -Path $certPath -Encoding Byte
-            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}-setup.exe"
-            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}.msi"
+            [System.Convert]::FromBase64String("$env:WIN_CERT") | Set-Content -Path $certPath -Encoding Byte
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "$env:WIN_PASS" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}-setup.exe"
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "$env:WIN_PASS" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}.msi"
             Remove-Item -Path $certPath -Force
           }
 
@@ -180,6 +189,8 @@ jobs:
       # -----------------------------------------------------------------------
       - name: Package macOS (.tar.gz & .dmg)
         if: startsWith(matrix.os, 'macos')
+        env:
+          MAC_CERT: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
         run: |
           mkdir -p staging_mac
           cp target/${{ matrix.target }}/release/audiowave-studio staging_mac/
@@ -214,7 +225,7 @@ jobs:
           EOF
 
           # Sign App Bundle if macOS cert is present
-          if [ "${{ secrets.MACOS_CERTIFICATE_BASE64 }}" != "" ]; then
+          if [ "$MAC_CERT" != "" ]; then
             codesign --force --deep --options runtime --sign "Developer ID Application: CredibleMark Studio" "AudioWave Studio.app" || true
           fi
 
