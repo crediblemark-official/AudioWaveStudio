@@ -45,7 +45,6 @@ const SUPPORTED_AUDIO_EXTS: &[&str] = &["mp3", "wav", "flac", "ogg", "m4a", "aac
 const BG_MODE_PAIRS: &[(&str, &str)] = &[
     ("Solid", "solid"),
     ("Gradient", "gradient"),
-    ("Custom Image", "customImage"),
     ("Grid", "grid"),
     ("Aurora", "aurora"),
     ("Noise", "noise"),
@@ -594,10 +593,9 @@ pub fn bind_app_callbacks(
                 let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
                 slint::invoke_from_event_loop(move || {
                     let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
-                    s.config.background.mode = crate::config::BackgroundMode::CustomImage;
                     s.config.background.custom_image_uri = Some(path_str);
                     if let Some(w) = window_handle.upgrade() {
-                        w.set_bg_mode(slint::SharedString::from("Custom Image"));
+                        w.set_custom_bg_name(slint::SharedString::from(filename.clone()));
                         push_toast(
                             &w,
                             &mut s,
@@ -616,9 +614,8 @@ pub fn bind_app_callbacks(
     window.on_remove_custom_image_clicked(move || {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         s.config.background.custom_image_uri = None;
-        s.config.background.mode = crate::config::BackgroundMode::Solid;
         if let Some(w) = window_handle.upgrade() {
-            w.set_bg_mode(slint::SharedString::from("Solid"));
+            w.set_custom_bg_name(slint::SharedString::from(""));
             push_toast(
                 &w,
                 &mut s,
@@ -1419,6 +1416,11 @@ fn sync_ui_from_config(w: &crate::AppWindow, c: &crate::config::VisualizerConfig
     w.set_radial_center_image_uri(slint::SharedString::from(
         c.background.radial_center_image_uri.clone().unwrap_or_default(),
     ));
+    let bg_file_name = c.background.custom_image_uri.as_ref()
+        .and_then(|p| std::path::Path::new(p).file_name())
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_default();
+    w.set_custom_bg_name(slint::SharedString::from(bg_file_name));
 
     let bg_mode = serde_json::to_string(&c.background.mode).unwrap_or_else(|_| "\"gradient\"".into());
     w.set_bg_mode(slint::SharedString::from(id_to_label(

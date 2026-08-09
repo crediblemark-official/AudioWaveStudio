@@ -569,6 +569,7 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> blur-amount: 0.0;
     in-out property <float> overlay-opacity: 0.3;
     in-out property <float> image-opacity: 1.0;
+    in-out property <string> custom-bg-name: "";
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
     in-out property <bool> show-fireworks: false;
@@ -1013,20 +1014,45 @@ export component ControlPanel inherits Rectangle {
                     SectionTitle { text: "BACKGROUND FILL & EFFECT STYLE"; }
                     ComboBox {
                         height: 34px;
-                        model: ["Solid", "Gradient", "Custom Image", "Grid", "Aurora", "Noise", "Bokeh", "Starfield", "Nebula", "Psychedelic"];
+                        model: ["Solid", "Gradient", "Grid", "Aurora", "Noise", "Bokeh", "Starfield", "Nebula", "Psychedelic"];
                         current-value: root.bg-mode;
-                        current-index: root.bg-mode == "Solid" ? 0 : root.bg-mode == "Gradient" ? 1 : root.bg-mode == "Custom Image" ? 2 : root.bg-mode == "Grid" ? 3 : root.bg-mode == "Aurora" ? 4 : root.bg-mode == "Noise" ? 5 : root.bg-mode == "Bokeh" ? 6 : root.bg-mode == "Starfield" ? 7 : root.bg-mode == "Nebula" ? 8 : 9;
+                        current-index: root.bg-mode == "Solid" ? 0 : root.bg-mode == "Gradient" ? 1 : root.bg-mode == "Grid" ? 2 : root.bg-mode == "Aurora" ? 3 : root.bg-mode == "Noise" ? 4 : root.bg-mode == "Bokeh" ? 5 : root.bg-mode == "Starfield" ? 6 : root.bg-mode == "Nebula" ? 7 : 8;
                         selected(val) => { root.bg-mode = val; root.config-changed(); }
                     }
 
                     SectionTitle { text: "CUSTOM BACKGROUND IMAGE"; }
+                    if (root.custom-bg-name != "") : HorizontalLayout {
+                        spacing: 6px;
+                        alignment: center;
+                        Rectangle {
+                            background: #ffd70015;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #ffd70040;
+
+                            HorizontalLayout {
+                                padding: 6px;
+                                spacing: 6px;
+                                alignment: center;
+                                Text {
+                                    text: "📷 Selected: " + root.custom-bg-name;
+                                    font-size: 11px;
+                                    color: #ffd700;
+                                    font-weight: 600;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
                     HorizontalLayout {
                         spacing: 8px;
                         Button {
-                            text: "🖼 Select Background Image";
+                            text: root.custom-bg-name != "" ? "🖼 Change Background Image" : "🖼 Select Background Image";
                             clicked => { root.open-custom-image-clicked(); }
                         }
-                        Button {
+                        if (root.custom-bg-name != "") : Button {
                             text: "🗑 Remove Image";
                             clicked => { root.remove-custom-image-clicked(); }
                         }

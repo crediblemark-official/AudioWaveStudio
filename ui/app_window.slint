@@ -183,6 +183,7 @@ export component AppWindow inherits Window {
     in-out property <float> blur-amount: 0.0;
     in-out property <float> overlay-opacity: 0.3;
     in-out property <float> image-opacity: 1.0;
+    in-out property <string> custom-bg-name: "";
     in-out property <bool> show-particles: true;
     in-out property <bool> show-music-notes: false;
     in-out property <bool> show-fireworks: false;
@@ -578,6 +579,7 @@ export component AppWindow inherits Window {
                     blur-amount <=> root.blur-amount;
                     overlay-opacity <=> root.overlay-opacity;
                     image-opacity <=> root.image-opacity;
+                    custom-bg-name <=> root.custom-bg-name;
                     show-particles <=> root.show-particles;
                     show-music-notes <=> root.show-music-notes;
                     show-fireworks <=> root.show-fireworks;
