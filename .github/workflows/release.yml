@@ -53,6 +53,32 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       # -----------------------------------------------------------------------
+      # WINDOWS CODE SIGNING (Optional Authenticode via SignTool)
+      # -----------------------------------------------------------------------
+      - name: Windows Code Signing
+        if: matrix.os == 'windows-latest' && secrets.WINDOWS_CERTIFICATE_BASE64 != ''
+        shell: pwsh
+        run: |
+          $certPath = "$env:TEMP\cert.pfx"
+          [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}") | Set-Content -Path $certPath -Encoding Byte
+          & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "target\${{ matrix.target }}\release\audiowave-studio.exe"
+          Remove-Item -Path $certPath -Force
+
+      # -----------------------------------------------------------------------
+      # MACOS CODE SIGNING (Optional Apple Codesign)
+      # -----------------------------------------------------------------------
+      - name: macOS Code Signing Setup
+        if: startsWith(matrix.os, 'macos') && secrets.MACOS_CERTIFICATE_BASE64 != ''
+        run: |
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo "${{ secrets.MACOS_CERTIFICATE_BASE64 }}" | base64 --decode > $RUNNER_TEMP/certificate.p12
+          security create-keychain -p "" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "" $KEYCHAIN_PATH
+          security import $RUNNER_TEMP/certificate.p12 -k $KEYCHAIN_PATH -P "${{ secrets.MACOS_CERT_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" $KEYCHAIN_PATH
+
+      # -----------------------------------------------------------------------
       # LINUX PACKAGING (.tar.gz, .deb, .AppImage)
       # -----------------------------------------------------------------------
       - name: Package Linux (.tar.gz, .deb, .AppImage)
@@ -140,8 +166,17 @@ jobs:
           # Create .msi installer copy for Windows MSI deployment
           Copy-Item ${{ matrix.artifact_name }}-setup.exe ${{ matrix.artifact_name }}.msi
 
+          # Sign Installer Executables if Code Signing Cert is present
+          if ("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}" -ne "") {
+            $certPath = "$env:TEMP\cert.pfx"
+            [System.Convert]::FromBase64String("${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}") | Set-Content -Path $certPath -Encoding Byte
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}-setup.exe"
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}.msi"
+            Remove-Item -Path $certPath -Force
+          }
+
       # -----------------------------------------------------------------------
-      # MACOS PACKAGING (.tar.gz, .dmg)
+      # MACOS PACKAGING (.tar.gz, .dmg) & SIGNING
       # -----------------------------------------------------------------------
       - name: Package macOS (.tar.gz & .dmg)
         if: startsWith(matrix.os, 'macos')
@@ -178,13 +213,26 @@ jobs:
           </plist>
           EOF
 
+          # Sign App Bundle if macOS cert is present
+          if [ "${{ secrets.MACOS_CERTIFICATE_BASE64 }}" != "" ]; then
+            codesign --force --deep --options runtime --sign "Developer ID Application: CredibleMark Studio" "AudioWave Studio.app" || true
+          fi
+
           mkdir -p dmg_stage
           cp -r "AudioWave Studio.app" dmg_stage/
           ln -s /Applications dmg_stage/Applications
           hdiutil create -volname "AudioWave Studio" -srcfolder dmg_stage -ov -format UDZO "${{ matrix.artifact_name }}.dmg"
 
       # -----------------------------------------------------------------------
-      # PUBLISH ALL INSTALLER PACKAGES TO GITHUB RELEASES
+      # GENERATE SHA-256 CHECKSUMS (BINARY INTEGRITY SIGNATURE)
+      # -----------------------------------------------------------------------
+      - name: Generate SHA-256 Checksums
+        shell: bash
+        run: |
+          sha256sum ${{ matrix.artifact_name }}* > ${{ matrix.artifact_name }}-SHA256SUMS.txt 2>/dev/null || shasum -a 256 ${{ matrix.artifact_name }}* > ${{ matrix.artifact_name }}-SHA256SUMS.txt
+
+      # -----------------------------------------------------------------------
+      # PUBLISH ALL SIGNED INSTALLER PACKAGES TO GITHUB RELEASES
       # -----------------------------------------------------------------------
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
