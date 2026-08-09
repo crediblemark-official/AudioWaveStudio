@@ -101,7 +101,7 @@ jobs:
           cp target/debian/*.deb ./${{ matrix.artifact_name }}.deb 2>/dev/null || cp target/${{ matrix.target }}/debian/*.deb ./${{ matrix.artifact_name }}.deb
 
           # Build Portable .AppImage package
-          wget -q https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool
+          wget -q https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool
           chmod +x appimagetool
           mkdir -p AppDir/usr/bin
           mkdir -p AppDir/usr/share/applications
@@ -151,7 +151,7 @@ jobs:
           $issContent = @"
           [Setup]
           AppName=AudioWave Studio
-          AppVersion=1.11.0
+          AppVersion=1.12.0
           AppPublisher=CredibleMark Studio
           DefaultDirName={autopf}\AudioWave Studio
           DefaultGroupName=AudioWave Studio
@@ -217,7 +217,7 @@ jobs:
               <key>CFBundlePackageType</key>
               <string>APPL</string>
               <key>CFBundleShortVersionString</key>
-              <string>1.11.0</string>
+              <string>1.12.0</string>
               <key>NSHighResolutionCapable</key>
               <true/>
           </dict>
