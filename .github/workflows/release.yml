@@ -193,13 +193,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           files: |
-            *.tar.gz
-            *.zip
-            *.deb
-            *.AppImage
-            *.exe
-            *.msi
-            *.dmg
+            ${{ matrix.artifact_name }}*
+          fail_on_unmatched_files: false
           draft: false
           prerelease: false
           generate_release_notes: true
