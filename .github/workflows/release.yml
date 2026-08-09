@@ -98,7 +98,7 @@ jobs:
           # Build Debian / Ubuntu .deb package
           cargo install cargo-deb --no-track || true
           cargo deb --target ${{ matrix.target }} --no-build
-          cp target/${{ matrix.target }}/debian/*.deb ./${{ matrix.artifact_name }}.deb
+          cp target/debian/*.deb ./${{ matrix.artifact_name }}.deb 2>/dev/null || cp target/${{ matrix.target }}/debian/*.deb ./${{ matrix.artifact_name }}.deb
 
           # Build Portable .AppImage package
           wget -q https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage -O appimagetool

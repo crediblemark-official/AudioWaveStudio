@@ -4,6 +4,7 @@ version = "1.11.0"
 description = "AudioWave Studio Desktop Audio Visualizer"
 authors = ["CredibleMark <contact@crediblemark.com>"]
 edition = "2021"
+license = "MIT"
 
 [package.metadata.deb]
 maintainer = "CredibleMark <contact@crediblemark.com>"
