@@ -109,6 +109,28 @@ pub enum VisualizerStyle {
   ParticleWave3D,
   #[serde(rename = "cylinderMatrix3D")]
   CylinderMatrix3D,
+  #[serde(rename = "dualWaveHorizon")]
+  DualWaveHorizon,
+  #[serde(rename = "waveformSeismograph")]
+  WaveformSeismograph,
+  #[serde(rename = "waveformDualTube")]
+  WaveformDualTube,
+  #[serde(rename = "waveformVoxelTerrain")]
+  WaveformVoxelTerrain,
+  #[serde(rename = "waveformSineComb")]
+  WaveformSineComb,
+  #[serde(rename = "waveformHarmonicWeb")]
+  WaveformHarmonicWeb,
+  #[serde(rename = "waveformSteppedArcade")]
+  WaveformSteppedArcade,
+  #[serde(rename = "waveformBarcodePulse")]
+  WaveformBarcodePulse,
+  #[serde(rename = "waveformCurtainBeams")]
+  WaveformCurtainBeams,
+  #[serde(rename = "waveformOscillatingRings")]
+  WaveformOscillatingRings,
+  #[serde(rename = "waveformTopographicRibbon")]
+  WaveformTopographicRibbon,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -327,6 +349,56 @@ pub struct BackgroundSettings {
   pub show_sakura: Option<bool>,
   #[serde(default)]
   pub show_cyber_lightning: Option<bool>,
+  #[serde(default)]
+  pub fireworks_count: Option<u32>,
+  #[serde(default)]
+  pub fireworks_size: Option<f32>,
+  #[serde(default)]
+  pub fireworks_speed: Option<f32>,
+  #[serde(default)]
+  pub fireworks_depth: Option<f32>,
+  #[serde(default)]
+  pub fireworks_color: Option<String>,
+  #[serde(default)]
+  pub matrix_rain_count: Option<u32>,
+  #[serde(default)]
+  pub matrix_rain_size: Option<f32>,
+  #[serde(default)]
+  pub matrix_rain_speed: Option<f32>,
+  #[serde(default)]
+  pub matrix_rain_depth: Option<f32>,
+  #[serde(default)]
+  pub matrix_rain_color: Option<String>,
+  #[serde(default)]
+  pub fireflies_count: Option<u32>,
+  #[serde(default)]
+  pub fireflies_size: Option<f32>,
+  #[serde(default)]
+  pub fireflies_speed: Option<f32>,
+  #[serde(default)]
+  pub fireflies_depth: Option<f32>,
+  #[serde(default)]
+  pub fireflies_color: Option<String>,
+  #[serde(default)]
+  pub sakura_count: Option<u32>,
+  #[serde(default)]
+  pub sakura_size: Option<f32>,
+  #[serde(default)]
+  pub sakura_speed: Option<f32>,
+  #[serde(default)]
+  pub sakura_depth: Option<f32>,
+  #[serde(default)]
+  pub sakura_color: Option<String>,
+  #[serde(default)]
+  pub cyber_lightning_count: Option<u32>,
+  #[serde(default)]
+  pub cyber_lightning_size: Option<f32>,
+  #[serde(default)]
+  pub cyber_lightning_speed: Option<f32>,
+  #[serde(default)]
+  pub cyber_lightning_depth: Option<f32>,
+  #[serde(default)]
+  pub cyber_lightning_color: Option<String>,
   #[serde(default)]
   pub music_note_style: Option<MusicNoteStyle>,
   #[serde(default)]
@@ -574,7 +646,7 @@ pub struct ExportSettings {
   pub encoder: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ScreenEffectsSettings {
   pub enabled: bool,
@@ -586,6 +658,7 @@ pub struct ScreenEffectsSettings {
   pub shake_on_beat: bool,
   pub glitch_intensity: f32,
   pub pulse_intensity: f32,
+  pub vignette_intensity: f32,
   pub spotlight_color: String,
   pub strobe_intensity: f32,
   pub scanline_opacity: f32,
@@ -598,6 +671,37 @@ pub struct ScreenEffectsSettings {
   pub tilt_intensity: f32,
   pub heat_haze_intensity: f32,
   pub hue_shift_intensity: f32,
+}
+
+impl Default for ScreenEffectsSettings {
+  fn default() -> Self {
+    // Mirror the legacy defaults (presets.ts) and the Slint control-panel
+    // slider defaults so a fresh config has usable effect values.
+    ScreenEffectsSettings {
+      enabled: true,
+      background_only: None,
+      main_effect: ScreenEffect::None,
+      shake_intensity: 1.0,
+      shake_frequency: 0.5,
+      shake_max_offset: 40.0,
+      shake_on_beat: false,
+      glitch_intensity: 0.5,
+      pulse_intensity: 0.7,
+      vignette_intensity: 0.7,
+      spotlight_color: "#ffd700".to_string(),
+      strobe_intensity: 0.8,
+      scanline_opacity: 0.2,
+      chromatic_intensity: 0.5,
+      zoom_intensity: 0.2,
+      invert_intensity: 0.5,
+      bars_amount: 0.6,
+      shockwave_intensity: 0.6,
+      pixelate_intensity: 0.6,
+      tilt_intensity: 0.6,
+      heat_haze_intensity: 0.6,
+      hue_shift_intensity: 0.6,
+    }
+  }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]

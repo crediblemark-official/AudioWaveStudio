@@ -7,23 +7,31 @@ on:
   workflow_dispatch:
 
 jobs:
-  release:
+  build-release:
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-          - platform: 'ubuntu-22.04'
-            args: ''
-          - platform: 'windows-latest'
-            args: ''
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact_name: audiowave-studio-linux-x86_64
+            asset_extension: .tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: audiowave-studio-windows-x86_64
+            asset_extension: .zip
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: audiowave-studio-macos-arm64
+            asset_extension: .tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            artifact_name: audiowave-studio-macos-x64
+            asset_extension: .tar.gz
 
-    runs-on: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout repository
@@ -32,7 +40,7 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: ${{ matrix.target }}
 
       - name: Cache Rust dependencies
         uses: swatinem/rust-cache@v2
@@ -40,22 +48,37 @@ jobs:
           workspaces: '. -> target'
 
       - name: Install system dependencies (Linux)
-        if: matrix.platform == 'ubuntu-22.04'
+        if: matrix.os == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libssl-dev pkg-config ffmpeg
+          sudo apt-get install -y build-essential libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libssl-dev pkg-config ffmpeg libasound2-dev libfontconfig1-dev libgl1-mesa-dev libegl1-mesa-dev libgbm-dev
 
       - name: Build release binary
-        run: cargo build --release ${{ matrix.args }}
+        run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Upload artifacts
+      - name: Package Release Assets (Linux / macOS)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mkdir -p staging
+          cp target/${{ matrix.target }}/release/audiowave-studio staging/
+          cp README.md staging/ 2>/dev/null || true
+          tar -czvf ${{ matrix.artifact_name }}.tar.gz -C staging .
+
+      - name: Package Release Assets (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path staging
+          Copy-Item target/${{ matrix.target }}/release/audiowave-studio.exe -Destination staging/
+          if (Test-Path README.md) { Copy-Item README.md -Destination staging/ }
+          Compress-Archive -Path staging/* -DestinationPath ${{ matrix.artifact_name }}.zip
+
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: audiowave-studio-${{ matrix.platform }}-${{ matrix.args }}
-          path: |
-            target/release/audiowave-studio
-            target/release/audiowave-studio.exe
-          if-no-files-found: warn
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}${{ matrix.asset_extension }}
+          if-no-files-found: error
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -63,9 +86,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: |
-            target/release/audiowave-studio
-            target/release/audiowave-studio.exe
+          files: ${{ matrix.artifact_name }}${{ matrix.asset_extension }}
           draft: false
           prerelease: false
           generate_release_notes: true

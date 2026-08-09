@@ -389,6 +389,8 @@ pub struct FrameEnvelope {
   pub bg_shake_x: f32,
   pub bg_shake_y: f32,
   pub shake_margin: f32,
+  /// Monotonic clock for time-based screen effects (see ScreenFxState.fx_time).
+  pub fx_time: f32,
 }
 
 pub fn advance_envelope(
@@ -452,7 +454,6 @@ pub fn advance_envelope(
     &config.screen_effects,
     above_floor,
     state.beat_strength,
-    frame_time,
   );
   let (bg_shake_x, bg_shake_y) = ((shake_x * 1.8).round(), (shake_y * 1.8).round());
   let shake_margin = (bg_shake_x * bg_shake_x + bg_shake_y * bg_shake_y).sqrt().ceil();
@@ -467,6 +468,7 @@ pub fn advance_envelope(
     bg_shake_x,
     bg_shake_y,
     shake_margin,
+    fx_time: state.screen_fx.fx_time,
   }
 }
 
@@ -545,14 +547,6 @@ pub fn draw_frame_pass(
   if draw_style {
     c.save();
     c.translate(env.shake_x, env.shake_y);
-    let pos_offset_x = config.position_x * width * 0.5;
-    let pos_offset_y = config.position_y * height * 0.5;
-    c.translate(width / 2.0 + pos_offset_x, height / 2.0 + pos_offset_y);
-    let sx = config.scale;
-    if (sx - 1.0).abs() > 1e-6 {
-      c.scale(sx, sx);
-    }
-    c.translate(-width / 2.0, -height / 2.0);
     render_style(c, &mut ctx);
     c.restore();
 
@@ -614,12 +608,202 @@ pub fn draw_frame(
   draw_frame_pass(c, &mut scene3d, state, config, freq, time, frame_time, &env, FramePass::All);
 }
 
+/// Composite a custom background image (cover-fit, center-cropped — mirrors
+/// TS drawCoverImage) onto the CPU fallback frame.
+fn cpu_background_image(
+  rgb: &mut [u8],
+  w: u32,
+  h: u32,
+  rgba: &[u8],
+  iw: u32,
+  ih: u32,
+  opacity: f32,
+) {
+  if iw == 0 || ih == 0 || rgba.len() < (iw as usize) * (ih as usize) * 4 {
+    return;
+  }
+  let alpha = (opacity.clamp(0.0, 1.0) * 255.0) as u32;
+  if alpha == 0 {
+    return;
+  }
+  let (wf, hf) = (w as f32, h as f32);
+  let scale = (wf / iw as f32).max(hf / ih as f32);
+  let dw = (iw as f32 * scale).ceil() as i32;
+  let dh = (ih as f32 * scale).ceil() as i32;
+  let ox = (w as i32 - dw) / 2;
+  let oy = (h as i32 - dh) / 2;
+  for y in 0..h {
+    let src_y = ((y as i32 - oy) as f32 / scale) as i32;
+    if src_y < 0 || src_y >= ih as i32 {
+      continue;
+    }
+    for x in 0..w {
+      let src_x = ((x as i32 - ox) as f32 / scale) as i32;
+      if src_x < 0 || src_x >= iw as i32 {
+        continue;
+      }
+      let si = ((src_y as u32 * iw + src_x as u32) * 4) as usize;
+      let a = rgba[si + 3] as u32 * alpha / 255;
+      if a == 0 {
+        continue;
+      }
+      let o = ((y as usize) * (w as usize) + x as usize) * 3;
+      let inv = 255 - a;
+      rgb[o] = ((rgba[si] as u32 * a + rgb[o] as u32 * inv) / 255) as u8;
+      rgb[o + 1] = ((rgba[si + 1] as u32 * a + rgb[o + 1] as u32 * inv) / 255) as u8;
+      rgb[o + 2] = ((rgba[si + 2] as u32 * a + rgb[o + 2] as u32 * inv) / 255) as u8;
+    }
+  }
+}
+
+/// Rasterize one text run via the shared text atlas and source-over it onto
+/// the CPU fallback frame. `y` is the baseline; `x` is the pen anchor for the
+/// given align (mirrors GpuCanvas::draw_text_quad geometry exactly).
+fn cpu_draw_text(
+  rgb: &mut [u8],
+  w: u32,
+  h: u32,
+  text: &str,
+  x: f32,
+  baseline_y: f32,
+  align: crate::config::TextAlign,
+  family: &str,
+  weight: f32,
+  italic: bool,
+  font_size: f32,
+  color: [u8; 3],
+  opacity: f32,
+) {
+  if text.trim().is_empty() || font_size <= 0.0 || opacity <= 0.0 {
+    return;
+  }
+  let Some(font) = crate::gpu2d::text::select_font_for_text_style(family, weight, italic, text) else {
+    return;
+  };
+  let fill = Fill::Solid(Color::rgb(
+    color[0] as f32 / 255.0,
+    color[1] as f32 / 255.0,
+    color[2] as f32 / 255.0,
+  ));
+  let opts = crate::gpu2d::text::TextOpts::default();
+  let Some(atl) = crate::gpu2d::text::rasterize(font, text, font_size, &fill, &opts) else {
+    return;
+  };
+  let dx = match align {
+    crate::config::TextAlign::Left => 0.0,
+    crate::config::TextAlign::Center => -atl.advance / 2.0,
+    crate::config::TextAlign::Right => -atl.advance,
+  };
+  let pen_x = x + dx;
+  let alpha_mult = (opacity.clamp(0.0, 1.0) * 255.0) as u32;
+  for py in 0..atl.atlas_h {
+    for px in 0..atl.atlas_w {
+      let i = ((py * atl.atlas_w + px) * 4) as usize;
+      let a = atl.rgba[i + 3] as u32 * alpha_mult / 255;
+      if a == 0 {
+        continue;
+      }
+      let cx = (pen_x + (px as f32 - atl.pen_x)).round() as i32;
+      let cy = (baseline_y + (py as f32 - atl.baseline)).round() as i32;
+      if cx < 0 || cy < 0 || cx >= w as i32 || cy >= h as i32 {
+        continue;
+      }
+      let o = ((cy as usize) * (w as usize) + cx as usize) * 3;
+      let inv = 255 - a;
+      rgb[o] = ((atl.rgba[i] as u32 * a + rgb[o] as u32 * inv) / 255) as u8;
+      rgb[o + 1] = ((atl.rgba[i + 1] as u32 * a + rgb[o + 1] as u32 * inv) / 255) as u8;
+      rgb[o + 2] = ((atl.rgba[i + 2] as u32 * a + rgb[o + 2] as u32 * inv) / 255) as u8;
+    }
+  }
+}
+
+/// Mirror the GPU text overlay (drawTextOverlay) on the CPU fallback: title,
+/// artist and any enabled custom blocks, positioned as a percentage of the
+/// frame (block_anchor) with the block's baseline at the anchor y.
+fn cpu_text_overlay(rgb: &mut [u8], w: u32, h: u32, config: &VisualizerConfig) {
+  let txt = &config.text;
+  let default_family = if txt.font_family.trim().is_empty() {
+    "Outfit"
+  } else {
+    txt.font_family.as_str()
+  };
+
+  struct Item<'a> {
+    block: &'a crate::config::TextBlock,
+    text: String,
+  }
+  let mut items: Vec<Item> = Vec::new();
+  if txt.show_title {
+    let t = if !txt.song_title.trim().is_empty() {
+      txt.song_title.as_str()
+    } else if !txt.title.text.trim().is_empty() {
+      txt.title.text.as_str()
+    } else {
+      "Song Title"
+    };
+    items.push(Item { block: &txt.title, text: t.to_string() });
+  }
+  if txt.show_artist {
+    let a = if !txt.artist_name.trim().is_empty() {
+      txt.artist_name.as_str()
+    } else if !txt.artist.text.trim().is_empty() {
+      txt.artist.text.as_str()
+    } else {
+      "Artist Name"
+    };
+    items.push(Item { block: &txt.artist, text: a.to_string() });
+  }
+  for b in &txt.blocks {
+    if b.enabled && !b.text.trim().is_empty() {
+      items.push(Item { block: b, text: b.text.clone() });
+    }
+  }
+
+  for item in items {
+    let block = item.block;
+    let (w_f, h_f) = (w as f32, h as f32);
+    let anchor_x = (block.position_x / 100.0) * w_f;
+    let anchor_y = (block.position_y / 100.0) * h_f;
+    let family = if block.font_family.trim().is_empty() {
+      default_family
+    } else {
+      block.font_family.as_str()
+    };
+    let color: [u8; 3] = if block.color.trim().is_empty() {
+      [255, 255, 255]
+    } else {
+      let c = Color::hex(&block.color);
+      [
+        (c.r * 255.0) as u8,
+        (c.g * 255.0) as u8,
+        (c.b * 255.0) as u8,
+      ]
+    };
+    cpu_draw_text(
+      rgb,
+      w,
+      h,
+      &item.text,
+      anchor_x,
+      anchor_y,
+      block.align,
+      family,
+      block.font_weight,
+      block.italic,
+      block.font_size,
+      color,
+      block.opacity,
+    );
+  }
+}
+
 pub fn render_frame_to_rgb(
   config: &VisualizerConfig,
   freq: &[u8],
   time: &[u8],
   _bass_energy: f32,
   frame_time: f32,
+  fx_time: f32,
   width: u32,
   height: u32,
 ) -> Vec<u8> {
@@ -652,6 +836,21 @@ pub fn render_frame_to_rgb(
       rgb[idx] = r;
       rgb[idx + 1] = g;
       rgb[idx + 2] = b;
+    }
+  }
+
+  // Custom background image (cover-fit, mirrors the GPU path + TS drawCoverImage).
+  if matches!(
+    config.background.mode,
+    crate::config::BackgroundMode::CustomImage
+  ) {
+    if let Some((rgba, iw, ih)) =
+      crate::gpu_export::decode_background_image(config.background.custom_image_uri.as_deref())
+    {
+      let default_opacity = 1.0;
+      let raw_op = config.background.image_opacity.unwrap_or(default_opacity);
+      let op = if raw_op > 1.0 { raw_op / 100.0 } else { raw_op };
+      cpu_background_image(&mut rgb, width, height, &rgba, iw, ih, op);
     }
   }
 
@@ -743,7 +942,7 @@ pub fn render_frame_to_rgb(
     let total_span_w = w_f * scale;
     let bar_width = (total_span_w / bar_count as f32).max(1.0);
     let x_start_base = cx - total_span_w / 2.0;
-    let y_base = (h_f + pos_y_offset) as i32;
+  let y_base = (h_f / 2.0 + pos_y_offset + h_f * 0.5).round() as i32;
     let total_bins = freq.len().max(1) as f32;
 
     for i in 0..bar_count {
@@ -785,6 +984,22 @@ pub fn render_frame_to_rgb(
       }
     }
   }
+
+  // Screen effects on the software path (mirror of the GPU pipeline).
+  let env = screen_effects::cpu_envelope(freq);
+  screen_effects::apply_cpu_screen_effects(
+    &mut rgb,
+    width,
+    height,
+    &config.screen_effects,
+    env.above_floor,
+    env.beat,
+    fx_time,
+  );
+
+  // Text overlay (title / artist / custom blocks) — the CPU fallback used to
+  // drop text entirely even though the GPU path always renders it.
+  cpu_text_overlay(&mut rgb, width, height, config);
 
   rgb
 }

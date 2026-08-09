@@ -44,7 +44,9 @@ fn decode_uri_to_path(s: &str) -> String {
   out
 }
 
-fn decode_background_image(uri: Option<&str>) -> Option<(Vec<u8>, u32, u32)> {
+/// Decode a custom background image URI (base64 data URI or file path) into
+/// raw RGBA. Shared by the GPU export path and the CPU fallback compositor.
+pub(crate) fn decode_background_image(uri: Option<&str>) -> Option<(Vec<u8>, u32, u32)> {
   let uri = uri?;
   if uri.trim().is_empty() {
     return None;
@@ -99,7 +101,12 @@ pub fn export_gpu(
   audio_file_path: String,
   output_path: String,
   include_audio: bool,
+  cancel_flag: Arc<AtomicBool>,
 ) -> Result<String, String> {
+  // A stale flag (e.g. a previous cancelled run) must not abort a fresh
+  // export; the caller resets it before calling, but be defensive.
+  cancel_flag.store(false, Ordering::SeqCst);
+
   let (width, height) = export_dimensions(&config);
   let fps = config.export.fps.max(1);
   let fft_size = config.reactivity.fft_size.max(64);
@@ -125,7 +132,6 @@ pub fn export_gpu(
     config.export.encoder.as_deref().unwrap_or("auto"),
   )?;
 
-  let cancel_flag = Arc::new(AtomicBool::new(false));
   let _start = std::time::Instant::now();
 
   let render_result = std::thread::spawn(move || -> Result<(), String> {
@@ -198,6 +204,8 @@ pub fn export_gpu(
 
       // Export always renders as if playing (TS export sets isPlaying=true).
       let frame_time = time_sec as f32;
+      // Export time is already continuous, so it doubles as the fx clock.
+      rstate.screen_fx.fx_time = frame_time;
       // Advance the envelope ONCE per frame; the passes below only read it.
       let env = advance_envelope(&mut rstate, &config, &freq_u8, frame_time, true);
       let fx = crate::renderers::screen_effects::post_fx(
@@ -205,12 +213,11 @@ pub fn export_gpu(
         &config.screen_effects,
         env.above_floor,
         rstate.beat_strength,
-        frame_time,
         config.export.fps.max(1) as f32,
       );
       let bg_only = config.screen_effects.background_only.unwrap_or(true);
 
-      if fx.is_some() && bg_only {
+      if let Some(fx_ref) = fx.as_ref().filter(|_| bg_only) {
         // backgroundOnly: apply the frame-sampling effect to the background
         // layer only, then draw the style/particles/text over it (mirrors
         // canvasRenderer drawFrame).
@@ -228,7 +235,7 @@ pub fn export_gpu(
           FramePass::ForegroundOnly,
         );
         let fg_mesh = fg_canvas.finish_with(fg_scene);
-        gpu.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx.as_ref().unwrap(), slot);
+        gpu.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx_ref, slot);
       } else {
         let mut canvas = GpuCanvas::new(width, height);
         let mut scene3d = Scene3D::new();
@@ -299,6 +306,11 @@ pub fn export_gpu(
     let _ = stderr_reader.join();
 
     if let Some(e) = final_error {
+      // A cancelled export shouldn't wait for FFmpeg to finish the partial
+      // stream — kill it now so the cleanup path returns promptly.
+      if e == "Export cancelled" {
+        let _ = child.kill();
+      }
       return Err(e);
     }
 
@@ -368,6 +380,8 @@ pub fn render_preview_frame_inner(
   freq_data: &[u8],
   time_data: &[u8],
   frame_time: f32,
+  fx_time: f32,
+  fps: f32,
   width: u32,
   height: u32,
   is_playing: bool,
@@ -378,6 +392,10 @@ pub fn render_preview_frame_inner(
   // VU decay and RNG continuity persist across frames. Rebuild only on the
   // first frame or when the bar count changed (peak_data is sized to it).
   let mut rstate = take_or_init_render_state(&mut engine.render_state, bar_count);
+
+  // Monotonic clock for time-based effects: keeps them animating across
+  // pause/seek instead of freezing/jumping (fx_time, not song time).
+  rstate.screen_fx.fx_time = fx_time;
 
   let cur_bg_uri = config.background.custom_image_uri.clone();
   if engine.bg_image_uri != cur_bg_uri {
@@ -420,12 +438,11 @@ pub fn render_preview_frame_inner(
     &config.screen_effects,
     env.above_floor,
     rstate.beat_strength,
-    frame_time,
-    config.export.fps.max(1) as f32,
+    fps,
   );
   let bg_only = config.screen_effects.background_only.unwrap_or(true);
 
-  if fx.is_some() && bg_only {
+  if let Some(fx_ref) = fx.as_ref().filter(|_| bg_only) {
     // backgroundOnly: effect applies to the background layer only.
     let mut bg_canvas = GpuCanvas::new(width, height);
     let mut bg_scene = Scene3D::new();
@@ -441,7 +458,7 @@ pub fn render_preview_frame_inner(
       FramePass::ForegroundOnly,
     );
     let fg_mesh = fg_canvas.finish_with(fg_scene);
-    engine.renderer.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx.as_ref().unwrap(), 0);
+    engine.renderer.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx_ref, 0);
   } else {
     let mut canvas = GpuCanvas::new(width, height);
     let mut scene3d = Scene3D::new();

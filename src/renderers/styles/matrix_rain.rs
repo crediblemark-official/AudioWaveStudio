@@ -26,6 +26,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let glow_col = theme_glow(theme);
 
     let sensitivity = ctx.config.reactivity.sensitivity;
+    let _user_scale = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
     let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
@@ -33,15 +36,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx = width * 0.5 + pos_offset_x;
+    let cy = height * 0.5 + pos_offset_y;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep pitch-black matrix backdrop
-    c.set_fill(Fill::Solid(Color::hex("#010602")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#010602")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Matrix digital rain ambient glow
     let amb_glow = Fill::radial_gradient(
@@ -58,7 +61,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(amb_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. CASCADING MATRIX DATA RAIN STREAM BLOCKS

@@ -1,3 +1,4 @@
+import { CustomTextBlockData } from "custom_text.slint";
 import { Button, Slider, ComboBox, LineEdit, ScrollView, CheckBox } from "std-widgets.slint";
 
 component StyleVisualIcon inherits Rectangle {
@@ -7,7 +8,7 @@ component StyleVisualIcon inherits Rectangle {
     width: 24px;
     height: 18px;
 
-    if root.style-id == "spectrum" || root.style-id == "smoothSpectrum" : HorizontalLayout {
+    if root.style-id == "spectrum" || root.style-id == "smoothSpectrum" || root.style-id == "waveformBarcodePulse" : HorizontalLayout {
         spacing: 2px;
         alignment: center;
         cross-axis-alignment: end;
@@ -17,7 +18,7 @@ component StyleVisualIcon inherits Rectangle {
         Rectangle { width: 3px; height: 14px; border-radius: 1px; background: root.icon-color; }
     }
 
-    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" || root.style-id == "radialRipple3D" || root.style-id == "vinylRecord" || root.style-id == "orbitSpike" || root.style-id == "cyberRing3D" || root.style-id == "dualPortalBridge" || root.style-id == "cyberBlackHole" || root.style-id == "supernovaBurst" || root.style-id == "quantumEye" || root.style-id == "chronoReactor" || root.style-id == "solarFlareCrown" || root.style-id == "warpDrive" || root.style-id == "neonBiohazard" || root.style-id == "neonLotus" || root.style-id == "holographicVinyl" || root.style-id == "acousticCymascope" : HorizontalLayout {
+    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" || root.style-id == "radialRipple3D" || root.style-id == "vinylRecord" || root.style-id == "orbitSpike" || root.style-id == "cyberRing3D" || root.style-id == "dualPortalBridge" || root.style-id == "cyberBlackHole" || root.style-id == "supernovaBurst" || root.style-id == "quantumEye" || root.style-id == "chronoReactor" || root.style-id == "solarFlareCrown" || root.style-id == "warpDrive" || root.style-id == "neonBiohazard" || root.style-id == "neonLotus" || root.style-id == "holographicVinyl" || root.style-id == "acousticCymascope" || root.style-id == "waveformOscillatingRings" : HorizontalLayout {
         alignment: center;
         cross-axis-alignment: center;
         Rectangle {
@@ -35,7 +36,7 @@ component StyleVisualIcon inherits Rectangle {
         }
     }
 
-    if root.style-id == "oscilloscope" || root.style-id == "minimal" || root.style-id == "auroraWave" || root.style-id == "particleWave3D" || root.style-id == "waterfall3D" : HorizontalLayout {
+    if root.style-id == "oscilloscope" || root.style-id == "minimal" || root.style-id == "auroraWave" || root.style-id == "particleWave3D" || root.style-id == "waterfall3D" || root.style-id == "dualWaveHorizon" || root.style-id == "mercuryFluid" || root.style-id == "quantumRibbon" || root.style-id == "waveformSeismograph" || root.style-id == "waveformDualTube" || root.style-id == "waveformSineComb" || root.style-id == "waveformHarmonicWeb" || root.style-id == "waveformTopographicRibbon" || root.style-id == "waveformCurtainBeams" : HorizontalLayout {
         spacing: 1px;
         alignment: center;
         cross-axis-alignment: center;
@@ -46,7 +47,7 @@ component StyleVisualIcon inherits Rectangle {
         Rectangle { width: 4px; height: 2px; background: root.icon-color; }
     }
 
-    if root.style-id == "equalizer" || root.style-id == "vuMeter" : HorizontalLayout {
+    if root.style-id == "equalizer" || root.style-id == "vuMeter" || root.style-id == "laserWall" || root.style-id == "waveformVoxelTerrain" || root.style-id == "waveformSteppedArcade" : HorizontalLayout {
         alignment: center;
         cross-axis-alignment: center;
         GridLayout {
@@ -74,7 +75,8 @@ component StyleVisualIcon inherits Rectangle {
         Rectangle { width: 4px; height: 10px; background: root.icon-color; }
     }
 
-    if root.style-id == "spiralGalaxy" || root.style-id == "threeD" || root.style-id == "neonCity3D" || root.style-id == "speaker3D" || root.style-id == "speakerTrio" || root.style-id == "speakerSplatter" || root.style-id == "cassetteTape" || root.style-id == "turntable" || root.style-id == "retroRadio" || root.style-id == "djController" || root.style-id == "speakerExplosion" || root.style-id == "hologramStage" || root.style-id == "cylinderMatrix3D" : HorizontalLayout {
+    // Default 3D / Audio Stage icon for all other styles
+    if root.style-id != "spectrum" && root.style-id != "smoothSpectrum" && root.style-id != "waveformBarcodePulse" && root.style-id != "radial" && root.style-id != "circularBars" && root.style-id != "pulseRings" && root.style-id != "radialRipple3D" && root.style-id != "vinylRecord" && root.style-id != "orbitSpike" && root.style-id != "cyberRing3D" && root.style-id != "dualPortalBridge" && root.style-id != "cyberBlackHole" && root.style-id != "supernovaBurst" && root.style-id != "quantumEye" && root.style-id != "chronoReactor" && root.style-id != "solarFlareCrown" && root.style-id != "warpDrive" && root.style-id != "neonBiohazard" && root.style-id != "neonLotus" && root.style-id != "holographicVinyl" && root.style-id != "acousticCymascope" && root.style-id != "waveformOscillatingRings" && root.style-id != "oscilloscope" && root.style-id != "minimal" && root.style-id != "auroraWave" && root.style-id != "particleWave3D" && root.style-id != "waterfall3D" && root.style-id != "dualWaveHorizon" && root.style-id != "mercuryFluid" && root.style-id != "quantumRibbon" && root.style-id != "waveformSeismograph" && root.style-id != "waveformDualTube" && root.style-id != "waveformSineComb" && root.style-id != "waveformHarmonicWeb" && root.style-id != "waveformTopographicRibbon" && root.style-id != "waveformCurtainBeams" && root.style-id != "equalizer" && root.style-id != "vuMeter" && root.style-id != "laserWall" && root.style-id != "waveformVoxelTerrain" && root.style-id != "waveformSteppedArcade" && root.style-id != "waveformFill" && root.style-id != "api3D" : HorizontalLayout {
         spacing: 3px;
         alignment: center;
         cross-axis-alignment: center;
@@ -582,6 +584,31 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> particle-speed: 1.0;
     in-out property <float> particle-count: 60.0;
     in-out property <string> particle-color: "#00f0ff";
+    in-out property <float> fireworks-count: 7.0;
+    in-out property <float> fireworks-size: 4.0;
+    in-out property <float> fireworks-speed: 1.0;
+    in-out property <float> fireworks-depth: 1.0;
+    in-out property <string> fireworks-color: "#ff7700";
+    in-out property <float> matrix-rain-count: 40.0;
+    in-out property <float> matrix-rain-size: 5.0;
+    in-out property <float> matrix-rain-speed: 1.0;
+    in-out property <float> matrix-rain-depth: 1.0;
+    in-out property <string> matrix-rain-color: "#00ff66";
+    in-out property <float> fireflies-count: 36.0;
+    in-out property <float> fireflies-size: 6.0;
+    in-out property <float> fireflies-speed: 1.0;
+    in-out property <float> fireflies-depth: 1.0;
+    in-out property <string> fireflies-color: "#ffcc00";
+    in-out property <float> sakura-count: 28.0;
+    in-out property <float> sakura-size: 10.0;
+    in-out property <float> sakura-speed: 1.0;
+    in-out property <float> sakura-depth: 1.0;
+    in-out property <string> sakura-color: "#ffb7c5";
+    in-out property <float> cyber-lightning-count: 4.0;
+    in-out property <float> cyber-lightning-size: 3.0;
+    in-out property <float> cyber-lightning-speed: 1.0;
+    in-out property <float> cyber-lightning-depth: 1.0;
+    in-out property <string> cyber-lightning-color: "#00f0ff";
     in-out property <string> music-note-style: "Float";
     in-out property <float> music-note-size: 60.0;
     in-out property <float> music-note-count: 80.0;
@@ -611,6 +638,8 @@ export component ControlPanel inherits Rectangle {
     in-out property <bool> shake-on-beat: false;
     in-out property <float> glitch-intensity: 0.5;
     in-out property <float> pulse-intensity: 0.7;
+    in-out property <float> vignette-intensity: 0.7;
+    in-out property <string> spotlight-color: "#ffd700";
     in-out property <float> strobe-intensity: 0.8;
     in-out property <float> scanline-opacity: 0.2;
     in-out property <float> chromatic-intensity: 0.5;
@@ -638,6 +667,10 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> artist-pos-y: 86.0;
     in-out property <float> artist-font-size: 20.0;
     in-out property <string> artist-color: "#a3a3a3";
+    in-out property <[CustomTextBlockData]> custom-text-blocks: [];
+    callback add-custom-text-clicked();
+    callback remove-custom-text-clicked(int);
+    callback custom-text-edited(int, string, bool, float, float, float, string, string, string);
 
     callback config-changed();
     callback theme-preset-selected(string);
@@ -659,7 +692,6 @@ export component ControlPanel inherits Rectangle {
             TabBtn { label: "Bg"; active: root.active-tab == "background"; clicked => { root.active-tab = "background"; } }
             TabBtn { label: "FX"; active: root.active-tab == "effects"; clicked => { root.active-tab = "effects"; } }
             TabBtn { label: "Text"; active: root.active-tab == "text"; clicked => { root.active-tab = "text"; } }
-            TabBtn { label: "Export"; active: root.active-tab == "export"; clicked => { root.active-tab = "export"; } }
         }
 
         // TAB CONTENT AREA
@@ -667,6 +699,7 @@ export component ControlPanel inherits Rectangle {
             vertical-stretch: 1;
 
             VerticalLayout {
+                alignment: start;
                 padding: 10px;
                 spacing: 12px;
 
@@ -757,9 +790,25 @@ export component ControlPanel inherits Rectangle {
                         StyleCard { row: 25; col: 1; style-id: "cyberTunnel3D"; label: "Cyber Tunnel 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
 
                         StyleCard { row: 26; col: 0; style-id: "laserWall"; label: "Laser Equalizer Wall"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 26; col: 1; style-id: "dualWaveHorizon"; label: "Dual Wave Horizon"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 27; col: 0; style-id: "waveformSeismograph"; label: "3D Seismograph"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 27; col: 1; style-id: "waveformDualTube"; label: "Neon Dual Tube"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 28; col: 0; style-id: "waveformVoxelTerrain"; label: "3D Voxel Terrain"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 28; col: 1; style-id: "waveformSineComb"; label: "Spring Comb Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 29; col: 0; style-id: "waveformHarmonicWeb"; label: "Harmonic String Web"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 29; col: 1; style-id: "waveformSteppedArcade"; label: "8-Bit Stepped Arcade"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 30; col: 0; style-id: "waveformBarcodePulse"; label: "Barcode Pulse Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 30; col: 1; style-id: "waveformCurtainBeams"; label: "Laser Curtain Beams"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+
+                        StyleCard { row: 31; col: 0; style-id: "waveformOscillatingRings"; label: "Oscillating Rings"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        StyleCard { row: 31; col: 1; style-id: "waveformTopographicRibbon"; label: "Topographic Ribbon"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
                     }
 
-                    SliderRow {
+                    if (root.style-val == "spectrum" || root.style-val == "smoothSpectrum" || root.style-val == "hologramStage" || root.style-val == "orbitSpike" || root.style-val == "speakerExplosion" || root.style-val == "cyberRing3D" || root.style-val == "cylinderMatrix3D" || root.style-val == "neonCity3D" || root.style-val == "turntable" || root.style-val == "retroRadio") : SliderRow {
                         label: "Bar Count";
                         value-text: "" + root.bar-count;
                         minimum: 16;
@@ -1299,11 +1348,91 @@ export component ControlPanel inherits Rectangle {
                         checked: root.show-fireworks;
                         toggled => { root.show-fireworks = self.checked; root.config-changed(); }
                     }
+                    if (root.show-fireworks) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Burst Count";
+                            value-text: Math.round(root.fireworks-count) + "";
+                            minimum: 3.0;
+                            maximum: 20.0;
+                            value: root.fireworks-count;
+                            changed(val) => { root.fireworks-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Spark Size";
+                            value-text: Math.round(root.fireworks-size) + "px";
+                            minimum: 1.0;
+                            maximum: 12.0;
+                            value: root.fireworks-size;
+                            changed(val) => { root.fireworks-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Expansion Speed";
+                            value-text: Math.round(root.fireworks-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.fireworks-speed;
+                            changed(val) => { root.fireworks-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "3D Perspective Depth";
+                            value-text: Math.round(root.fireworks-depth * 100) + "%";
+                            minimum: 0.5;
+                            maximum: 3.0;
+                            value: root.fireworks-depth;
+                            changed(val) => { root.fireworks-depth = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Fireworks Color";
+                            hex-val: root.fireworks-color;
+                            changed(val) => { root.fireworks-color = val; root.config-changed(); }
+                        }
+                    }
 
                     CheckBox {
                         text: "Show Matrix Code Rain";
                         checked: root.show-matrix-rain;
                         toggled => { root.show-matrix-rain = self.checked; root.config-changed(); }
+                    }
+                    if (root.show-matrix-rain) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Column Count";
+                            value-text: Math.round(root.matrix-rain-count) + "";
+                            minimum: 10.0;
+                            maximum: 90.0;
+                            value: root.matrix-rain-count;
+                            changed(val) => { root.matrix-rain-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Glyph Size";
+                            value-text: Math.round(root.matrix-rain-size) + "px";
+                            minimum: 2.0;
+                            maximum: 12.0;
+                            value: root.matrix-rain-size;
+                            changed(val) => { root.matrix-rain-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Fall Speed";
+                            value-text: Math.round(root.matrix-rain-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.matrix-rain-speed;
+                            changed(val) => { root.matrix-rain-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "3D Grid Depth";
+                            value-text: Math.round(root.matrix-rain-depth * 100) + "%";
+                            minimum: 0.5;
+                            maximum: 3.0;
+                            value: root.matrix-rain-depth;
+                            changed(val) => { root.matrix-rain-depth = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Matrix Color";
+                            hex-val: root.matrix-rain-color;
+                            changed(val) => { root.matrix-rain-color = val; root.config-changed(); }
+                        }
                     }
 
                     CheckBox {
@@ -1311,11 +1440,91 @@ export component ControlPanel inherits Rectangle {
                         checked: root.show-fireflies;
                         toggled => { root.show-fireflies = self.checked; root.config-changed(); }
                     }
+                    if (root.show-fireflies) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Firefly Count";
+                            value-text: Math.round(root.fireflies-count) + "";
+                            minimum: 10.0;
+                            maximum: 100.0;
+                            value: root.fireflies-count;
+                            changed(val) => { root.fireflies-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Glow Size";
+                            value-text: Math.round(root.fireflies-size) + "px";
+                            minimum: 2.0;
+                            maximum: 16.0;
+                            value: root.fireflies-size;
+                            changed(val) => { root.fireflies-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Drift Speed";
+                            value-text: Math.round(root.fireflies-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.fireflies-speed;
+                            changed(val) => { root.fireflies-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "3D Swarm Depth";
+                            value-text: Math.round(root.fireflies-depth * 100) + "%";
+                            minimum: 0.5;
+                            maximum: 3.0;
+                            value: root.fireflies-depth;
+                            changed(val) => { root.fireflies-depth = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Firefly Color";
+                            hex-val: root.fireflies-color;
+                            changed(val) => { root.fireflies-color = val; root.config-changed(); }
+                        }
+                    }
 
                     CheckBox {
                         text: "Show Floating Sakura Petals";
                         checked: root.show-sakura;
                         toggled => { root.show-sakura = self.checked; root.config-changed(); }
+                    }
+                    if (root.show-sakura) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Petal Count";
+                            value-text: Math.round(root.sakura-count) + "";
+                            minimum: 10.0;
+                            maximum: 80.0;
+                            value: root.sakura-count;
+                            changed(val) => { root.sakura-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Petal Size";
+                            value-text: Math.round(root.sakura-size) + "px";
+                            minimum: 4.0;
+                            maximum: 24.0;
+                            value: root.sakura-size;
+                            changed(val) => { root.sakura-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Fall Speed";
+                            value-text: Math.round(root.sakura-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.sakura-speed;
+                            changed(val) => { root.sakura-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "3D Tumbling Spin Rate";
+                            value-text: Math.round(root.sakura-depth * 100) + "%";
+                            minimum: 0.5;
+                            maximum: 3.0;
+                            value: root.sakura-depth;
+                            changed(val) => { root.sakura-depth = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Sakura Color";
+                            hex-val: root.sakura-color;
+                            changed(val) => { root.sakura-color = val; root.config-changed(); }
+                        }
                     }
 
                     CheckBox {
@@ -1323,10 +1532,51 @@ export component ControlPanel inherits Rectangle {
                         checked: root.show-cyber-lightning;
                         toggled => { root.show-cyber-lightning = self.checked; root.config-changed(); }
                     }
+                    if (root.show-cyber-lightning) : VerticalLayout {
+                        spacing: 10px;
+                        SliderRow {
+                            label: "Arc Count";
+                            value-text: Math.round(root.cyber-lightning-count) + "";
+                            minimum: 2.0;
+                            maximum: 12.0;
+                            value: root.cyber-lightning-count;
+                            changed(val) => { root.cyber-lightning-count = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Arc Thickness";
+                            value-text: Math.round(root.cyber-lightning-size) + "px";
+                            minimum: 1.0;
+                            maximum: 8.0;
+                            value: root.cyber-lightning-size;
+                            changed(val) => { root.cyber-lightning-size = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "Flash Speed";
+                            value-text: Math.round(root.cyber-lightning-speed * 100) + "%";
+                            minimum: 0.2;
+                            maximum: 3.0;
+                            value: root.cyber-lightning-speed;
+                            changed(val) => { root.cyber-lightning-speed = val; root.config-changed(); }
+                        }
+                        SliderRow {
+                            label: "3D Mesh Radius";
+                            value-text: Math.round(root.cyber-lightning-depth * 100) + "%";
+                            minimum: 0.5;
+                            maximum: 3.0;
+                            value: root.cyber-lightning-depth;
+                            changed(val) => { root.cyber-lightning-depth = val; root.config-changed(); }
+                        }
+                        ColorPickerField {
+                            label: "Lightning Color";
+                            hex-val: root.cyber-lightning-color;
+                            changed(val) => { root.cyber-lightning-color = val; root.config-changed(); }
+                        }
+                    }
                 }
 
                 // EFFECTS TAB
                 if (root.active-tab == "effects") : VerticalLayout {
+                    alignment: start;
                     spacing: 10px;
                     SectionTitle { text: "SCREEN EFFECTS"; }
 
@@ -1337,6 +1587,7 @@ export component ControlPanel inherits Rectangle {
                     }
 
                     if (root.effects-enabled) : VerticalLayout {
+                        alignment: start;
                         spacing: 10px;
                         CheckBox {
                             text: "Apply Effects to Background Only";
@@ -1420,7 +1671,19 @@ export component ControlPanel inherits Rectangle {
                             }
                         }
 
-                        if (root.main-effect == "Vignette" || root.main-effect == "Pulse") : VerticalLayout {
+                        if (root.main-effect == "Vignette") : VerticalLayout {
+                            spacing: 10px;
+                            SliderRow {
+                                label: "Vignette Intensity";
+                                value-text: Math.round(root.vignette-intensity * 100) + "%";
+                                minimum: 0.0;
+                                maximum: 1.0;
+                                value: root.vignette-intensity;
+                                changed(val) => { root.vignette-intensity = val; root.config-changed(); }
+                            }
+                        }
+
+                        if (root.main-effect == "Pulse") : VerticalLayout {
                             spacing: 10px;
                             SliderRow {
                                 label: "Pulse Strength";
@@ -1429,6 +1692,15 @@ export component ControlPanel inherits Rectangle {
                                 maximum: 1.0;
                                 value: root.pulse-intensity;
                                 changed(val) => { root.pulse-intensity = val; root.config-changed(); }
+                            }
+                        }
+
+                        if (root.main-effect == "Spotlight") : VerticalLayout {
+                            spacing: 10px;
+                            ColorPickerField {
+                                label: "Spotlight Color";
+                                hex-val: root.spotlight-color;
+                                changed(val) => { root.spotlight-color = val; root.config-changed(); }
                             }
                         }
 
@@ -1595,11 +1867,121 @@ export component ControlPanel inherits Rectangle {
                         edited(val) => { root.track-artist = val; root.config-changed(); }
                     }
 
-                    SectionTitle { text: "CASSETTE SUBTITLE / VOLUME"; }
-                    LineEdit {
-                        text: root.cassette-label;
-                        placeholder-text: "Cassette Label (e.g. VOLUME #1, ENVATO #2)";
-                        edited(val) => { root.cassette-label = val; root.config-changed(); }
+                    SectionTitle { text: "DYNAMIC CUSTOM TEXT OVERLAYS"; }
+
+                    Button {
+                        text: "+ Add Custom Text";
+                        height: 36px;
+                        clicked => { root.add-custom-text-clicked(); }
+                    }
+
+                    for block[idx] in root.custom-text-blocks : Rectangle {
+                        background: #ffffff0a;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: #ffd70030;
+
+                        VerticalLayout {
+                            padding: 10px;
+                            spacing: 8px;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: center;
+                                CheckBox {
+                                    text: "Enable Text #" + (idx + 1);
+                                    checked: block.enabled;
+                                    toggled => {
+                                        root.custom-text-edited(block.id, block.text, self.checked, block.pos_x, block.pos_y, block.font_size, block.font_family, block.font_weight, block.color_hex);
+                                    }
+                                }
+                                Rectangle { horizontal-stretch: 1.0; }
+                                Button {
+                                    text: "✕ Remove";
+                                    height: 28px;
+                                    clicked => { root.remove-custom-text-clicked(block.id); }
+                                }
+                            }
+
+                            LineEdit {
+                                text: block.text;
+                                placeholder-text: "Custom Text (e.g. CredibleMark Studio)";
+                                edited(val) => {
+                                    root.custom-text-edited(block.id, val, block.enabled, block.pos_x, block.pos_y, block.font_size, block.font_family, block.font_weight, block.color_hex);
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Text {
+                                    text: "Font Variant:";
+                                    color: #a3a3a3;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                }
+                                ComboBox {
+                                    height: 30px;
+                                    horizontal-stretch: 1.0;
+                                    model: ["Inter", "Roboto", "Outfit", "Serif", "Monospace"];
+                                    current-value: block.font_family;
+                                    selected(val) => {
+                                        root.custom-text-edited(block.id, block.text, block.enabled, block.pos_x, block.pos_y, block.font_size, val, block.font_weight, block.color_hex);
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 10px;
+                                Text {
+                                    text: "Font Weight:";
+                                    color: #a3a3a3;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                }
+                                ComboBox {
+                                    height: 30px;
+                                    horizontal-stretch: 1.0;
+                                    model: ["Normal", "Bold", "Heavy"];
+                                    current-value: block.font_weight;
+                                    selected(val) => {
+                                        root.custom-text-edited(block.id, block.text, block.enabled, block.pos_x, block.pos_y, block.font_size, block.font_family, val, block.color_hex);
+                                    }
+                                }
+                            }
+
+                            SliderRow {
+                                label: "Pos X";
+                                value-text: Math.round(block.pos_x) + "%";
+                                minimum: 0.0;
+                                maximum: 100.0;
+                                value: block.pos_x;
+                                changed(val) => {
+                                    root.custom-text-edited(block.id, block.text, block.enabled, val, block.pos_y, block.font_size, block.font_family, block.font_weight, block.color_hex);
+                                }
+                            }
+
+                            SliderRow {
+                                label: "Pos Y";
+                                value-text: Math.round(block.pos_y) + "%";
+                                minimum: 0.0;
+                                maximum: 100.0;
+                                value: block.pos_y;
+                                changed(val) => {
+                                    root.custom-text-edited(block.id, block.text, block.enabled, block.pos_x, val, block.font_size, block.font_family, block.font_weight, block.color_hex);
+                                }
+                            }
+
+                            SliderRow {
+                                label: "Font Size";
+                                value-text: Math.round(block.font_size) + "px";
+                                minimum: 10.0;
+                                maximum: 120.0;
+                                value: block.font_size;
+                                changed(val) => {
+                                    root.custom-text-edited(block.id, block.text, block.enabled, block.pos_x, block.pos_y, val, block.font_family, block.font_weight, block.color_hex);
+                                }
+                            }
+                        }
                     }
 
                     SectionTitle { text: "QUICK POSITION PRESET"; }

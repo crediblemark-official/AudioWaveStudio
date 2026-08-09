@@ -107,23 +107,23 @@ impl Scene3D {
   }
 
   pub fn translate(&mut self, x: f32, y: f32, z: f32) {
-    self.cur = self.cur * Mat4::from_translation(Vec3::new(x, y, z));
+    self.cur *= Mat4::from_translation(Vec3::new(x, y, z));
   }
 
   pub fn rotate_x(&mut self, a: f32) {
-    self.cur = self.cur * Mat4::from_rotation_x(a);
+    self.cur *= Mat4::from_rotation_x(a);
   }
 
   pub fn rotate_y(&mut self, a: f32) {
-    self.cur = self.cur * Mat4::from_rotation_y(a);
+    self.cur *= Mat4::from_rotation_y(a);
   }
 
   pub fn rotate_z(&mut self, a: f32) {
-    self.cur = self.cur * Mat4::from_rotation_z(a);
+    self.cur *= Mat4::from_rotation_z(a);
   }
 
   pub fn scale(&mut self, sx: f32, sy: f32, sz: f32) {
-    self.cur = self.cur * Mat4::from_scale(Vec3::new(sx, sy, sz));
+    self.cur *= Mat4::from_scale(Vec3::new(sx, sy, sz));
   }
 
   fn push_vertex(&mut self, pos: Vec3, n: Vec3, c: Color) -> u32 {

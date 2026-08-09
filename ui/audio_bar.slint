@@ -99,6 +99,7 @@ export component AudioBar inherits Rectangle {
         padding-left: 20px;
         padding-right: 20px;
         spacing: 16px; // legacy gap 16px
+        cross-axis-alignment: center;
 
         // SONG INFO — legacy .player-track-info (music icon + title/artist)
         HorizontalLayout {
@@ -139,10 +140,12 @@ export component AudioBar inherits Rectangle {
         HorizontalLayout {
             horizontal-stretch: 1;
             spacing: 12px;
+            cross-axis-alignment: center;
 
             // legacy .player-controls (gap 8px)
             HorizontalLayout {
                 spacing: 8px;
+                cross-axis-alignment: center;
 
                 PlayBtn {
                     playing: root.is-playing;

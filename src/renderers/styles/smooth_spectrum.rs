@@ -14,11 +14,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   }
 
   let available_width = ctx.width * 0.92;
-  let start_x = (ctx.width - available_width) / 2.0;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * ctx.width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * ctx.height * 0.5;
+  let start_x = (ctx.width * 0.5 + pos_offset_x) - available_width * user_scale * 0.5;
   let step = ((ctx.freq_data.len() as f32) / bar_count as f32).floor().max(1.0) as usize;
-  let bottom_y = ctx.height * 0.85;
-  let max_h = ctx.height * 0.65;
-  let x_step = available_width / (bar_count as f32 - 1.0);
+  let bottom_y = ctx.height * 0.5 + pos_offset_y + ctx.height * 0.35 * user_scale;
+  let max_h = ctx.height * 0.65 * user_scale;
+  let x_step = available_width * user_scale / (bar_count as f32 - 1.0);
 
   let mut points: Vec<(f32, f32)> = Vec::with_capacity(bar_count);
   for i in 0..bar_count {

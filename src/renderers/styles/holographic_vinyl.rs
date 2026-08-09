@@ -58,7 +58,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(holo_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. ROTATING HOLOGRAPHIC VINYL DISC & PLATTNER RIM
@@ -132,14 +132,27 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 3. TURNTABLE TONEARM WITH GLOWING STYLUS NEEDLE
     // -------------------------------------------------------------------------
-    let arm_pivot_x = cx + disc_r * 1.15;
-    let arm_pivot_y = cy - disc_r * 0.85;
+    // Pivot sits upper-right of the disc. We compute the angle so the stylus
+    // tip lands exactly on the outer groove ring of the vinyl.
+    let arm_pivot_x = cx + disc_r * 1.30;
+    let arm_pivot_y = cy - disc_r * 1.10;
 
-    let arm_angle = -0.60 + (frame_time * 0.30).sin() * 0.05 + be * 0.04;
-    let arm_len = disc_r * 1.25;
+    // Distance from pivot to disc center
+    let pivot_dx = cx - arm_pivot_x;
+    let pivot_dy = cy - arm_pivot_y;
+    let pivot_dist = (pivot_dx * pivot_dx + pivot_dy * pivot_dy).sqrt();
 
-    let stylus_x = arm_pivot_x + arm_angle.cos() * arm_len;
-    let stylus_y = arm_pivot_y + arm_angle.sin() * arm_len;
+    // Rest angle: arm tip at outer disc edge (disc_r + small clearance).
+    // We solve: arm_len along angle from pivot hits disc_r from disc center.
+    // Angle to disc center from pivot:
+    let angle_to_center = pivot_dy.atan2(pivot_dx);
+    // Offset angle so tip lands on the outer groove ring, sweeping inward over time
+    let arm_len = pivot_dist - disc_r * 0.92;  // tip rests near outer groove
+    let sway = (frame_time * 0.25).sin() * 0.018 + be * 0.025; // gentle sway
+    let arm_angle = angle_to_center + sway;
+
+    let stylus_x = arm_pivot_x + arm_angle.cos() * (pivot_dist - disc_r * 0.92);
+    let stylus_y = arm_pivot_y + arm_angle.sin() * (pivot_dist - disc_r * 0.92);
 
     // Tonearm Shaft
     c.set_stroke(Fill::Solid(Color::rgba(0.90, 0.95, 1.0, 0.90)));
@@ -147,10 +160,19 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_shadow(Color::rgba(0.90, 0.95, 1.0, 0.80), 8.0 * user_scale);
     c.stroke_line(arm_pivot_x, arm_pivot_y, stylus_x, stylus_y);
 
-    // Stylus Head Flare
-    c.set_fill(Fill::Solid(mix(glow_col, Color::hex("#ff007f"), bs)));
-    c.set_shadow(mix(glow_col, Color::hex("#ff007f"), bs), 12.0 * user_scale);
-    c.fill_circle(stylus_x, stylus_y, (6.0 + bs * 4.0) * user_scale);
+    // Pivot ball
+    c.set_fill(Fill::Solid(Color::rgba(0.85, 0.90, 1.0, 0.95)));
+    c.set_shadow(glow_col, 10.0 * user_scale);
+    c.fill_circle(arm_pivot_x, arm_pivot_y, 6.0 * user_scale);
+
+    // Stylus Head Flare — glows on beat
+    let stylus_col = mix(glow_col, Color::hex("#ff007f"), bs);
+    c.set_fill(Fill::Solid(stylus_col));
+    c.set_shadow(stylus_col, (14.0 + bs * 8.0) * user_scale);
+    c.fill_circle(stylus_x, stylus_y, (5.0 + bs * 4.0) * user_scale);
+
+    // suppress unused warning
+    let _ = arm_len;
 
     c.set_global_alpha(1.0);
     c.restore();

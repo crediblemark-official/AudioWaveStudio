@@ -2,10 +2,11 @@ import { Navbar } from "navbar.slint";
 import { AudioBar } from "audio_bar.slint";
 import { ControlPanel } from "control_panel.slint";
 import { ExportModal } from "export_modal.slint";
+import { ModalBtn } from "export_modal.slint";
 import { HardwareModal } from "hardware_modal.slint";
 import { AboutModal } from "about_modal.slint";
 import { ToastItem, ToastHost } from "toast.slint";
-import { ModalBtn } from "export_modal.slint";
+import { CustomTextBlockData } from "custom_text.slint";
 
 // ONBOARDING EMPTY STATE — shown over the canvas while no track is loaded:
 // a message + drop hint + Browse button (legacy App.tsx empty/drag-drop
@@ -197,6 +198,31 @@ export component AppWindow inherits Window {
     in-out property <float> particle-speed: 1.0;
     in-out property <float> particle-count: 60.0;
     in-out property <string> particle-color: "#00f0ff";
+    in-out property <float> fireworks-count: 7.0;
+    in-out property <float> fireworks-size: 4.0;
+    in-out property <float> fireworks-speed: 1.0;
+    in-out property <float> fireworks-depth: 1.0;
+    in-out property <string> fireworks-color: "#ff7700";
+    in-out property <float> matrix-rain-count: 40.0;
+    in-out property <float> matrix-rain-size: 5.0;
+    in-out property <float> matrix-rain-speed: 1.0;
+    in-out property <float> matrix-rain-depth: 1.0;
+    in-out property <string> matrix-rain-color: "#00ff66";
+    in-out property <float> fireflies-count: 36.0;
+    in-out property <float> fireflies-size: 6.0;
+    in-out property <float> fireflies-speed: 1.0;
+    in-out property <float> fireflies-depth: 1.0;
+    in-out property <string> fireflies-color: "#ffcc00";
+    in-out property <float> sakura-count: 28.0;
+    in-out property <float> sakura-size: 10.0;
+    in-out property <float> sakura-speed: 1.0;
+    in-out property <float> sakura-depth: 1.0;
+    in-out property <string> sakura-color: "#ffb7c5";
+    in-out property <float> cyber-lightning-count: 4.0;
+    in-out property <float> cyber-lightning-size: 3.0;
+    in-out property <float> cyber-lightning-speed: 1.0;
+    in-out property <float> cyber-lightning-depth: 1.0;
+    in-out property <string> cyber-lightning-color: "#00f0ff";
     in-out property <string> music-note-style: "Float";
     in-out property <float> music-note-size: 60.0;
     in-out property <float> music-note-count: 80.0;
@@ -227,6 +253,8 @@ export component AppWindow inherits Window {
     in-out property <bool> shake-on-beat: false;
     in-out property <float> glitch-intensity: 0.5;
     in-out property <float> pulse-intensity: 0.7;
+    in-out property <float> vignette-intensity: 0.7;
+    in-out property <string> spotlight-color: "#ffd700";
     in-out property <float> strobe-intensity: 0.8;
     in-out property <float> scanline-opacity: 0.2;
     in-out property <float> chromatic-intensity: 0.5;
@@ -253,6 +281,10 @@ export component AppWindow inherits Window {
     in-out property <float> artist-pos-y: 86.0;
     in-out property <float> artist-font-size: 20.0;
     in-out property <string> artist-color: "#a3a3a3";
+    in-out property <[CustomTextBlockData]> custom-text-blocks: [];
+    callback add-custom-text-clicked();
+    callback remove-custom-text-clicked(int);
+    callback custom-text-edited(int, string, bool, float, float, float, string, string, string);
 
     // Export Settings
     in-out property <string> export-aspect-ratio: "16:9";
@@ -561,6 +593,31 @@ export component AppWindow inherits Window {
                     particle-speed <=> root.particle-speed;
                     particle-count <=> root.particle-count;
                     particle-color <=> root.particle-color;
+                    fireworks-count <=> root.fireworks-count;
+                    fireworks-size <=> root.fireworks-size;
+                    fireworks-speed <=> root.fireworks-speed;
+                    fireworks-depth <=> root.fireworks-depth;
+                    fireworks-color <=> root.fireworks-color;
+                    matrix-rain-count <=> root.matrix-rain-count;
+                    matrix-rain-size <=> root.matrix-rain-size;
+                    matrix-rain-speed <=> root.matrix-rain-speed;
+                    matrix-rain-depth <=> root.matrix-rain-depth;
+                    matrix-rain-color <=> root.matrix-rain-color;
+                    fireflies-count <=> root.fireflies-count;
+                    fireflies-size <=> root.fireflies-size;
+                    fireflies-speed <=> root.fireflies-speed;
+                    fireflies-depth <=> root.fireflies-depth;
+                    fireflies-color <=> root.fireflies-color;
+                    sakura-count <=> root.sakura-count;
+                    sakura-size <=> root.sakura-size;
+                    sakura-speed <=> root.sakura-speed;
+                    sakura-depth <=> root.sakura-depth;
+                    sakura-color <=> root.sakura-color;
+                    cyber-lightning-count <=> root.cyber-lightning-count;
+                    cyber-lightning-size <=> root.cyber-lightning-size;
+                    cyber-lightning-speed <=> root.cyber-lightning-speed;
+                    cyber-lightning-depth <=> root.cyber-lightning-depth;
+                    cyber-lightning-color <=> root.cyber-lightning-color;
                     music-note-style <=> root.music-note-style;
                     music-note-size <=> root.music-note-size;
                     music-note-count <=> root.music-note-count;
@@ -590,6 +647,8 @@ export component AppWindow inherits Window {
                     shake-on-beat <=> root.shake-on-beat;
                     glitch-intensity <=> root.glitch-intensity;
                     pulse-intensity <=> root.pulse-intensity;
+                    vignette-intensity <=> root.vignette-intensity;
+                    spotlight-color <=> root.spotlight-color;
                     strobe-intensity <=> root.strobe-intensity;
                     scanline-opacity <=> root.scanline-opacity;
                     chromatic-intensity <=> root.chromatic-intensity;
@@ -618,6 +677,12 @@ export component AppWindow inherits Window {
                     artist-font-size <=> root.artist-font-size;
                     artist-color <=> root.artist-color;
 
+                    custom-text-blocks <=> root.custom-text-blocks;
+                    add-custom-text-clicked => { root.add-custom-text-clicked(); }
+                    remove-custom-text-clicked(id) => { root.remove-custom-text-clicked(id); }
+                    custom-text-edited(id, text, enabled, pos_x, pos_y, font_size, font_family, font_weight, color_hex) => {
+                        root.custom-text-edited(id, text, enabled, pos_x, pos_y, font_size, font_family, font_weight, color_hex);
+                    }
                     config-changed => { root.config-changed(); }
                     theme-preset-selected(preset) => { root.theme-preset-selected(preset); }
                     open-radial-image-clicked => { root.open-radial-image-clicked(); }

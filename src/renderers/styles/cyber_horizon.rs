@@ -60,7 +60,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(horizon_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. SYNTHWAVE HORIZON SUN WITH SEGMENTED CUTOUTS

@@ -58,7 +58,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(amb_nebula);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     let step_f = (freq.len() / bar_count).max(1);
 

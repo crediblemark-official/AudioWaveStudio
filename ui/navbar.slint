@@ -117,6 +117,9 @@ export component Navbar inherits Rectangle {
     in-out property <bool> show-mic-picker: false;
 
     private property <float> ticker-progress: 0.0;
+    // Pulsing "live" dot state for the mic status pill (toggled by the ticker
+    // timer below).
+    private property <bool> mic-pulse: false;
 
     // FULL-NAVBAR DRAG REGION — legacy `data-tauri-drag-region` on the whole
     // header. Sits behind all interactive elements so it only receives events
@@ -211,25 +214,37 @@ export component Navbar inherits Rectangle {
                 }
             }
 
-            if (root.mic-devices.length > 1) : Rectangle {
-                width: 24px;
-                height: 32px;
-                border-radius: 6px;
-                background: mic-arrow-ta.has-hover ? #ffd70033 : #ffffff12;
+            // LIVE mic status pill — only rendered while the mic is on, so the
+            // waveform source is always visible in the navbar.
+            Rectangle {
+                visible: root.is-listening;
+                height: 28px;
+                border-radius: 14px;
+                background: #16a34a18;
+                border-width: 1px;
+                border-color: #16a34a55;
+                HorizontalLayout {
+                    spacing: 6px;
+                    padding-left: 10px;
+                    padding-right: 12px;
+                    alignment: center;
 
-                mic-arrow-ta := TouchArea {
-                    mouse-cursor: pointer;
-                    clicked => { root.show-mic-picker = !root.show-mic-picker; }
-                }
-
-                Text {
-                    text: "▼";
-                    font-size: 10px;
-                    color: root.show-mic-picker ? #ffd700 : #cbd5e1;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                    Rectangle {
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: root.mic-pulse ? #22c55e : #16a34a;
+                    }
+                    Text {
+                        text: "Mic Live";
+                        color: #86efac;
+                        font-size: 11px;
+                        font-weight: 600;
+                        vertical-alignment: center;
+                    }
                 }
             }
+
 
             Rectangle {
                 width: 1px;
@@ -318,6 +333,9 @@ export component Navbar inherits Rectangle {
             running: true;
             triggered() => {
                 root.ticker-progress = Math.mod(root.ticker-progress + 1.0 / 1125.0, 1.0);
+                // Toggle the mic-status dot twice per second while listening.
+                if (root.is-listening) { root.mic-pulse = !root.mic-pulse; }
+                else { root.mic-pulse = false; }
             }
         }
 
@@ -467,59 +485,6 @@ export component Navbar inherits Rectangle {
         }
     }
 
-    // MIC DEVICE PICKER — dropdown below the navbar (legacy device picker),
-    // anchored under the Listen button itself.
-    if (root.show-mic-picker && root.mic-devices.length > 1) : Rectangle {
-        // listen-btn is nested inside the left cluster (which itself sits at the
-        // navbar's 20px padding), so anchor in navbar-root coordinates by adding
-        // the cluster's own offset — otherwise the dropdown drifts ~20px left.
-        x: left-cluster.x + listen-btn.x - 40px;
-        y: root.height + 4px;
-        width: 410px;
-        height: root.mic-devices.length * 30px + 46px;
-        border-radius: 10px;
-        background: #0d0d0d;
-        border-width: 1px;
-        border-color: #ffd70066;
-
-        VerticalLayout {
-            padding: 8px;
-            spacing: 3px;
-
-            Text {
-                text: "🎙️ Select Input Device";
-                color: #ffd700;
-                font-size: 11px;
-                font-weight: 700;
-            }
-
-            for dev in root.mic-devices : Rectangle {
-                height: 28px;
-                border-radius: 6px;
-                background: row-ta.has-hover ? #ffd70029
-                    : (dev == root.mic-device-label ? #ffd7001a : #ffffff08);
-
-                row-ta := TouchArea {
-                    width: parent.width;
-                    height: parent.height;
-                    mouse-cursor: pointer;
-                    clicked => {
-                        root.mic-device-label = dev;
-                        root.show-mic-picker = false;
-                        root.mic-device-selected(dev);
-                    }
-                }
-
-                Text {
-                    text: dev;
-                    color: dev == root.mic-device-label ? #ffd700 : #f8fafc;
-                    font-size: 11px;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-            }
-        }
-    }
 
     // Legacy gold border-bottom (rgba(255, 215, 0, 0.2))
     Rectangle {

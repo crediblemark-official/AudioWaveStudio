@@ -1,9 +1,11 @@
-//! Hologram Matrix 3D style renderer (`equalizer`) — 3D Glass LED Matrix Engine.
+//! Equalizer style renderer (`equalizer`) — Neon Spectrum Equalizer.
 //!
-//! Upgraded Masterpiece:
-//! - 3D volumetric glass/crystal LED matrix blocks surging in 3D space.
-//! - Audio-reactive grid height pulsation & glowing crystal reflections.
-//! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
+//! One cohesive design:
+//! - Smooth gradient vertical bars spanning full width, rising with frequency.
+//! - Per-bar peak-hold dot that lingers then falls.
+//! - Mirror floor reflection fading below the baseline.
+//! - Subtle vertical scanlines for depth and texture.
+//! - All elements share the same gradient color language from primary → accent.
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 use crate::renderers::helpers::mix;
@@ -11,95 +13,168 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const MATRIX_COLS: usize = 16;
-const MATRIX_ROWS: usize = 12;
-
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
-    let width = ctx.width;
+    let width  = ctx.width;
     let height = ctx.height;
-    let theme = &ctx.config.theme;
+    let theme  = &ctx.config.theme;
 
-    let p_col = theme_primary(theme);
-    let s_col = theme_secondary(theme);
-    let accent_col = theme_accent(theme);
-    let glow_col = theme_glow(theme);
+    let p_col   = theme_primary(theme);
+    let s_col   = theme_secondary(theme);
+    let acc_col = theme_accent(theme);
+    let glow    = theme_glow(theme);
 
-    let sensitivity = ctx.config.reactivity.sensitivity;
-    let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+    let sensitivity  = ctx.config.reactivity.sensitivity;
+    let user_scale   = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width  * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
+    let bar_count    = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
-    let _bs = ctx.beat_strength.clamp(0.0, 1.0);
-    let freq = ctx.freq_data;
-    let _frame_time = ctx.frame_time;
+    let bs = ctx.beat_strength.clamp(0.0, 1.0);
+    let freq      = ctx.freq_data;
+    let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx      = width  * 0.5 + pos_offset_x;
+    // Baseline: where bars sit — slightly below centre
+    let base_y  = height * 0.72 + pos_offset_y;
+    // Maximum bar height (upward from baseline)
+    let max_h   = height * 0.62 * user_scale;
+
+    let n_bars  = bar_count;
+    let step_f  = (freq.len() / n_bars).max(1);
+
+    // Bar geometry
+    let total_w  = width * 0.92 * user_scale;
+    let bar_w    = (total_w / n_bars as f32).clamp(2.0, 40.0);
+    let gap      = (bar_w * 0.18).clamp(1.0, 5.0);
+    let b_w      = bar_w - gap;
+    let start_x  = cx - total_w * 0.5;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Deep matrix backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020308")));
-    c.fill_rect(0.0, 0.0, width, height);
+    // -------------------------------------------------------------------------
+    // 1. BACKGROUND — dark void + bass-reactive radial bloom
+    // -------------------------------------------------------------------------
+//     c.set_fill(Fill::Solid(Color::hex("#020308")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
-    // Ambient matrix glow
-    let amb_glow = Fill::radial_gradient(
-        cx,
-        cy,
-        0.0,
-        cx,
-        cy,
-        width * 0.60,
+    let bloom = Fill::radial_gradient(
+        cx, base_y, 0.0,
+        cx, base_y, width * 0.65,
         &[
-            (0.0, mix(glow_col, Color::rgba(0.0, 0.90, 1.0, 0.22), 0.5)),
-            (0.50, mix(p_col, Color::rgba(0.40, 0.0, 0.80, 0.08), 0.5)),
-            (1.0, Color::TRANSPARENT),
+            (0.00, mix(glow, p_col, 0.4).with_alpha(0.20 + be * 0.16)),
+            (0.40, mix(p_col, acc_col, 0.5).with_alpha(0.08 + be * 0.06)),
+            (0.80, s_col.with_alpha(0.03)),
+            (1.00, Color::TRANSPARENT),
         ],
     );
-    c.set_fill(amb_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+    c.set_fill(bloom);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
-    // 1. HOLOGRAM MATRIX 3D LED BLOCKS
+    // 2. BASELINE GLOW — horizontal neon line where bars rest
     // -------------------------------------------------------------------------
-    let step_f = (freq.len() / bar_count).max(1);
-    let cell_w = (width * 0.70) / MATRIX_COLS as f32;
-    let cell_h = (height * 0.55) / MATRIX_ROWS as f32;
-    let gap = 3.0;
+    let baseline_col = mix(p_col, acc_col, 0.3 + be * 0.2);
+    let baseline_grad = Fill::linear_gradient(
+        start_x, base_y, start_x + total_w, base_y,
+        &[
+            (0.00, Color::TRANSPARENT),
+            (0.10, baseline_col.with_alpha(0.55 + be * 0.20)),
+            (0.50, baseline_col.with_alpha(0.90 + be * 0.08)),
+            (0.90, baseline_col.with_alpha(0.55 + be * 0.20)),
+            (1.00, Color::TRANSPARENT),
+        ],
+    );
+    c.set_stroke(baseline_grad);
+    c.set_line_width((1.4 + be * 1.2) * user_scale);
+    c.set_shadow(baseline_col, (8.0 + be * 6.0) * user_scale);
+    c.stroke_line(start_x, base_y, start_x + total_w, base_y);
 
-    let start_x = cx - (MATRIX_COLS as f32 * cell_w) * 0.5;
-    let start_y = cy + (MATRIX_ROWS as f32 * cell_h) * 0.5;
+    // -------------------------------------------------------------------------
+    // 3. BARS + REFLECTIONS + PEAKS
+    // -------------------------------------------------------------------------
+    for i in 0..n_bars {
+        let i_f = i as f32;
+        let t   = i_f / (n_bars - 1) as f32; // 0..1 across width
 
-    for col in 0..MATRIX_COLS {
-        let bin_k = (col * step_f / (MATRIX_COLS / bar_count.max(1)).max(1))
-            .min(freq.len().saturating_sub(1));
+        let bin_k = (i * step_f).min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let active_rows = ((fv * MATRIX_ROWS as f32 * sensitivity + be * 2.0) as usize).min(MATRIX_ROWS);
+        let x = start_x + i_f * bar_w;
 
-        for row in 0..MATRIX_ROWS {
-            let x = start_x + col as f32 * cell_w + gap * 0.5;
-            let y = start_y - (row as f32 + 1.0) * cell_h + gap * 0.5;
-            let bw = cell_w - gap;
-            let bh = cell_h - gap;
+        // Bar height: frequency + bass boost
+        let bar_h = (fv * max_h * sensitivity + be * max_h * 0.10)
+            .clamp(2.0 * user_scale, max_h);
+        let top_y = base_y - bar_h;
 
-            if row < active_rows {
-                let block_col = mix(
-                    mix(p_col, s_col, row as f32 / MATRIX_ROWS as f32),
-                    mix(accent_col, glow_col, fv),
-                    row as f32 / MATRIX_ROWS as f32,
-                );
+        // Color shifts left→right across frequency range: p_col → acc_col → glow
+        let bar_col_bot = mix(p_col,   acc_col, t);
+        let bar_col_top = mix(acc_col, glow,    t);
 
-                c.set_fill(Fill::Solid(block_col));
-                c.set_shadow(block_col, 8.0);
-                c.fill_rounded_rect(x, y, bw, bh, 3.0);
-            } else {
-                c.set_fill(Fill::Solid(Color::rgba(0.10, 0.15, 0.25, 0.20)));
-                c.set_shadow(Color::TRANSPARENT, 0.0);
-                c.fill_rounded_rect(x, y, bw, bh, 3.0);
-            }
-        }
+        // 3a. BAR FILL — vertical gradient, bright top fades to darker bottom
+        let bar_fill = Fill::linear_gradient(
+            x, top_y, x, base_y,
+            &[
+                (0.00, mix(bar_col_top, Color::rgba(1.0, 1.0, 1.0, 1.0), 0.25 + fv * 0.15)),
+                (0.25, bar_col_top.with_alpha(0.98)),
+                (0.65, bar_col_bot.with_alpha(0.92)),
+                (1.00, bar_col_bot.with_alpha(0.70)),
+            ],
+        );
+        c.set_fill(bar_fill);
+        c.set_shadow(Color::TRANSPARENT, 0.0);
+        c.fill_rect(x, top_y, b_w, bar_h);
+
+        // 3b. BAR GLOW — subtle shadow bloom from each bar
+        c.set_shadow(mix(bar_col_top, glow, 0.4), (6.0 + fv * 8.0) * user_scale);
+        c.fill_rect(x, top_y, b_w, bar_h.min(4.0 * user_scale));
+
+        // 3c. TOP EDGE HIGHLIGHT — thin bright cap line
+        c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.75 + fv * 0.20)));
+        c.set_shadow(mix(bar_col_top, Color::rgba(1.0, 1.0, 1.0, 1.0), 0.5), 6.0 * user_scale);
+        c.fill_rect(x, top_y, b_w, (1.5 * user_scale).max(1.0));
+
+        // 3d. PEAK HOLD DOT
+        // Simulate peak hold using a slow sine decay from max (no persistent state available)
+        let peak_decay = (frame_time * 0.4 + i_f * 0.08).sin() * 0.06 + 0.94;
+        let peak_h = bar_h * peak_decay * (1.0 + bs * 0.12);
+        let peak_y = base_y - peak_h.clamp(bar_h, max_h * 1.05);
+        let pk_col = mix(bar_col_top, Color::rgba(1.0, 1.0, 1.0, 0.95), 0.6);
+        c.set_fill(Fill::Solid(pk_col));
+        c.set_shadow(pk_col, (8.0 + fv * 6.0) * user_scale);
+        c.fill_rect(x, peak_y, b_w, (2.5 * user_scale).max(2.0));
+
+        // 3e. FLOOR REFLECTION — mirrored bar below baseline, fades out quickly
+        let refl_h = bar_h * 0.32;
+        let refl_fill = Fill::linear_gradient(
+            x, base_y, x, base_y + refl_h,
+            &[
+                (0.00, bar_col_bot.with_alpha(0.35 + fv * 0.10)),
+                (1.00, Color::TRANSPARENT),
+            ],
+        );
+        c.set_fill(refl_fill);
+        c.set_shadow(Color::TRANSPARENT, 0.0);
+        c.fill_rect(x, base_y, b_w, refl_h);
     }
+
+    // -------------------------------------------------------------------------
+    // 4. SCANLINES — subtle horizontal bands for CRT/LED panel texture
+    //    Drawn as very thin semi-transparent dark lines across the bar area
+    // -------------------------------------------------------------------------
+    let scanline_alpha = 0.07;
+    let scanline_step  = (3.5 * user_scale).max(2.0);
+    let mut sy = 0.0f32;
+    while sy < height {
+        c.set_fill(Fill::Solid(Color::rgba(0.0, 0.0, 0.0, scanline_alpha)));
+        c.set_shadow(Color::TRANSPARENT, 0.0);
+        c.fill_rect(0.0, sy, width, (0.9 * user_scale).max(0.8));
+        sy += scanline_step;
+    }
+
+    // suppress unused
+    let _ = (s_col, frame_time);
 
     c.set_global_alpha(1.0);
     c.restore();

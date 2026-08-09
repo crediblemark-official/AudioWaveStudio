@@ -32,7 +32,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let glow_col = theme_glow(theme);
 
     let sensitivity = ctx.config.reactivity.sensitivity;
-    // Scale & position are applied once by the global canvas transform.
+    let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
+    // Scale & position are applied internally per renderer.
     let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
@@ -40,18 +43,18 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx = width * 0.5 + pos_offset_x;
+    let cy = height * 0.5 + pos_offset_y;
     let reference_size = width.min(height);
-    let rim_r = 150.0 * (reference_size / 500.0);
+    let rim_r = 150.0 * (reference_size / 500.0) * user_scale;
     let core_r = rim_r * 0.42;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep circular backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020308")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#020308")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Ambient halo glow
     let halo_glow = Fill::radial_gradient(
@@ -68,7 +71,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(halo_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. ROTATING DASHED OUTER TRACK
@@ -140,7 +143,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(mirror_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Core rim ring around the center disc
     c.set_stroke(Fill::Solid(mix(p_col, glow_col, 0.7).with_alpha(0.8)));

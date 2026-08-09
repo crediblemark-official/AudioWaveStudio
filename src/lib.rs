@@ -10,6 +10,7 @@ pub mod gpu2d;
 pub mod gpu_export;
 pub mod hardware;
 pub mod renderers;
+pub mod text_shaper;
 
 use app_state::{create_slint_image_from_rgb, format_time, SlintAppState};
 use callbacks::bind_app_callbacks;
@@ -310,6 +311,10 @@ pub fn run() {
     let preview_handle = preview.as_ref().map(|p| p.as_weak());
     let timer = slint::Timer::default();
     let mut idle_clock: f32 = 0.0;
+    // Monotonic wall-clock (seconds) driving time-based screen effects so they
+    // keep animating while paused and never jump when seeking.
+    let mut fx_clock: f32 = 0.0;
+    let mut last_tick = std::time::Instant::now();
     // Timestamp (in idle seconds) of the last recovered-frame log, used to
     // throttle recurring faults to ~1 line/s.
     let mut last_panic_log: f32 = -10.0;
@@ -320,6 +325,11 @@ pub fn run() {
         // whole process. Catch it here so one bad frame can never force-close
         // the app: the frame is skipped and the animation continues.
         let frame_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let now = std::time::Instant::now();
+        let tick_dt = now.duration_since(last_tick).as_secs_f32().clamp(0.001, 1.0);
+        last_tick = now;
+        fx_clock += tick_dt;
+        let live_fps = (1.0 / tick_dt).clamp(1.0, 240.0);
         idle_clock += 0.016;
         let (audio_opt, time_sec, duration_sec, is_playing, config) = {
             let mut s = poison_proof(&state_clone);
@@ -458,6 +468,8 @@ pub fn run() {
                         &freq_data,
                         &time_data,
                         frame_time,
+                        fx_clock,
+                        live_fps,
                         width,
                         height,
                         is_playing,
@@ -489,6 +501,7 @@ pub fn run() {
                     &time_data,
                     0.0,
                     frame_time,
+                    fx_clock,
                     cpu_w,
                     cpu_h,
                 );

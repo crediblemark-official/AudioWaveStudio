@@ -74,7 +74,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(bg_haze);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
   // 2. TURNTABLE CHASSIS BASE (PLINTH) & 4 ISOLATOR FEET

@@ -1,11 +1,12 @@
-//! Neon Audio Prism 3D style renderer (`audioPrism3D`) — Optical Dispersion Prism Engine.
+//! Audio Prism 3D style renderer (`audioPrism3D`) — Glass Optical Dispersion Engine.
 //!
-//! Masterpiece Optical Prism Refraction:
-//! - Full 3D retained geometry scene built using `ctx.scene3d`.
-//! - White laser beam entering the 3D glass crystal prism from the left.
-//! - Continuous audio-reactive rainbow dispersion fan refracting out of the prism to the right (NO surrounding sticks!).
-//! - Rotating 3D crystal pyramid core with glass specular reflections & inner spectrum dispersion.
-//! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
+//! Dark Side of the Moon style glass prism:
+//! - Triangular glass prism with realistic transparent shading & specular highlights.
+//! - White laser beam enters the left face, disperses as audio-reactive rainbow out the right face.
+//! - Each rainbow ray thickness reacts to its matching frequency band.
+//! - Caustic light scatter on the floor below the prism.
+
+use std::f32::consts::PI;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
 use crate::renderers::helpers::mix;
@@ -13,143 +14,240 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const DISPERSION_BEAMS: usize = 32;
+const RAINBOW_RAYS: usize = 36;
+
+// Spectral hue table: ROYGBIV across the fan
+fn spectral_color(t: f32) -> Color {
+    // t: 0=red, 1=violet
+    let hue = t * 270.0; // degrees, 0=red → 270=violet
+    let h = hue / 60.0;
+    let x = 1.0 - (h % 2.0 - 1.0).abs();
+    let (r, g, b) = if h < 1.0      { (1.0, x,   0.0) }
+                    else if h < 2.0 { (x,   1.0, 0.0) }
+                    else if h < 3.0 { (0.0, 1.0, x)   }
+                    else if h < 4.0 { (0.0, x,   1.0) }
+                    else             { (x,   0.0, 1.0) };
+    Color::rgba(r, g, b, 0.92)
+}
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
-    let width = ctx.width;
+    let width  = ctx.width;
     let height = ctx.height;
-    let theme = &ctx.config.theme;
+    let theme  = &ctx.config.theme;
 
-    let p_col = theme_primary(theme);
-    let s_col = theme_secondary(theme);
-    let accent_col = theme_accent(theme);
-    let glow_col = theme_glow(theme);
+    let p_col   = theme_primary(theme);
+    let s_col   = theme_secondary(theme);
+    let acc_col = theme_accent(theme);
+    let glow    = theme_glow(theme);
 
-    let sensitivity = ctx.config.reactivity.sensitivity;
-    let user_scale = ctx.config.scale.clamp(0.1, 5.0);
-    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let sensitivity  = ctx.config.reactivity.sensitivity;
+    let user_scale   = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width  * 0.5;
     let pos_offset_y = -ctx.config.position_y * height * 0.5;
-    let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+    let bar_count    = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let bs = ctx.beat_strength.clamp(0.0, 1.0);
-    let freq = ctx.freq_data;
+    let freq      = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.5 - pos_offset_y;
+    // Prism centred slightly left of screen centre so the rainbow has room
+    let cx = width  * 0.42 + pos_offset_x;
+    let cy = height * 0.50 + pos_offset_y;
+
+    // Prism geometry — equilateral-ish triangle
+    let prism_size = 110.0 * user_scale;
+    let prism_h    = prism_size * 0.866; // height of equilateral triangle
+
+    // Vertices: apex top-centre, bottom-left, bottom-right
+    let apex    = (cx,                  cy - prism_h * 0.55);
+    let bot_l   = (cx - prism_size * 0.5, cy + prism_h * 0.45);
+    let bot_r   = (cx + prism_size * 0.5, cy + prism_h * 0.45);
+
+    // Beam enters horizontal from left, aimed at the midpoint of the left face
+    let entry_pt_x = (apex.0 + bot_l.0) * 0.5;
+    let entry_pt_y = (apex.1 + bot_l.1) * 0.5;
+    // Exit point: midpoint of right face
+    let exit_pt_x  = (apex.0 + bot_r.0) * 0.5;
+    let exit_pt_y  = (apex.1 + bot_r.1) * 0.5;
+
+    // Slow gentle sway with bass
+    let sway = (frame_time * 0.4).sin() * 4.0 * user_scale * be;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // Prism optics atmospheric glow
-    let prism_glow = Fill::radial_gradient(
-        cx,
-        cy,
-        0.0,
-        cx,
-        cy,
-        width * 0.70 * user_scale,
+    // -------------------------------------------------------------------------
+    // 1. BACKGROUND — deep void + faint prism atmosphere
+    // -------------------------------------------------------------------------
+//     c.set_fill(Fill::Solid(Color::hex("#04050e")));
+//     c.fill_rect(0.0, 0.0, width, height);
+
+    let bg_glow = Fill::radial_gradient(
+        cx, cy, 0.0, cx, cy, width * 0.55,
         &[
-            (0.0, mix(glow_col, Color::rgba(0.0, 0.90, 1.0, 0.35 + be * 0.20), 0.5)),
-            (0.40, mix(accent_col, Color::rgba(1.0, 0.10, 0.70, 0.15), 0.5)),
-            (0.80, mix(s_col, Color::rgba(0.10, 0.0, 0.30, 0.04), 0.5)),
-            (1.0, Color::TRANSPARENT),
+            (0.00, mix(glow, Color::rgba(0.20, 0.60, 1.0, 0.18 + be * 0.10), 0.5)),
+            (0.50, mix(p_col, Color::rgba(0.05, 0.10, 0.28, 0.06), 0.5)),
+            (1.00, Color::TRANSPARENT),
         ],
     );
-    c.set_fill(prism_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+    c.set_fill(bg_glow);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
-    // 1. INCOMING INTENSE WHITE LASER BEAM (FROM LEFT TO PRISM)
+    // 2. INCOMING WHITE LASER BEAM (left edge → prism entry face)
     // -------------------------------------------------------------------------
-    let prism_x = cx;
-    let prism_y = cy;
-    let beam_in_start_x = 0.0;
-    let beam_in_start_y = cy + (frame_time * 0.5).sin() * (15.0 * user_scale);
+    let beam_y = entry_pt_y + sway;
 
-    // Outer Laser Beam Glow
-    c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.40)));
-    c.set_line_width((16.0 + be * 8.0) * user_scale);
-    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.80), 20.0 * user_scale);
-    c.stroke_line(beam_in_start_x, beam_in_start_y, prism_x - 30.0 * user_scale, prism_y);
+    // Soft outer glow halo
+    c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.25)));
+    c.set_line_width((22.0 + be * 10.0) * user_scale);
+    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.60), 28.0 * user_scale);
+    c.stroke_line(0.0, beam_y, entry_pt_x, beam_y);
 
-    // Intense White Core Beam
+    // Medium glow
+    c.set_stroke(Fill::Solid(Color::rgba(0.80, 0.90, 1.0, 0.50)));
+    c.set_line_width((8.0 + be * 4.0) * user_scale);
+    c.set_shadow(Color::rgba(0.80, 0.90, 1.0, 0.80), 14.0 * user_scale);
+    c.stroke_line(0.0, beam_y, entry_pt_x, beam_y);
+
+    // Bright white core
     c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.98)));
-    c.set_line_width((4.0 + be * 3.0) * user_scale);
-    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.95), 10.0 * user_scale);
-    c.stroke_line(beam_in_start_x, beam_in_start_y, prism_x - 30.0 * user_scale, prism_y);
+    c.set_line_width((2.5 + be * 1.5) * user_scale);
+    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 1.0), 8.0 * user_scale);
+    c.stroke_line(0.0, beam_y, entry_pt_x, beam_y);
 
     // -------------------------------------------------------------------------
-    // 2. CONFIGURE NATIVE 3D CRYSTAL PRISM (Scene3D)
+    // 3. GLASS PRISM — triangular polygon with glass shading
     // -------------------------------------------------------------------------
-    let scene = &mut ctx.scene3d;
-    scene.clear();
+    let tri: Vec<(f32, f32)> = vec![
+        (apex.0,  apex.1),
+        (bot_l.0, bot_l.1),
+        (bot_r.0, bot_r.1),
+    ];
 
-    scene.cam_yaw = (frame_time * 0.15).sin() * 0.10;
-    scene.cam_pitch = -0.16 + (frame_time * 0.08).sin() * 0.04;
-    scene.cam_zoom = (0.95 - be * 0.05) / user_scale;
-    scene.target_x = pos_offset_x;
-    scene.target_y = pos_offset_y;
+    // Glass body fill: blue-grey semi-transparent
+    let glass_fill = Fill::linear_gradient(
+        bot_l.0, apex.1,
+        bot_r.0, bot_r.1,
+        &[
+            (0.00, Color::rgba(0.55, 0.72, 0.92, 0.28)),
+            (0.40, Color::rgba(0.75, 0.88, 1.00, 0.22)),
+            (0.70, Color::rgba(0.40, 0.58, 0.82, 0.32)),
+            (1.00, Color::rgba(0.25, 0.40, 0.65, 0.35)),
+        ],
+    );
+    c.set_fill(glass_fill);
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+    c.fill_polygon(&tri);
 
-    // Floating 3D Crystalline Prism Pyramid Core
-    let prism_sz = (110.0 + be * 25.0 * sensitivity) * user_scale;
-    let rotation = frame_time * 0.40;
+    // Glass edge outline (thin bright rim)
+    c.set_stroke(Fill::Solid(Color::rgba(0.88, 0.95, 1.0, 0.75)));
+    c.set_line_width(2.0 * user_scale);
+    c.set_shadow(Color::rgba(0.70, 0.90, 1.0, 0.80), 8.0 * user_scale);
+    // stroke_polyline: close the triangle by repeating the first vertex
+    let tri_closed: Vec<(f32, f32)> = vec![
+        (apex.0,  apex.1),
+        (bot_l.0, bot_l.1),
+        (bot_r.0, bot_r.1),
+        (apex.0,  apex.1),
+    ];
+    c.stroke_polyline(&tri_closed);
 
-    for layer in 0..6 {
-        let l_f = layer as f32;
-        let l_sz = prism_sz * (1.0 - l_f * 0.14);
-        let l_y = (l_f - 2.5) * 20.0 * user_scale;
-
-        scene.push();
-        scene.translate(0.0, l_y, 0.0);
-        scene.rotate_y(rotation + l_f * 0.10);
-        scene.add_box(
-            0.0,
-            0.0,
-            0.0,
-            l_sz,
-            16.0 * user_scale,
-            l_sz,
-            mix(p_col, Color::rgba(0.95, 0.98, 1.0, 0.92), l_f / 6.0),
-        );
-        scene.pop();
-    }
+    // Internal specular highlight — thin bright streak along left face
+    let spec_ax = apex.0 * 0.85 + bot_l.0 * 0.15;
+    let spec_ay = apex.1 * 0.85 + bot_l.1 * 0.15;
+    let spec_bx = apex.0 * 0.50 + bot_l.0 * 0.50;
+    let spec_by = apex.1 * 0.50 + bot_l.1 * 0.50;
+    c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.55)));
+    c.set_line_width(1.5 * user_scale);
+    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.70), 5.0 * user_scale);
+    c.stroke_line(spec_ax, spec_ay, spec_bx, spec_by);
 
     // -------------------------------------------------------------------------
-    // 3. OUTGOING CONTINUOUS AUDIO-REACTIVE RAINBOW DISPERSION FAN (TO RIGHT)
+    // 4. RAINBOW DISPERSION FAN (exit right face → right edge of screen)
     // -------------------------------------------------------------------------
-    let step_f = (freq.len() / bar_count).max(1);
-    let disp_start_x = prism_x + 30.0 * user_scale;
-    let disp_end_x = width;
+    let step_f    = (freq.len() / bar_count).max(1);
+    // Fan spreads vertically from the exit point to the right screen edge
+    // Top ray (red) exits upward, bottom ray (violet) exits downward
+    let fan_top_y = exit_pt_y - height * 0.40 * user_scale;
+    let fan_bot_y = exit_pt_y + height * 0.40 * user_scale;
+    let fan_end_x = width;
 
-    for b in 0..DISPERSION_BEAMS {
-        let b_f = b as f32;
-        let t_spread = (b_f / (DISPERSION_BEAMS - 1) as f32) - 0.5; // -0.5 to +0.5 fan spread
+    for r in 0..RAINBOW_RAYS {
+        let t = r as f32 / (RAINBOW_RAYS - 1) as f32; // 0=top(red)→1=bot(violet)
 
-        let bin_k = (b * step_f / (DISPERSION_BEAMS / bar_count.max(1)).max(1))
+        let bin_k = (r * step_f / ((RAINBOW_RAYS / bar_count.max(1)).max(1)))
             .min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let end_y = cy + t_spread * (height * 0.85 * user_scale) + (t_spread * 12.0).sin() * (fv * 60.0 * sensitivity);
+        let end_y = fan_top_y + t * (fan_bot_y - fan_top_y)
+            + (t * PI * 2.0).sin() * fv * 22.0 * sensitivity; // subtle audio wave on each ray
 
-        // Rainbow spectral hue gradient across the fan
-        let ray_col = mix(
-            mix(glow_col, Color::rgba(1.0, 0.10, 0.50, 0.90), t_spread + 0.5),
-            mix(p_col, accent_col, fv),
-            fv,
-        );
+        let ray_col = spectral_color(t);
+        let ray_w   = (2.5 + fv * 5.0 * sensitivity + be * 2.0) * user_scale;
 
+        // Outer glow
+        c.set_stroke(Fill::Solid(ray_col.with_alpha(0.30 + fv * 0.15)));
+        c.set_line_width(ray_w * 4.0);
+        c.set_shadow(ray_col, (10.0 + fv * 8.0) * user_scale);
+        c.stroke_line(exit_pt_x, exit_pt_y, fan_end_x, end_y);
+
+        // Bright core
         c.set_stroke(Fill::Solid(ray_col));
-        c.set_line_width((4.0 + fv * 6.0) * user_scale);
-        c.set_shadow(ray_col, (12.0 + fv * 8.0) * user_scale);
-        c.stroke_line(disp_start_x, prism_y, disp_end_x, end_y);
+        c.set_line_width(ray_w);
+        c.set_shadow(ray_col, (6.0 + fv * 6.0) * user_scale);
+        c.stroke_line(exit_pt_x, exit_pt_y, fan_end_x, end_y);
     }
 
-    // Central Refraction Crystal Point Flare
-    c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.98)));
-    c.set_shadow(glow_col, (24.0 + bs * 12.0) * user_scale);
-    c.fill_circle(prism_x, prism_y, 16.0 * user_scale);
+    // -------------------------------------------------------------------------
+    // 5. PRISM EXIT FLARE — bright white-hot point where beam exits
+    // -------------------------------------------------------------------------
+    let flare_r = (10.0 + bs * 16.0 + be * 8.0) * user_scale;
+    let flare_grad = Fill::radial_gradient(
+        exit_pt_x, exit_pt_y, 0.0,
+        exit_pt_x, exit_pt_y, flare_r * 2.5,
+        &[
+            (0.00, Color::rgba(1.0, 1.0, 1.0, 0.98)),
+            (0.30, Color::rgba(0.90, 0.96, 1.0, 0.70 + bs * 0.15)),
+            (0.70, Color::rgba(0.50, 0.75, 1.0, 0.25)),
+            (1.00, Color::TRANSPARENT),
+        ],
+    );
+    c.set_fill(flare_grad);
+    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.90), (18.0 + bs * 12.0) * user_scale);
+    c.fill_circle(exit_pt_x, exit_pt_y, flare_r);
+
+    // Entry point flare (smaller)
+    c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.85)));
+    c.set_shadow(Color::rgba(1.0, 1.0, 1.0, 0.80), 10.0 * user_scale);
+    c.fill_circle(entry_pt_x, beam_y, (5.0 + be * 4.0) * user_scale);
+
+    // -------------------------------------------------------------------------
+    // 6. CAUSTIC FLOOR — faint rainbow patches below prism (refracted light)
+    // -------------------------------------------------------------------------
+    let floor_y = bot_l.1 + 18.0 * user_scale;
+    for r in 0..6usize {
+        let t = r as f32 / 5.0;
+        let caus_col = spectral_color(t);
+        let caus_x = bot_l.0 + t * (bot_r.0 - bot_l.0) + (frame_time * 0.6 + t * 1.2).sin() * 8.0;
+        let caus_r = (8.0 + t * 6.0) * user_scale;
+        let caus_grad = Fill::radial_gradient(
+            caus_x, floor_y, 0.0,
+            caus_x, floor_y, caus_r * 2.5,
+            &[
+                (0.00, caus_col.with_alpha(0.30 + be * 0.12)),
+                (0.60, caus_col.with_alpha(0.10)),
+                (1.00, Color::TRANSPARENT),
+            ],
+        );
+        c.set_fill(caus_grad);
+        c.set_shadow(Color::TRANSPARENT, 0.0);
+        c.fill_circle(caus_x, floor_y, caus_r * 2.5);
+    }
+
+    // suppress unused
+    let _ = (s_col, acc_col, glow, sway);
 
     c.set_global_alpha(1.0);
     c.restore();

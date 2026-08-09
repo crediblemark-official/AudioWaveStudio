@@ -176,6 +176,9 @@ pub struct SlintAppState {
     /// Selected capture device (label for display, `arg` for arecord `-D`).
     pub mic_device_label: String,
     pub mic_device_arg: String,
+    /// Set true by the ExportModal cancel button so the in-flight export loop
+    /// can stop rendering and clean up. Cleared on the next export start.
+    pub export_cancel: bool,
     /// Toast notification queue (see module docs above).
     pub toasts: VecDeque<ToastMsg>,
     /// Monotonic id counter so dismissals are unambiguous.
@@ -202,11 +205,14 @@ impl SlintAppState {
             mic_elapsed: 0.0,
             mic_device_label: "Default (System)".to_string(),
             mic_device_arg: String::new(),
+            export_cancel: false,
             toasts: VecDeque::new(),
             next_toast_id: 1,
         }
     }
+}
 
+impl SlintAppState {
     /// Append a toast to the queue, evicting the oldest when full.
     pub fn push_toast(&mut self, kind: ToastKind, text: impl Into<String>) {
         self.toasts.push_back(ToastMsg {
@@ -364,6 +370,12 @@ impl SlintAppState {
     }
 }
 
+impl Default for SlintAppState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn format_time(seconds: f64) -> String {
     let total_sec = seconds.max(0.0).round() as u64;
     let mins = total_sec / 60;
@@ -372,41 +384,29 @@ pub fn format_time(seconds: f64) -> String {
 }
 
 pub fn create_slint_image_from_rgb(width: u32, height: u32, rgb_bytes: &[u8]) -> Image {
-    let buffer = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
-    let pixels = buffer.as_slice();
-    
-    let expected = (width * height * 3) as usize;
-    if rgb_bytes.len() >= expected {
-        for (i, pixel) in pixels.iter().enumerate() {
-            let idx = i * 3;
-            let p = pixel as *const Rgb8Pixel as *mut Rgb8Pixel;
-            unsafe {
-                (*p).r = rgb_bytes[idx];
-                (*p).g = rgb_bytes[idx + 1];
-                (*p).b = rgb_bytes[idx + 2];
-            }
-        }
+    let mut buffer = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+    let pixel_count = (width * height) as usize;
+    let expected_src = pixel_count * 3;
+    if rgb_bytes.len() >= expected_src {
+        // Safe: make_mut_bytes() gives a proper &mut [u8] — no unsafe needed.
+        let dst = buffer.make_mut_bytes();
+        dst[..expected_src].copy_from_slice(&rgb_bytes[..expected_src]);
     }
-
     Image::from_rgb8(buffer)
 }
 
 pub fn create_slint_image_from_rgba(width: u32, height: u32, rgba_bytes: &[u8]) -> Image {
-    let buffer = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
-    let pixels = buffer.as_slice();
-    
-    let expected = (width * height * 4) as usize;
-    if rgba_bytes.len() >= expected {
-        for (i, pixel) in pixels.iter().enumerate() {
-            let idx = i * 4;
-            let p = pixel as *const Rgb8Pixel as *mut Rgb8Pixel;
-            unsafe {
-                (*p).r = rgba_bytes[idx];
-                (*p).g = rgba_bytes[idx + 1];
-                (*p).b = rgba_bytes[idx + 2];
-            }
+    let mut buffer = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+    let pixel_count = (width * height) as usize;
+    let expected_src = pixel_count * 4;
+    if rgba_bytes.len() >= expected_src {
+        let dst = buffer.make_mut_bytes();
+        // Strip the alpha channel: copy R,G,B from each RGBA quad.
+        for i in 0..pixel_count {
+            dst[i * 3]     = rgba_bytes[i * 4];
+            dst[i * 3 + 1] = rgba_bytes[i * 4 + 1];
+            dst[i * 3 + 2] = rgba_bytes[i * 4 + 2];
         }
     }
-
     Image::from_rgb8(buffer)
 }

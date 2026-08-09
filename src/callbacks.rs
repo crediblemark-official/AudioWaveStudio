@@ -5,6 +5,7 @@ use rfd::FileDialog;
 use slint::ComponentHandle;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 // Brings `row_count` / `row_data` / `set_row_data` into scope for the toast
@@ -179,7 +180,7 @@ thread_local! {
     /// mutated in place so existing toast cards never replay their entrance
     /// animation.
     static TOAST_MODEL: RefCell<Option<Rc<slint::VecModel<crate::ToastItem>>>> =
-        RefCell::new(None);
+        const { RefCell::new(None) };
 }
 
 /// Mirror `state.toasts` into the Slint toast model, creating the model on
@@ -277,16 +278,32 @@ pub(crate) fn load_audio_from_path(
 
             let mut s = state.lock().unwrap_or_else(|e| e.into_inner());
             let _ = s.audio_player.load_file(&path_str, duration);
+            let meta_artist = data.artist.clone();
+            let meta_title = data.title.clone();
             s.audio_data = Some(Arc::new(data));
             s.audio_path = Some(path_str);
-            s.config.text.song_title = file_name.clone();
+
+            let title_str = meta_title.unwrap_or_else(|| file_name.clone());
+            let artist_str = meta_artist.unwrap_or_else(|| {
+                // Check if file_name is formatted as "Artist - Title"
+                if let Some(pos) = file_name.find(" - ") {
+                    file_name[..pos].trim().to_string()
+                } else {
+                    "AudioWave Studio".to_string()
+                }
+            });
+
+            let shaped_title = crate::text_shaper::shape_text(&title_str);
+            let shaped_artist = crate::text_shaper::shape_text(&artist_str);
+
+            s.config.text.song_title = shaped_title.clone();
+            s.config.text.artist_name = shaped_artist.clone();
+            s.config.text.title.text = shaped_title.clone();
+            s.config.text.artist.text = shaped_artist.clone();
 
             if let Some(w) = window_weak.upgrade() {
-                w.set_track_title(slint::SharedString::from(file_name.clone()));
-                w.set_track_artist(slint::SharedString::from(format!(
-                    "{:.1}s • Ready",
-                    duration
-                )));
+                w.set_track_title(slint::SharedString::from(shaped_title.clone()));
+                w.set_track_artist(slint::SharedString::from(shaped_artist.clone()));
                 w.set_duration_str(slint::SharedString::from(format_time(duration)));
                 w.set_duration_sec(duration as f32); // arrow-seek shortcuts
                 w.set_current_time_str(slint::SharedString::from("00:00"));
@@ -297,7 +314,7 @@ pub(crate) fn load_audio_from_path(
                     &w,
                     &mut s,
                     ToastKind::Info,
-                    format!("Loaded {file_name} • {:.1}s", duration),
+                    format!("Loaded {shaped_title} • {shaped_artist}"),
                 );
             }
         }
@@ -324,13 +341,17 @@ pub fn bind_app_callbacks(
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_open_file_clicked(move || {
-        guarded("open_file", || {
+        let state_clone = state_clone.clone();
+        let window_handle = window_handle.clone();
+        std::thread::spawn(move || {
             let file = FileDialog::new()
                 .add_filter("Audio Files", SUPPORTED_AUDIO_EXTS)
                 .pick_file();
 
             if let Some(path) = file {
-                load_audio_from_path(&window_handle, &state_clone, path);
+                slint::invoke_from_event_loop(move || {
+                    load_audio_from_path(&window_handle, &state_clone, path);
+                }).ok();
             }
         });
     });
@@ -561,26 +582,32 @@ pub fn bind_app_callbacks(
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_open_custom_image_clicked(move || {
-        let file = FileDialog::new()
-            .add_filter("Image Files", &["png", "jpg", "jpeg", "webp"])
-            .pick_file();
+        let state_clone = state_clone.clone();
+        let window_handle = window_handle.clone();
+        std::thread::spawn(move || {
+            let file = FileDialog::new()
+                .add_filter("Image Files", &["png", "jpg", "jpeg", "webp"])
+                .pick_file();
 
-        if let Some(path) = file {
-            let path_str = path.to_string_lossy().to_string();
-            let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-            let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
-            s.config.background.mode = crate::config::BackgroundMode::CustomImage;
-            s.config.background.custom_image_uri = Some(path_str);
-            if let Some(w) = window_handle.upgrade() {
-                w.set_bg_mode(slint::SharedString::from("Custom Image"));
-                push_toast(
-                    &w,
-                    &mut s,
-                    ToastKind::Success,
-                    format!("Custom background image loaded: {filename}"),
-                );
+            if let Some(path) = file {
+                let path_str = path.to_string_lossy().to_string();
+                let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+                slint::invoke_from_event_loop(move || {
+                    let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+                    s.config.background.mode = crate::config::BackgroundMode::CustomImage;
+                    s.config.background.custom_image_uri = Some(path_str);
+                    if let Some(w) = window_handle.upgrade() {
+                        w.set_bg_mode(slint::SharedString::from("Custom Image"));
+                        push_toast(
+                            &w,
+                            &mut s,
+                            ToastKind::Success,
+                            format!("Custom background image loaded: {filename}"),
+                        );
+                    }
+                }).ok();
             }
-        }
+        });
     });
 
     // BIND CALLBACK: REMOVE CUSTOM BACKGROUND IMAGE
@@ -605,18 +632,24 @@ pub fn bind_app_callbacks(
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_open_radial_image_clicked(move || {
-        let file = FileDialog::new()
-            .add_filter("Image Files", &["png", "jpg", "jpeg", "webp"])
-            .pick_file();
+        let state_clone = state_clone.clone();
+        let window_handle = window_handle.clone();
+        std::thread::spawn(move || {
+            let file = FileDialog::new()
+                .add_filter("Image Files", &["png", "jpg", "jpeg", "webp"])
+                .pick_file();
 
-        if let Some(path) = file {
-            let path_str = path.to_string_lossy().to_string();
-            let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
-            s.config.background.radial_center_image_uri = Some(path_str.clone());
-            if let Some(w) = window_handle.upgrade() {
-                w.set_radial_center_image_uri(slint::SharedString::from(path_str));
+            if let Some(path) = file {
+                let path_str = path.to_string_lossy().to_string();
+                slint::invoke_from_event_loop(move || {
+                    let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+                    s.config.background.radial_center_image_uri = Some(path_str.clone());
+                    if let Some(w) = window_handle.upgrade() {
+                        w.set_radial_center_image_uri(slint::SharedString::from(path_str));
+                    }
+                }).ok();
             }
-        }
+        });
     });
 
     // BIND CALLBACK: REMOVE RADIAL CENTER IMAGE
@@ -663,92 +696,174 @@ pub fn bind_app_callbacks(
     let window_handle = window.as_weak();
     window.on_save_preset_clicked(move || {
         let config = state_clone.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
-        let path = FileDialog::new()
-            .set_file_name("my-preset.awpreset")
-            .add_filter("AudioWave Preset", &["awpreset"])
-            .save_file();
-        if let Some(p) = path {
-            let result = serde_json::to_string_pretty(&config)
-                .map(|json| std::fs::write(&p, json));
-            if let Some(w) = window_handle.upgrade() {
-                match result {
-                    Ok(Ok(())) => {
-                        push_toast(
-                            &w,
-                            &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
-                            ToastKind::Success,
-                            format!("Preset saved to {}", p.display()),
-                        );
+        let window_handle = window_handle.clone();
+        let state_clone = state_clone.clone();
+        std::thread::spawn(move || {
+            let path = FileDialog::new()
+                .set_file_name("my-preset.awpreset")
+                .add_filter("AudioWave Preset", &["awpreset"])
+                .save_file();
+            if let Some(p) = path {
+                let result = serde_json::to_string_pretty(&config)
+                    .map(|json| std::fs::write(&p, json));
+                slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_handle.upgrade() {
+                        let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+                        match result {
+                            Ok(Ok(())) => {
+                                push_toast(
+                                    &w,
+                                    &mut s,
+                                    ToastKind::Success,
+                                    format!("Preset saved to {}", p.display()),
+                                );
+                            }
+                            Ok(Err(e)) => {
+                                eprintln!("[Preset] Failed to save preset: {}", e);
+                                push_toast(
+                                    &w,
+                                    &mut s,
+                                    ToastKind::Error,
+                                    format!("Failed to save preset: {e}"),
+                                );
+                            }
+                            Err(e) => {
+                                eprintln!("[Preset] Failed to serialize config: {}", e);
+                                push_toast(
+                                    &w,
+                                    &mut s,
+                                    ToastKind::Error,
+                                    "Failed to save preset (config serialization error)",
+                                );
+                            }
+                        }
                     }
-                    Ok(Err(e)) => {
-                        eprintln!("[Preset] Failed to save preset: {}", e);
-                        push_toast(
-                            &w,
-                            &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
-                            ToastKind::Error,
-                            format!("Failed to save preset: {e}"),
-                        );
-                    }
-                    Err(e) => {
-                        eprintln!("[Preset] Failed to serialize config: {}", e);
-                        push_toast(
-                            &w,
-                            &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
-                            ToastKind::Error,
-                            "Failed to save preset (config serialization error)",
-                        );
-                    }
-                }
+                }).ok();
             }
-        }
+        });
     });
 
     // BIND CALLBACK: LOAD PRESET
     let state_clone = state.clone();
     let window_handle = window.as_weak();
     window.on_load_preset_clicked(move || {
-        let file = FileDialog::new()
-            .add_filter("AudioWave Preset", &["awpreset"])
-            .pick_file();
-        if let Some(path) = file {
-            match std::fs::read_to_string(&path) {
-                Ok(json) => match serde_json::from_str::<crate::config::VisualizerConfig>(&json) {
-                    Ok(loaded) => {
-                        let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
-                        s.config = loaded.clone();
-                        if let Some(w) = window_handle.upgrade() {
-                            sync_ui_from_config(&w, &s.config);
-                            push_toast(
-                                &w,
-                                &mut s,
-                                ToastKind::Success,
-                                "Preset loaded",
-                            );
+        let state_clone = state_clone.clone();
+        let window_handle = window_handle.clone();
+        std::thread::spawn(move || {
+            let file = FileDialog::new()
+                .add_filter("AudioWave Preset", &["awpreset"])
+                .pick_file();
+            if let Some(path) = file {
+                slint::invoke_from_event_loop(move || {
+                    match std::fs::read_to_string(&path) {
+                        Ok(json) => match serde_json::from_str::<crate::config::VisualizerConfig>(&json) {
+                            Ok(loaded) => {
+                                let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+                                s.config = loaded.clone();
+                                if let Some(w) = window_handle.upgrade() {
+                                    sync_ui_from_config(&w, &s.config);
+                                    push_toast(
+                                        &w,
+                                        &mut s,
+                                        ToastKind::Success,
+                                        "Preset loaded",
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                eprintln!("[Preset] Failed to parse preset: {}", e);
+                                if let Some(w) = window_handle.upgrade() {
+                                    push_toast(
+                                        &w,
+                                        &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
+                                        ToastKind::Error,
+                                        "Failed to load preset (invalid file)",
+                                    );
+                                }
+                            }
+                        },
+                        Err(e) => {
+                            eprintln!("[Preset] Failed to read preset file: {}", e);
+                            if let Some(w) = window_handle.upgrade() {
+                                push_toast(
+                                    &w,
+                                    &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
+                                    ToastKind::Error,
+                                    format!("Failed to read preset file: {e}"),
+                                );
+                            }
                         }
                     }
-                    Err(e) => {
-                        eprintln!("[Preset] Failed to parse preset: {}", e);
-                        if let Some(w) = window_handle.upgrade() {
-                            push_toast(
-                                &w,
-                                &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
-                                ToastKind::Error,
-                                "Failed to load preset (invalid file)",
-                            );
-                        }
-                    }
-                },
-                Err(e) => {
-                    eprintln!("[Preset] Failed to read preset file: {}", e);
-                    if let Some(w) = window_handle.upgrade() {
-                        push_toast(
-                            &w,
-                            &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
-                            ToastKind::Error,
-                            format!("Failed to read preset file: {e}"),
-                        );
-                    }
-                }
+                }).ok();
+            }
+        });
+    });
+
+    // BIND CALLBACK: ADD CUSTOM TEXT BLOCK
+    let state_clone = state.clone();
+    let window_handle = window.as_weak();
+    window.on_add_custom_text_clicked(move || {
+        let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+        let new_block = crate::config::TextBlock {
+            id: format!("custom_{}", s.config.text.blocks.len() + 1),
+            text: "CredibleMark Studio".to_string(),
+            enabled: true,
+            font_family: "Inter".to_string(),
+            font_size: 24.0,
+            font_weight: 400.0,
+            color: "#ffffff".to_string(),
+            position_x: 50.0,
+            position_y: 50.0,
+            opacity: 1.0,
+            align: crate::config::TextAlign::Center,
+            ..Default::default()
+        };
+        s.config.text.blocks.push(new_block);
+        if let Some(w) = window_handle.upgrade() {
+            sync_custom_text_blocks_to_ui(&w, &s.config);
+            push_toast(&w, &mut s, ToastKind::Success, "Added Custom Text overlay");
+        }
+    });
+
+    // BIND CALLBACK: REMOVE CUSTOM TEXT BLOCK
+    let state_clone = state.clone();
+    let window_handle = window.as_weak();
+    window.on_remove_custom_text_clicked(move |id| {
+        let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+        let idx = id as usize;
+        if idx < s.config.text.blocks.len() {
+            s.config.text.blocks.remove(idx);
+            if let Some(w) = window_handle.upgrade() {
+                sync_custom_text_blocks_to_ui(&w, &s.config);
+                push_toast(&w, &mut s, ToastKind::Info, "Removed Custom Text overlay");
+            }
+        }
+    });
+
+    // BIND CALLBACK: CUSTOM TEXT EDITED
+    let state_clone = state.clone();
+    let window_handle = window.as_weak();
+    window.on_custom_text_edited(move |id, text, enabled, pos_x, pos_y, font_size, font_family, font_weight, color_hex| {
+        let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+        let idx = id as usize;
+        if idx < s.config.text.blocks.len() {
+            let b = &mut s.config.text.blocks[idx];
+            b.text = text.as_str().to_string();
+            b.enabled = enabled;
+            b.position_x = pos_x;
+            b.position_y = pos_y;
+            b.font_size = font_size;
+            b.font_family = font_family.as_str().to_string();
+            b.font_weight = match font_weight.as_str() {
+                "Bold" => 700.0,
+                "Heavy" => 900.0,
+                _ => 400.0,
+            };
+            if !color_hex.trim().is_empty() {
+                b.color = color_hex.as_str().to_string();
+            }
+            if let Some(w) = window_handle.upgrade() {
+                sync_custom_text_blocks_to_ui(&w, &s.config);
             }
         }
     });
@@ -841,6 +956,36 @@ pub fn bind_app_callbacks(
             s.config.background.particle_count = Some(w.get_particle_count() as u32);
             s.config.background.particle_color = w.get_particle_color().to_string();
 
+            s.config.background.fireworks_count = Some(w.get_fireworks_count() as u32);
+            s.config.background.fireworks_size = Some(w.get_fireworks_size());
+            s.config.background.fireworks_speed = Some(w.get_fireworks_speed());
+            s.config.background.fireworks_depth = Some(w.get_fireworks_depth());
+            s.config.background.fireworks_color = Some(w.get_fireworks_color().to_string());
+
+            s.config.background.matrix_rain_count = Some(w.get_matrix_rain_count() as u32);
+            s.config.background.matrix_rain_size = Some(w.get_matrix_rain_size());
+            s.config.background.matrix_rain_speed = Some(w.get_matrix_rain_speed());
+            s.config.background.matrix_rain_depth = Some(w.get_matrix_rain_depth());
+            s.config.background.matrix_rain_color = Some(w.get_matrix_rain_color().to_string());
+
+            s.config.background.fireflies_count = Some(w.get_fireflies_count() as u32);
+            s.config.background.fireflies_size = Some(w.get_fireflies_size());
+            s.config.background.fireflies_speed = Some(w.get_fireflies_speed());
+            s.config.background.fireflies_depth = Some(w.get_fireflies_depth());
+            s.config.background.fireflies_color = Some(w.get_fireflies_color().to_string());
+
+            s.config.background.sakura_count = Some(w.get_sakura_count() as u32);
+            s.config.background.sakura_size = Some(w.get_sakura_size());
+            s.config.background.sakura_speed = Some(w.get_sakura_speed());
+            s.config.background.sakura_depth = Some(w.get_sakura_depth());
+            s.config.background.sakura_color = Some(w.get_sakura_color().to_string());
+
+            s.config.background.cyber_lightning_count = Some(w.get_cyber_lightning_count() as u32);
+            s.config.background.cyber_lightning_size = Some(w.get_cyber_lightning_size());
+            s.config.background.cyber_lightning_speed = Some(w.get_cyber_lightning_speed());
+            s.config.background.cyber_lightning_depth = Some(w.get_cyber_lightning_depth());
+            s.config.background.cyber_lightning_color = Some(w.get_cyber_lightning_color().to_string());
+
             s.config.background.music_note_size = Some(w.get_music_note_size());
             s.config.background.music_note_count = Some(w.get_music_note_count() as u32);
             s.config.background.music_note_sensitivity = Some(w.get_music_note_sensitivity());
@@ -879,6 +1024,8 @@ pub fn bind_app_callbacks(
             s.config.screen_effects.shake_on_beat = w.get_shake_on_beat();
             s.config.screen_effects.glitch_intensity = w.get_glitch_intensity();
             s.config.screen_effects.pulse_intensity = w.get_pulse_intensity();
+            s.config.screen_effects.vignette_intensity = w.get_vignette_intensity();
+            s.config.screen_effects.spotlight_color = w.get_spotlight_color().to_string();
             s.config.screen_effects.strobe_intensity = w.get_strobe_intensity();
             s.config.screen_effects.scanline_opacity = w.get_scanline_opacity();
             s.config.screen_effects.chromatic_intensity = w.get_chromatic_intensity();
@@ -915,11 +1062,11 @@ pub fn bind_app_callbacks(
             s.config.export.encoder = Some(label_to_id(w.get_export_encoder().as_str(), ENCODER_PAIRS));
             s.config.reactivity.fft_size = w.get_export_fft_size() as usize;
 
-            s.config.text.song_title = w.get_track_title().to_string();
-            s.config.text.artist_name = w.get_track_artist().to_string();
-            s.config.text.cassette_label = w.get_cassette_label().to_string();
-            s.config.text.title.text = w.get_track_title().to_string();
-            s.config.text.artist.text = w.get_track_artist().to_string();
+            s.config.text.song_title = crate::text_shaper::shape_text(w.get_track_title().as_str());
+            s.config.text.artist_name = crate::text_shaper::shape_text(w.get_track_artist().as_str());
+            s.config.text.cassette_label = crate::text_shaper::shape_text(w.get_cassette_label().as_str());
+            s.config.text.title.text = crate::text_shaper::shape_text(w.get_track_title().as_str());
+            s.config.text.artist.text = crate::text_shaper::shape_text(w.get_track_artist().as_str());
             s.config.text.show_title = w.get_show_title();
             s.config.text.show_artist = w.get_show_artist();
 
@@ -942,28 +1089,34 @@ pub fn bind_app_callbacks(
     // BIND CALLBACK: TOAST DISMISS (manual ✕ or auto-dismiss timer)
     let state_clone = state.clone();
     let window_handle = window.as_weak();
+    let window_handle_toast = window_handle.clone();
     window.on_toast_dismissed(move |id| {
         let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
         if s.dismiss_toast(id as u64) {
-            if let Some(w) = window_handle.upgrade() {
+            if let Some(w) = window_handle_toast.upgrade() {
                 sync_toasts(&w, &mut s);
             }
         }
     });
 
     // BIND CALLBACK: START EXPORT
-    let state_clone = state.clone();
-    let window_handle = window.as_weak();
+    // The cancel flag is shared between the start and cancel handlers so the
+    // ExportModal's Cancel button can abort an in-flight render/encode.
+    let export_cancel_flag = Arc::new(AtomicBool::new(false));
+    let cancel_flag_for_cancel = export_cancel_flag.clone();
+    let window_handle_export = window_handle.clone();
+    let state_export = state.clone();
     window.on_start_export_clicked(move || {
         guarded("start_export", || {
+        export_cancel_flag.store(false, Ordering::SeqCst);
         let (audio_path, mut config) = {
-            let s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
+            let s = state_export.lock().unwrap_or_else(|e| e.into_inner());
             (s.audio_path.clone(), s.config.clone())
         };
 
         // Always pull the live export settings from the UI so choices made in
         // the ExportModal (which never fires config-changed) reach the export.
-        if let Some(w) = window_handle.upgrade() {
+        if let Some(w) = window_handle_export.upgrade() {
             if let Ok(ar) = serde_json::from_str::<AspectRatio>(&format!(
                 "\"{}\"",
                 w.get_export_aspect_ratio()
@@ -986,7 +1139,7 @@ pub fn bind_app_callbacks(
             config.export.encoder = Some(label_to_id(w.get_export_encoder().as_str(), ENCODER_PAIRS));
             config.reactivity.fft_size = w.get_export_fft_size() as usize;
         }
-        let include_audio = window_handle
+        let include_audio = window_handle_export
             .upgrade()
             .map(|w| w.get_include_audio())
             .unwrap_or(true);
@@ -995,10 +1148,10 @@ pub fn bind_app_callbacks(
             Some(p) => p,
             None => {
                 eprintln!("[Export] No audio file loaded to export");
-                if let Some(w) = window_handle.upgrade() {
+                if let Some(w) = window_handle_export.upgrade() {
                     push_toast(
                         &w,
-                        &mut state_clone.lock().unwrap_or_else(|e| e.into_inner()),
+                        &mut state_export.lock().unwrap_or_else(|e| e.into_inner()),
                         ToastKind::Error,
                         "Load an audio file before exporting",
                     );
@@ -1024,16 +1177,23 @@ pub fn bind_app_callbacks(
             None => return,
         };
 
-        if let Some(w) = window_handle.upgrade() {
+        if let Some(w) = window_handle_export.upgrade() {
             w.set_is_exporting(true);
             w.set_export_status_text(slint::SharedString::from("Rendering & encoding MP4..."));
             w.set_export_progress_percent(10.0);
         }
 
-        let window_weak = window_handle.clone();
-        let state_for_toast = state_clone.clone();
+        let window_weak = window_handle_export.clone();
+        let state_for_toast = state_export.clone();
+        let cancel_flag = export_cancel_flag.clone();
         std::thread::spawn(move || {
-            let res = crate::gpu_export::export_gpu(config, audio_path, output_path.clone(), include_audio);
+            let res = crate::gpu_export::export_gpu(
+                config,
+                audio_path,
+                output_path.clone(),
+                include_audio,
+                cancel_flag,
+            );
             slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {
                     w.set_is_exporting(false);
@@ -1049,6 +1209,18 @@ pub fn bind_app_callbacks(
                                 &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
                                 ToastKind::Success,
                                 "Export complete — video saved",
+                            );
+                        }
+                        Err(e) if e == "Export cancelled" => {
+                            w.set_export_status_text(slint::SharedString::from(
+                                "Export cancelled",
+                            ));
+                            w.set_export_progress_percent(0.0);
+                            push_toast(
+                                &w,
+                                &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
+                                ToastKind::Info,
+                                "Export cancelled",
                             );
                         }
                         Err(e) => {
@@ -1069,6 +1241,16 @@ pub fn bind_app_callbacks(
             })
             .unwrap();
         });
+        });
+    });
+
+    let window_handle_cancel = window_handle.clone();
+    window.on_cancel_export_clicked(move || {
+        guarded("cancel_export", || {
+            cancel_flag_for_cancel.store(true, Ordering::SeqCst);
+            if let Some(w) = window_handle_cancel.upgrade() {
+                w.set_export_status_text(slint::SharedString::from("Cancelling…"));
+            }
         });
     });
 
@@ -1179,7 +1361,35 @@ pub fn bind_app_callbacks(
 }
 
 /// Push a freshly loaded config into the Slint UI properties.
+pub(crate) fn sync_custom_text_blocks_to_ui(w: &crate::AppWindow, c: &crate::config::VisualizerConfig) {
+    let slint_blocks: Vec<crate::CustomTextBlockData> = c.text.blocks.iter().enumerate().map(|(idx, b)| {
+        let family = if b.font_family.trim().is_empty() { "Inter".to_string() } else { b.font_family.clone() };
+        let weight = if b.font_weight >= 850.0 {
+            "Heavy".to_string()
+        } else if b.font_weight >= 650.0 {
+            "Bold".to_string()
+        } else {
+            "Normal".to_string()
+        };
+        crate::CustomTextBlockData {
+            id: idx as i32,
+            text: b.text.clone().into(),
+            enabled: b.enabled,
+            pos_x: b.position_x,
+            pos_y: b.position_y,
+            font_size: b.font_size,
+            font_family: family.into(),
+            font_weight: weight.into(),
+            color_hex: b.color.clone().into(),
+        }
+    }).collect();
+
+    let model = std::rc::Rc::new(slint::VecModel::from(slint_blocks));
+    w.set_custom_text_blocks(model.into());
+}
+
 fn sync_ui_from_config(w: &crate::AppWindow, c: &crate::config::VisualizerConfig) {
+    sync_custom_text_blocks_to_ui(w, c);
     // serde renames are the canonical UI ids (e.g. "waveformFill", "customImage").
     w.set_style_val(slint::SharedString::from(serde_json::to_string(&c.style).unwrap_or_else(|_| "\"spectrum\"".into()).trim_matches('"')));
     w.set_bar_count(c.reactivity.bar_count as i32);
@@ -1221,6 +1431,40 @@ fn sync_ui_from_config(w: &crate::AppWindow, c: &crate::config::VisualizerConfig
     w.set_overlay_opacity(c.background.overlay_opacity);
     w.set_show_particles(c.background.show_particles);
     w.set_show_music_notes(c.background.show_music_notes.unwrap_or(false));
+    w.set_show_fireworks(c.background.show_fireworks.unwrap_or(false));
+    w.set_fireworks_count(c.background.fireworks_count.unwrap_or(7) as f32);
+    w.set_fireworks_size(c.background.fireworks_size.unwrap_or(4.0));
+    w.set_fireworks_speed(c.background.fireworks_speed.unwrap_or(1.0));
+    w.set_fireworks_depth(c.background.fireworks_depth.unwrap_or(1.0));
+    w.set_fireworks_color(slint::SharedString::from(c.background.fireworks_color.clone().unwrap_or_else(|| "#ff7700".into())));
+
+    w.set_show_matrix_rain(c.background.show_matrix_rain.unwrap_or(false));
+    w.set_matrix_rain_count(c.background.matrix_rain_count.unwrap_or(40) as f32);
+    w.set_matrix_rain_size(c.background.matrix_rain_size.unwrap_or(5.0));
+    w.set_matrix_rain_speed(c.background.matrix_rain_speed.unwrap_or(1.0));
+    w.set_matrix_rain_depth(c.background.matrix_rain_depth.unwrap_or(1.0));
+    w.set_matrix_rain_color(slint::SharedString::from(c.background.matrix_rain_color.clone().unwrap_or_else(|| "#00ff66".into())));
+
+    w.set_show_fireflies(c.background.show_fireflies.unwrap_or(false));
+    w.set_fireflies_count(c.background.fireflies_count.unwrap_or(36) as f32);
+    w.set_fireflies_size(c.background.fireflies_size.unwrap_or(6.0));
+    w.set_fireflies_speed(c.background.fireflies_speed.unwrap_or(1.0));
+    w.set_fireflies_depth(c.background.fireflies_depth.unwrap_or(1.0));
+    w.set_fireflies_color(slint::SharedString::from(c.background.fireflies_color.clone().unwrap_or_else(|| "#ffcc00".into())));
+
+    w.set_show_sakura(c.background.show_sakura.unwrap_or(false));
+    w.set_sakura_count(c.background.sakura_count.unwrap_or(28) as f32);
+    w.set_sakura_size(c.background.sakura_size.unwrap_or(10.0));
+    w.set_sakura_speed(c.background.sakura_speed.unwrap_or(1.0));
+    w.set_sakura_depth(c.background.sakura_depth.unwrap_or(1.0));
+    w.set_sakura_color(slint::SharedString::from(c.background.sakura_color.clone().unwrap_or_else(|| "#ffb7c5".into())));
+
+    w.set_show_cyber_lightning(c.background.show_cyber_lightning.unwrap_or(false));
+    w.set_cyber_lightning_count(c.background.cyber_lightning_count.unwrap_or(4) as f32);
+    w.set_cyber_lightning_size(c.background.cyber_lightning_size.unwrap_or(3.0));
+    w.set_cyber_lightning_speed(c.background.cyber_lightning_speed.unwrap_or(1.0));
+    w.set_cyber_lightning_depth(c.background.cyber_lightning_depth.unwrap_or(1.0));
+    w.set_cyber_lightning_color(slint::SharedString::from(c.background.cyber_lightning_color.clone().unwrap_or_else(|| "#00f0ff".into())));
 
     let main_effect = serde_json::to_string(&c.screen_effects.main_effect).unwrap_or_else(|_| "\"none\"".into());
     w.set_main_effect(slint::SharedString::from(id_to_label(
@@ -1234,6 +1478,13 @@ fn sync_ui_from_config(w: &crate::AppWindow, c: &crate::config::VisualizerConfig
     w.set_shake_on_beat(c.screen_effects.shake_on_beat);
     w.set_glitch_intensity(c.screen_effects.glitch_intensity);
     w.set_pulse_intensity(c.screen_effects.pulse_intensity);
+    w.set_vignette_intensity(c.screen_effects.vignette_intensity);
+    let spotlight_color = if c.screen_effects.spotlight_color.is_empty() {
+        "#ffd700".to_string()
+    } else {
+        c.screen_effects.spotlight_color.clone()
+    };
+    w.set_spotlight_color(slint::SharedString::from(spotlight_color));
     w.set_strobe_intensity(c.screen_effects.strobe_intensity);
     w.set_scanline_opacity(c.screen_effects.scanline_opacity);
     w.set_chromatic_intensity(c.screen_effects.chromatic_intensity);

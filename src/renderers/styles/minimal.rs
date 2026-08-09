@@ -28,21 +28,24 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let glow_col = theme_glow(theme);
 
     let sensitivity = ctx.config.reactivity.sensitivity;
+    let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let _bs = ctx.beat_strength.clamp(0.0, 1.0);
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx = width * 0.5 + pos_offset_x;
+    let cy = height * 0.5 + pos_offset_y;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep aurora backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020409")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#020409")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Ambient horizon glow
     let amb_glow = Fill::radial_gradient(
@@ -59,7 +62,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(amb_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. 3 MULTI-LAYERED AURORA WAVE RIBBONS
@@ -77,8 +80,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             let bin_k = (seg * step_f).min(freq.len().saturating_sub(1));
             let fv = freq[bin_k] as f32 / 255.0;
 
-            let wave1 = (t * 5.0 + frame_time * (1.2 + layer_f * 0.4)).sin() * (30.0 + layer_f * 15.0);
-            let wave2 = (t * 9.0 - frame_time * 1.5).cos() * (15.0 + fv * 60.0 * sensitivity);
+            let wave1 = (t * 5.0 + frame_time * (1.2 + layer_f * 0.4)).sin() * (30.0 + layer_f * 15.0) * user_scale;
+            let wave2 = (t * 9.0 - frame_time * 1.5).cos() * (15.0 + fv * 60.0 * sensitivity) * user_scale;
             let y = cy + (wave1 + wave2 + (layer_f - 1.0) * 35.0 + be * 20.0);
 
             top_pts.push((x, y));

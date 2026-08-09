@@ -76,13 +76,16 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 2. LAYOUT & METER GAUGES GEOMETRY
   // -------------------------------------------------------------------------
-  let cx = ctx.width / 2.0;
-  let cy = ctx.height / 2.0;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * ctx.width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * ctx.height * 0.5;
+  let cx = ctx.width / 2.0 + pos_offset_x;
+  let cy = ctx.height / 2.0 + pos_offset_y;
 
   // Compute meter housing dimensions so both meters sit side-by-side cleanly
-  let card_w = (ctx.width * 0.42).clamp(240.0, 480.0);
-  let card_h = (ctx.height * 0.65).clamp(200.0, 360.0);
-  let card_gap = (ctx.width * 0.03).clamp(16.0, 40.0);
+  let card_w = (ctx.width * 0.42 * user_scale).clamp(240.0, 480.0);
+  let card_h = (ctx.height * 0.65 * user_scale).clamp(200.0, 360.0);
+  let card_gap = (ctx.width * 0.03 * user_scale).clamp(16.0, 40.0);
   let center_spacing = (card_w + card_gap) / 2.0;
 
   let gauge_r = (card_w * 0.40).min(card_h * 0.45);

@@ -14,6 +14,7 @@ pub mod cyber_tunnel_3d;
 pub mod cylinder_matrix_3d;
 pub mod dj_controller;
 pub mod dual_portal_bridge;
+pub mod dual_wave_horizon;
 pub mod equalizer;
 pub mod holographic_vinyl;
 pub mod hologram_stage;
@@ -53,6 +54,16 @@ pub mod vu_meter;
 pub mod warp_drive;
 pub mod waterfall_3d;
 pub mod waveform_fill;
+pub mod waveform_seismograph;
+pub mod waveform_dual_tube;
+pub mod waveform_voxel_terrain;
+pub mod waveform_sine_comb;
+pub mod waveform_harmonic_web;
+pub mod waveform_stepped_arcade;
+pub mod waveform_barcode_pulse;
+pub mod waveform_curtain_beams;
+pub mod waveform_oscillating_rings;
+pub mod waveform_topographic_ribbon;
 pub mod woofer;
 
 use crate::config::VisualizerStyle;
@@ -114,5 +125,16 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::DualPortalBridge => dual_portal_bridge::render(c, ctx),
     VisualizerStyle::ParticleWave3D => particle_wave_3d::render(c, ctx),
     VisualizerStyle::CylinderMatrix3D => cylinder_matrix_3d::render(c, ctx),
+    VisualizerStyle::DualWaveHorizon => dual_wave_horizon::render(c, ctx),
+    VisualizerStyle::WaveformSeismograph => waveform_seismograph::render(c, ctx),
+    VisualizerStyle::WaveformDualTube => waveform_dual_tube::render(c, ctx),
+    VisualizerStyle::WaveformVoxelTerrain => waveform_voxel_terrain::render(c, ctx),
+    VisualizerStyle::WaveformSineComb => waveform_sine_comb::render(c, ctx),
+    VisualizerStyle::WaveformHarmonicWeb => waveform_harmonic_web::render(c, ctx),
+    VisualizerStyle::WaveformSteppedArcade => waveform_stepped_arcade::render(c, ctx),
+    VisualizerStyle::WaveformBarcodePulse => waveform_barcode_pulse::render(c, ctx),
+    VisualizerStyle::WaveformCurtainBeams => waveform_curtain_beams::render(c, ctx),
+    VisualizerStyle::WaveformOscillatingRings => waveform_oscillating_rings::render(c, ctx),
+    VisualizerStyle::WaveformTopographicRibbon => waveform_topographic_ribbon::render(c, ctx),
   }
 }

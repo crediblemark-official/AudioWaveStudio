@@ -24,21 +24,24 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let glow_col = theme_glow(theme);
 
     let sensitivity = ctx.config.reactivity.sensitivity;
+    let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let bs = ctx.beat_strength.clamp(0.0, 1.0);
     let wave = ctx.time_data;
     let frame_time = ctx.frame_time;
 
-    let cx = width * 0.5;
-    let cy = height * 0.5;
+    let cx = width * 0.5 + pos_offset_x;
+    let cy = height * 0.5 + pos_offset_y;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep oscilloscope dark backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020608")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#020608")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Ambient plasma glow
     let amb_glow = Fill::radial_gradient(
@@ -55,7 +58,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(amb_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. SILKY SMOOTH 3D PLASMA LASER WAVEFORM
@@ -65,13 +68,13 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     for i in 0..OSC_POINTS {
         let t = i as f32 / (OSC_POINTS - 1) as f32;
-        let x = (t - 0.5) * (width * 0.88) + cx;
+        let x = (t - 0.5) * (width * 0.88 * user_scale) + cx;
 
         let bin_k = (i * step_w).min(wave.len().saturating_sub(1));
         let wv = (wave[bin_k] as f32 - 128.0) / 128.0;
 
-        let smooth_wave = (t * 6.0 + frame_time * 2.0).sin() * 15.0 * (1.0 + be * 0.5);
-        let y = cy + (wv * 140.0 * sensitivity + smooth_wave);
+        let smooth_wave = (t * 6.0 + frame_time * 2.0).sin() * 15.0 * user_scale * (1.0 + be * 0.5);
+        let y = cy + (wv * 140.0 * sensitivity * user_scale + smooth_wave);
 
         pts.push((x, y));
     }

@@ -60,7 +60,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(bg_haze);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
   // 2. HYPNOTIC COSMIC PLASMA WAVE RIBBON & ORBITING AUDIO DUST (VINYL STYLE)
@@ -329,25 +329,22 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     &Default::default(),
   );
 
-  let track_title = if !ctx.config.text.cassette_label.trim().is_empty() {
-    ctx.config.text.cassette_label.to_uppercase()
-  } else {
-    "AUDIOWAVE STUDIO LP".to_string()
-  };
-
-  c.draw_text(
-    &track_title,
-    center_x,
-    center_y + label_r * 0.55,
-    (label_r * 0.15).clamp(8.0, 13.0),
-    "monospace",
-    700.0,
-    false,
-    TextAlign::Center,
-    Fill::Solid(Color::rgba(0.12, 0.12, 0.15, 0.95)),
-    1.0,
-    &Default::default(),
-  );
+  if !ctx.config.text.cassette_label.trim().is_empty() {
+    let track_title = ctx.config.text.cassette_label.to_uppercase();
+    c.draw_text(
+      &track_title,
+      center_x,
+      center_y + label_r * 0.55,
+      (label_r * 0.15).clamp(8.0, 13.0),
+      "monospace",
+      700.0,
+      false,
+      TextAlign::Center,
+      Fill::Solid(Color::rgba(0.12, 0.12, 0.15, 0.95)),
+      1.0,
+      &Default::default(),
+    );
+  }
 
   // Spindle center hole & metallic spindle ring
   let spindle_r = (label_r * 0.16).clamp(5.0, 14.0);

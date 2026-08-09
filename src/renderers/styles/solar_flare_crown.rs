@@ -61,7 +61,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(corona_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. ORGANIC SOLAR PROMINENCE ARCHES (CURVED LOOPS OVER SUN SURFACE)

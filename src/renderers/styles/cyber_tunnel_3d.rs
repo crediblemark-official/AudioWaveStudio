@@ -41,8 +41,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep cyberspace backdrop
-    c.set_fill(Fill::Solid(Color::hex("#010207")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#010207")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Tunnel vanishing point ambient glow
     let tunnel_glow = Fill::radial_gradient(
@@ -59,7 +59,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(tunnel_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. CONFIGURE NATIVE 3D SCENE (Scene3D)

@@ -15,6 +15,8 @@ pub struct AudioData {
   pub sample_rate: u32,
   pub channels: usize,
   pub duration_seconds: f64,
+  pub artist: Option<String>,
+  pub title: Option<String>,
 }
 
 impl AudioData {
@@ -31,9 +33,56 @@ impl AudioData {
     let metadata_opts: MetadataOptions = Default::default();
     let decoder_opts: DecoderOptions = Default::default();
 
-    let probed = symphonia::default::get_probe()
+    let mut meta_artist: Option<String> = None;
+    let mut meta_title: Option<String> = None;
+
+    let mut process_tags = |tags: &[symphonia::core::meta::Tag]| {
+      for tag in tags {
+        if let Some(std_key) = tag.std_key {
+          match std_key {
+            symphonia::core::meta::StandardTagKey::Artist => {
+              let v = tag.value.to_string();
+              if !v.trim().is_empty() {
+                meta_artist = Some(v.trim().to_string());
+              }
+            }
+            symphonia::core::meta::StandardTagKey::TrackTitle => {
+              let v = tag.value.to_string();
+              if !v.trim().is_empty() {
+                meta_title = Some(v.trim().to_string());
+              }
+            }
+            _ => {}
+          }
+        } else {
+          let k = tag.key.to_lowercase();
+          if k == "artist" || k == "author" || k == "performer" {
+            let v = tag.value.to_string();
+            if !v.trim().is_empty() {
+              meta_artist = Some(v.trim().to_string());
+            }
+          } else if k == "title" || k == "tracktitle" {
+            let v = tag.value.to_string();
+            if !v.trim().is_empty() {
+              meta_title = Some(v.trim().to_string());
+            }
+          }
+        }
+      }
+    };
+
+    let mut probed = symphonia::default::get_probe()
       .format(&hint, mss, &format_opts, &metadata_opts)
       .map_err(|e| format!("Unsupported audio format: {}", e))?;
+
+    if let Some(log) = probed.metadata.get() {
+      if let Some(rev) = log.current() {
+        process_tags(rev.tags());
+      }
+    }
+    if let Some(rev) = probed.format.metadata().current() {
+      process_tags(rev.tags());
+    }
 
     let mut format = probed.format;
 
@@ -92,6 +141,8 @@ impl AudioData {
       sample_rate,
       channels,
       duration_seconds,
+      artist: meta_artist,
+      title: meta_title,
     })
   }
 

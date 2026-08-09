@@ -7,7 +7,9 @@ use crate::renderers::{
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let theme = &ctx.config.theme;
-  let center_y = ctx.height * 0.55;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_y = -ctx.config.position_y * ctx.height * 0.5;
+  let center_y = ctx.height * 0.5 + pos_offset_y + ctx.height * 0.05;
   let len = ctx.time_data.len();
   if len < 2 {
     return;
@@ -18,7 +20,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let mut pts: Vec<(f32, f32)> = Vec::with_capacity(len);
   for i in 0..len {
     let v = ctx.time_data[i] as f32 / 128.0 - 1.0;
-    let y = center_y + v * (ctx.height * 0.28) * sensitivity;
+    let y = center_y + v * (ctx.height * 0.28) * sensitivity * user_scale;
     pts.push((i as f32 * slice_width, y));
   }
 

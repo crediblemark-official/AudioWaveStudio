@@ -61,7 +61,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(cym_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. CYMATICS CONCENTRIC WATER RIPPLE MANDALA RINGS (8-FOLD CHLADNI STANDING WAVES)

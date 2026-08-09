@@ -42,8 +42,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let freq = ctx.freq_data;
   let frame_time = ctx.frame_time;
 
-  let cx = width * 0.5;
-  let cy = height * 0.5;
+  let cx = width * 0.5 + pos_offset_x;
+  let cy = height * 0.5 + pos_offset_y;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
@@ -51,8 +51,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 1. ATMOSPHERIC HORIZON SUN & NEBULA AURA (2D Background Glow)
   // -------------------------------------------------------------------------
-  let sun_y = cy - height * 0.05 - pos_offset_y;
-  let sun_x = cx + pos_offset_x;
+  let sun_y = cy - height * 0.05;
+  let sun_x = cx;
 
   let bg_haze = Fill::radial_gradient(
     sun_x,
@@ -69,7 +69,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(bg_haze);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // Glowing Horizon Sun Disc
   let sun_r = (28.0 + be * 18.0 * sensitivity).clamp(16.0, 70.0) * user_scale;
@@ -157,8 +157,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       let z_rot = ry * sin_p + z_temp * cos_p;
 
       let proj_scale = cam_dist / (cam_dist - z_rot).max(10.0);
-      let screen_x = cx + pos_offset_x + x_rot * proj_scale;
-      let screen_y = cy - pos_offset_y - y_rot * proj_scale;
+      let screen_x = cx + x_rot * proj_scale;
+      let screen_y = cy - y_rot * proj_scale;
 
       let world_r = (3.5 * (1.0 - row_t * 0.6) + val * 2.0 + be * 1.0).clamp(1.5, 8.0);
       let screen_r = (world_r * proj_scale).clamp(1.2, 14.0);

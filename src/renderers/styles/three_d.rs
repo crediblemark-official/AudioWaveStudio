@@ -42,8 +42,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep 3D space backdrop
-    c.set_fill(Fill::Solid(Color::hex("#020308")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#020308")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Ambient thermal glow
     let amb_glow = Fill::radial_gradient(
@@ -60,7 +60,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(amb_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. CONFIGURE NATIVE 3D SCENE (Scene3D)

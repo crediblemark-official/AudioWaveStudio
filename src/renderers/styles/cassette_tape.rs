@@ -27,6 +27,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   // Settings integration
   let _sensitivity = ctx.config.reactivity.sensitivity;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
   let _bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
   let be = ctx.bass_energy;
@@ -35,11 +38,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let frame_time = ctx.frame_time;
   let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5;
-  let center_y = height * 0.44;
+  let center_x = width * 0.5 + pos_offset_x;
+  let center_y = height * 0.44 + pos_offset_y;
 
-  // Cassette Body Dimensions (global canvas transform applies Scale)
-  let tape_w = ((width * 0.54).clamp(300.0, 720.0)).clamp(160.0, width * 0.95);
+  // Cassette Body Dimensions (Scale applied internally)
+  let tape_w = ((width * 0.54 * user_scale).clamp(300.0, 720.0)).clamp(160.0, width * 0.95);
   let tape_h = tape_w * 0.62;
   let left_x = center_x - tape_w / 2.0;
   let top_y = center_y - tape_h / 2.0;
@@ -76,7 +79,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(haze);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
   // 2. SIDE DIGITAL TIMERS (VINTAGE LED FOIL DISPLAYS)
@@ -260,26 +263,23 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   );
 
   // Track Title / Cassette Label Text
-  let track_title = if !ctx.config.text.cassette_label.trim().is_empty() {
-    ctx.config.text.cassette_label.to_uppercase()
-  } else {
-    "AUDIOWAVE STUDIO  •  MASTER TAPE #1".to_string()
-  };
-
   let title_y = label_y + label_h * 0.23;
-  c.draw_text(
-    &track_title,
-    center_x,
-    title_y,
-    (label_h * 0.080).clamp(9.0, 15.0),
-    "monospace",
-    700.0,
-    false,
-    TextAlign::Center,
-    Fill::Solid(Color::rgba(0.12, 0.12, 0.15, 0.90)),
-    1.0,
-    &Default::default(),
-  );
+  if !ctx.config.text.cassette_label.trim().is_empty() {
+    let track_title = ctx.config.text.cassette_label.to_uppercase();
+    c.draw_text(
+      &track_title,
+      center_x,
+      title_y,
+      (label_h * 0.080).clamp(9.0, 15.0),
+      "monospace",
+      700.0,
+      false,
+      TextAlign::Center,
+      Fill::Solid(Color::rgba(0.12, 0.12, 0.15, 0.90)),
+      1.0,
+      &Default::default(),
+    );
+  }
 
   // Dotted write-in title lines below title
   c.set_stroke(Fill::Solid(Color::rgba(0.0, 0.0, 0.0, 0.15)));

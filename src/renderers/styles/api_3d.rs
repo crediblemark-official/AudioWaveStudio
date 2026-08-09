@@ -38,10 +38,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   let st = &mut ctx.state.advanced;
 
-  // 2D draws live under the global canvas transform (scale/position handled
-  // there once); only the native 3D camera re-applies them below.
-  let cx = width * 0.5;
-  let cy = height * 0.5;
+  // 2D draws use internal position offset (no longer relies on outer canvas transform).
+  let cx = width * 0.5 + pos_offset_x;
+  let cy = height * 0.5 + pos_offset_y;
 
   st.api_time += 0.02 + be * 0.015;
   let time = st.api_time;
@@ -67,7 +66,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(aura);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
   // 2. CAMERA CONFIGURATION FOR NATIVE 3D SCENE (Scene3D)

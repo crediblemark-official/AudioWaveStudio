@@ -34,10 +34,18 @@ jobs:
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libssl-dev pkg-config ffmpeg
+          sudo apt-get install -y build-essential libxkbcommon-dev libwayland-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-shm0-dev libssl-dev pkg-config ffmpeg libasound2-dev libfontconfig1-dev libgl1-mesa-dev libegl1-mesa-dev libgbm-dev
 
-      - name: Build (release)
+      - name: Check compilation
+        run: cargo check --release
+
+      - name: Build release binary
         run: cargo build --release
 
       - name: Run tests
         run: cargo test
+
+      # NOTE: the `ui-screenshot` feature (examples/ui_screenshot.rs) is
+      # intentionally NOT compiled in CI — it requires a running display server
+      # and fontconfig on the headless runner, and its failure was a recurring
+      # red-check source unrelated to app correctness.

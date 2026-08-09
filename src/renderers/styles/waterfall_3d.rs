@@ -31,6 +31,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   // Settings integration
   let sensitivity = ctx.config.reactivity.sensitivity;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
   let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
 
   let be = ctx.bass_energy;
@@ -49,18 +52,18 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     st.frame_history.pop();
   }
 
-  let cx = width * 0.5;
-  let front_y = height * 0.82;
-  let horizon_y = height * 0.18;
+  let cx = width * 0.5 + pos_offset_x;
+  let front_y = height * 0.82 + pos_offset_y;
+  let horizon_y = height * 0.18 + pos_offset_y;
   let rows_avail = st.frame_history.len().min(WATERFALL_ROWS);
 
-  let surf_r = (width * 0.28).clamp(140.0, 520.0);
+  let surf_r = (width * 0.28 * user_scale).clamp(140.0, 520.0);
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
   // Deep watery backdrop
-  let bg = Fill::linear_gradient(
+  let _bg = Fill::linear_gradient(
     0.0,
     0.0,
     0.0,
@@ -71,8 +74,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       (1.0, Color::rgba(0.01, 0.03, 0.05, 1.0)),
     ],
   );
-  c.set_fill(bg);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.set_fill(bg);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // Ambient glow rising from the cascade mouth
   let glow_fill = Fill::radial_gradient(
@@ -89,7 +92,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(glow_fill);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // -------------------------------------------------------------------------
   // 1. CASCADING SPECTRUM WATERFALL ROWS

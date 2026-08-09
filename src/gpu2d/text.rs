@@ -284,9 +284,7 @@ fn font_set() -> Option<&'static FontSet> {
 }
 
 pub fn is_arabic_text(text: &str) -> bool {
-  let has_arabic = text.chars().any(|ch| matches!(ch, '\u{0600}'..='\u{06FF}' | '\u{0750}'..='\u{077F}' | '\u{08A0}'..='\u{08FF}'));
-  let has_ascii_alnum = text.chars().any(|ch| ch.is_ascii_alphanumeric());
-  has_arabic && !has_ascii_alnum
+  crate::text_shaper::contains_arabic(text)
 }
 
 /// Pick a cached font for a family name + weight (600+ = bold).
@@ -364,28 +362,99 @@ struct ShapedGlyph {
 /// strong character, so a mixed "Arabic + Latin" line is shaped as a single
 /// run in one direction (no bidi). Proper mixed-script rendering needs a bidi
 /// algorithm + per-direction runs (future work).
+struct ScriptRun<'a> {
+  text: &'a str,
+  is_arabic: bool,
+}
+
+fn split_script_runs(text: &str) -> Vec<ScriptRun<'_>> {
+  let mut runs = Vec::new();
+  if text.is_empty() {
+    return runs;
+  }
+
+  let mut current_start = 0;
+  let mut current_is_arabic: Option<bool> = None;
+
+  for (idx, ch) in text.char_indices() {
+    let is_arb = crate::text_shaper::contains_arabic(&ch.to_string());
+    let is_neutral = ch.is_whitespace() || ch.is_ascii_punctuation() || ch.is_ascii_digit();
+
+    let run_type = if is_neutral {
+      current_is_arabic
+    } else {
+      Some(is_arb)
+    };
+
+    if let Some(is_arb_type) = run_type {
+      if let Some(curr_arb) = current_is_arabic {
+        if is_arb_type != curr_arb {
+          runs.push(ScriptRun {
+            text: &text[current_start..idx],
+            is_arabic: curr_arb,
+          });
+          current_start = idx;
+          current_is_arabic = Some(is_arb_type);
+        }
+      } else {
+        current_is_arabic = Some(is_arb_type);
+      }
+    }
+  }
+
+  if current_start < text.len() {
+    runs.push(ScriptRun {
+      text: &text[current_start..],
+      is_arabic: current_is_arabic.unwrap_or(false),
+    });
+  }
+
+  runs
+}
+
 fn shape_run(font: &Font, text: &str, font_size: f32, letter_spacing: f32) -> Option<Vec<ShapedGlyph>> {
   if text.is_empty() {
     return Some(Vec::new());
   }
   let face = font.hb_face()?;
-  let mut buffer = rustybuzz::UnicodeBuffer::new();
-  buffer.push_str(text);
-  buffer.guess_segment_properties();
-  let out = rustybuzz::shape(&face, &[], buffer);
   let scale = font_size / face.units_per_em() as f32;
-  let infos = out.glyph_infos();
-  let positions = out.glyph_positions();
-  let mut glyphs = Vec::with_capacity(infos.len());
-  for (info, pos) in infos.iter().zip(positions.iter()) {
-    glyphs.push(ShapedGlyph {
-      gid: GlyphId(info.glyph_id as u16),
-      x_advance: pos.x_advance as f32 * scale + letter_spacing,
-      x_offset: pos.x_offset as f32 * scale,
-      y_offset: -(pos.y_offset as f32 * scale),
-    });
+  let mut all_glyphs = Vec::new();
+
+  let runs = split_script_runs(text);
+  for run in runs {
+    let mut buffer = rustybuzz::UnicodeBuffer::new();
+    buffer.push_str(run.text);
+    if run.is_arabic {
+      buffer.set_direction(rustybuzz::Direction::RightToLeft);
+      buffer.set_script(rustybuzz::script::ARABIC);
+    } else {
+      buffer.set_direction(rustybuzz::Direction::LeftToRight);
+      buffer.set_script(rustybuzz::script::LATIN);
+    }
+
+    let out = rustybuzz::shape(&face, &[], buffer);
+    let infos = out.glyph_infos();
+    let positions = out.glyph_positions();
+    for (info, pos) in infos.iter().zip(positions.iter()) {
+      let mut gid = info.glyph_id as u16;
+      if gid == 0 {
+        let char_idx = info.cluster as usize;
+        if char_idx < run.text.len() {
+          if let Some(ch) = run.text[char_idx..].chars().next() {
+            gid = font.arc.glyph_id(ch).0;
+          }
+        }
+      }
+      all_glyphs.push(ShapedGlyph {
+        gid: GlyphId(gid),
+        x_advance: pos.x_advance as f32 * scale + letter_spacing,
+        x_offset: pos.x_offset as f32 * scale,
+        y_offset: -(pos.y_offset as f32 * scale),
+      });
+    }
   }
-  Some(glyphs)
+
+  Some(all_glyphs)
 }
 
 /// Visual width (px) of a shaped run: pen extent, positive for both LTR and

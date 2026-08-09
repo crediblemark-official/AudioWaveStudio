@@ -363,13 +363,12 @@ checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
 name = "audiowave-studio"
-version = "1.10.0"
+version = "1.11.0"
 dependencies = [
  "ab_glyph",
  "base64",
  "bytemuck",
  "glam",
- "i-slint-backend-testing",
  "i-slint-backend-winit",
  "image",
  "pollster 0.3.0",
@@ -1922,19 +1921,6 @@ dependencies = [
  "i-slint-core",
  "i-slint-core-macros",
  "i-slint-renderer-femtovg",
-]
-
-[[package]]
-name = "i-slint-backend-testing"
-version = "1.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "521e901e3d47ab829c0ef500c63155776208707cd93259e6a7803ed627fa2786"
-dependencies = [
- "cfg_aliases 0.2.2",
- "i-slint-common",
- "i-slint-core",
- "i-slint-renderer-software",
- "vtable",
 ]
 
 [[package]]

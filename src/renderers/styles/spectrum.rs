@@ -24,15 +24,18 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   };
 
   let available_width = ctx.width * 0.85;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * ctx.width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * ctx.height * 0.5;
   let total_gap = bar_gap * (bar_count as f32 - 1.0);
   let bar_width = if bar_width_cfg > 0.0 {
-    bar_width_cfg
+    bar_width_cfg * user_scale
   } else {
-    ((available_width - total_gap) / bar_count as f32).max(3.0)
+    ((available_width * user_scale - total_gap) / bar_count as f32).max(3.0)
   };
-  let start_x = (ctx.width - (bar_count as f32 * bar_width + total_gap)) / 2.0;
-  let max_bar_height = ctx.height * 0.45;
-  let center_y = ctx.height * 0.55;
+  let start_x = (ctx.width * 0.5 + pos_offset_x) - (bar_count as f32 * bar_width + total_gap) / 2.0;
+  let max_bar_height = ctx.height * 0.45 * user_scale;
+  let center_y = ctx.height * 0.5 + pos_offset_y + ctx.height * 0.05 * user_scale;
 
   let gradient = Fill::linear_gradient(0.0, center_y, 0.0, center_y - max_bar_height, &[
     (0.0, theme_secondary(theme)),

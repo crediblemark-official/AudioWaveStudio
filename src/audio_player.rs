@@ -9,7 +9,14 @@ pub struct AudioPlayer {
     is_playing: bool,
     volume: f32,
     child_process: Option<Child>,
+    /// When the playback child was last restarted for a live volume change.
+    /// Restarts are throttled so dragging the volume slider does not churn
+    /// (kill + re-spawn) the audio process on every tick.
+    last_restart: Option<Instant>,
 }
+
+/// Minimum spacing between volume-change restarts of the playback child.
+const RESTART_THROTTLE: std::time::Duration = std::time::Duration::from_millis(150);
 
 impl AudioPlayer {
     pub fn new() -> Self {
@@ -21,8 +28,18 @@ impl AudioPlayer {
             is_playing: false,
             volume: 0.8,
             child_process: None,
+            last_restart: None,
         }
     }
+}
+
+impl Default for AudioPlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AudioPlayer {
 
     pub fn load_file(&mut self, path: &str, duration_sec: f64) -> Result<(), String> {
         self.stop();
@@ -183,30 +200,32 @@ impl AudioPlayer {
     }
 
     pub fn set_volume(&mut self, vol: f32) {
-        let v = vol.max(0.0).min(1.0);
+        let v = vol.clamp(0.0, 1.0);
+        if (self.volume - v).abs() < 0.001 {
+            return;
+        }
         self.volume = v;
 
-        // Apply volume dynamically to system audio output (PipeWire / PulseAudio / ALSA)
-        let vol_float = format!("{:.2}", v);
-        let vol_pct = format!("{}%", (v * 100.0).round() as u32);
-
-        // Try wpctl (PipeWire default on Linux)
-        let _ = Command::new("wpctl")
-            .arg("set-volume")
-            .arg("@DEFAULT_AUDIO_SINK@")
-            .arg(&vol_float)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
-
-        // Try pactl (PulseAudio fallback)
-        let _ = Command::new("pactl")
-            .arg("set-sink-volume")
-            .arg("@DEFAULT_SINK@")
-            .arg(&vol_pct)
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
+        // App-local volume: NEVER touch the system sink volume (the old
+        // wpctl/pactl calls muted/un-muted the whole PipeWire/PulseAudio
+        // default sink, so the app's slider controlled the entire OS).
+        // External players only accept a volume at launch, so a live change
+        // restarts playback at the same position with the new `-volume`.
+        // Restarts are throttled (~6/s) so a drag doesn't churn the child.
+        if self.is_playing {
+            let now = Instant::now();
+            let due = self
+                .last_restart
+                .map(|t| now.duration_since(t) >= RESTART_THROTTLE)
+                .unwrap_or(true);
+            if due {
+                self.last_restart = Some(now);
+                let pos = self.accumulated_sec + self.start_instant.map(|i| i.elapsed().as_secs_f64()).unwrap_or(0.0);
+                self.pause();
+                self.accumulated_sec = pos;
+                let _ = self.play();
+            }
+        }
     }
 
     pub fn get_volume(&self) -> f32 {

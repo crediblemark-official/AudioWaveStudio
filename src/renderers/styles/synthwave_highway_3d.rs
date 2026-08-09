@@ -44,8 +44,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
     // Deep synthwave backdrop
-    c.set_fill(Fill::Solid(Color::hex("#05020a")));
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.set_fill(Fill::Solid(Color::hex("#05020a")));
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // Sunset Thermal Glow
     let sun_glow = Fill::radial_gradient(
@@ -63,7 +63,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(sun_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. CONFIGURE NATIVE 3D SCENE (Scene3D)

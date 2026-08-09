@@ -1,6 +1,6 @@
 [package]
 name = "audiowave-studio"
-version = "1.10.0"
+version = "1.11.0"
 description = "AudioWave Studio Desktop Audio Visualizer"
 authors = ["CredibleMark <contact@crediblemark.com>"]
 edition = "2021"
@@ -34,39 +34,16 @@ ab_glyph = "0.2"
 rustybuzz = "0.20"
 base64 = "0.22"
 pollster = "0.3"
-# Headless rendering backend for the `ui_screenshot` example: lets the real
-# AppWindow (ui/*.slint) render to a PNG without a display, so visual parity
-# and micro-interactions can be verified pixel-accurately (not via mockups).
-# Gated behind the optional `ui-screenshot` feature: plain `cargo build` /
-# `cargo test` never enable it, so the software-renderer dep tree is only
-# compiled when explicitly requested with `--features ui-screenshot`.
-# NOTE: keep the version in lockstep with the `slint` dependency (both 1.17.x)
-# so Cargo unifies them onto a single i-slint-core copy.
-i-slint-backend-testing = { version = "1.17", features = ["renderer-software"], optional = true }
 # Direct access to the winit backend's `CustomApplicationHandler`: the ONLY way
 # to receive OS-level file drag & drop in Slint 1.17 (the backend's built-in
 # event loop silently ignores winit DroppedFile/HoveredFile events — verified
 # in i-slint-backend-winit-1.17.1 event_loop.rs). We install a handler that
 # intercepts those events and routes them into a Slint callback.
 # NOTE: keep the version in lockstep with the `slint` dependency (both 1.17.x)
-# so Cargo unifies them onto a single i-slint-core copy (same rule as
-# i-slint-backend-testing above).
+# so Cargo unifies them onto a single i-slint-core copy.
 i-slint-backend-winit = { version = "1.17", features = ["x11", "wayland"] }
-
-[features]
-ui-screenshot = ["dep:i-slint-backend-testing"]
-
-[[example]]
-name = "ui_screenshot"
-required-features = ["ui-screenshot"]
 
 [profile.dev]
 opt-level = 1
-# Workaround for the flaky rust-lld "undefined hidden symbol" linker error
-# that appears with multiple codegen units when linking the
-# staticlib/cdylib/rlib crate into the dev binary (observed on rustc 1.97).
 codegen-units = 1
-
-[profile.dev.package."*"]
-opt-level = 2
 

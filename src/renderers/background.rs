@@ -95,8 +95,8 @@ pub fn render_particles(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let freq = ctx.freq_data;
   let kick_bins = 12.min(freq.len());
   let mut kick_sum = 0usize;
-  for k in 0..kick_bins {
-    kick_sum += freq[k] as usize;
+  for &bin in freq.iter().take(kick_bins) {
+    kick_sum += bin as usize;
   }
   let kick_energy = if kick_bins > 0 { kick_sum as f32 / (kick_bins as f32 * 255.0) } else { 0.0 };
   let is_percussive = bs > 0.12 || (kick_energy > 0.4 && bs > 0.08);
@@ -235,8 +235,8 @@ pub fn render_music_notes(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let freq = ctx.freq_data;
   let high_bins = 64.min(freq.len());
   let mut high_sum = 0usize;
-  for i in 24..high_bins {
-    high_sum += freq[i] as usize;
+  for &bin in freq.iter().skip(24).take(high_bins.saturating_sub(24)) {
+    high_sum += bin as usize;
   }
   let high_energy = high_sum as f32 / ((high_bins.saturating_sub(24)).max(1) as f32 * 255.0);
   let wobble_amp = high_energy * 3.0;
@@ -626,66 +626,124 @@ pub fn render_fireworks(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     return;
   }
 
-  let t = ctx.frame_time;
+  let bg = &ctx.config.background;
+  let num_bursts = bg.fireworks_count.unwrap_or(7).clamp(3, 20) as usize;
+  let base_size = bg.fireworks_size.unwrap_or(4.0).max(1.0);
+  let speed_mult = bg.fireworks_speed.unwrap_or(1.0).max(0.1);
+  let depth_mult = bg.fireworks_depth.unwrap_or(1.0).max(0.1);
+  let user_color_str = bg.fireworks_color.as_deref().unwrap_or("#ff7700");
+  let base_color = if user_color_str.is_empty() {
+    Color::hex("#ff7700")
+  } else {
+    Color::hex(user_color_str)
+  };
+
+  let t = ctx.frame_time * speed_mult;
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
-
-  let num_bursts = 7usize;
-  let sparks_per_burst = 22usize;
+  let sparks_per_burst = 28usize;
 
   c.save();
 
   for b in 0..num_bursts {
     let seed = b as f32 * 137.5;
-    // Periodic burst expansion lifecycle
     let cycle_period = 2.5 + (seed % 1.5);
     let local_t = (t + seed * 0.4) % cycle_period;
     let progress = local_t / cycle_period; // 0.0 to 1.0
 
-    // Position of burst center
-    let cx = ((seed * 0.17 + t * 0.08).sin() * 0.38 + 0.5) * ctx.width;
-    let cy = ((seed * 0.23 + t * 0.06).cos() * 0.35 + 0.45) * ctx.height;
+    // 3D Burst position
+    let cx_3d = ((seed * 0.17 + t * 0.08).sin() * 0.38 + 0.5) * ctx.width;
+    let cy_3d = ((seed * 0.23 + t * 0.06).cos() * 0.35 + 0.45) * ctx.height;
+    let cz_3d = (seed * 0.31 + t * 0.05).sin() * 150.0 * depth_mult;
 
-    // Burst radius expands outwards over time and pulses on beat
-    let max_r = 140.0 + (seed % 90.0) + bs * 60.0;
-    let r = progress * max_r;
+    // 3D perspective projection for burst center
+    let fov = 400.0f32;
+    let center_z_eff = cz_3d + 500.0;
+    if center_z_eff <= 50.0 {
+      continue;
+    }
+    let center_scale = fov / center_z_eff;
+    let cx_screen = ctx.width * 0.5 + (cx_3d - ctx.width * 0.5) * center_scale;
+    let cy_screen = ctx.height * 0.5 + (cy_3d - ctx.height * 0.5) * center_scale;
+
+    let max_r = (140.0 + (seed % 90.0) + bs * 60.0) * depth_mult;
+    let r_3d = progress * max_r;
     let alpha = (1.0 - progress).powi(2) * (0.6 + be * 0.4);
 
     if alpha <= 0.05 {
       continue;
     }
 
-    // 1. Draw glowing burst center point
-    let core_r = (6.0 + bs * 5.0).clamp(3.0, 14.0);
-    let core_col = Color::rgba(1.0, 0.95, 0.9, alpha);
+    // 1. Core 3D Glowing Center
+    let core_r = (base_size * 1.5 + bs * 5.0).clamp(2.0, 20.0) * center_scale;
+    let core_col = base_color.with_alpha(alpha);
     c.set_fill(Fill::Solid(core_col));
-    c.set_shadow(Color::rgba(1.0, 0.7, 0.3, alpha * 0.9), 12.0);
-    c.fill_ellipse(cx, cy, core_r, core_r);
+    c.set_shadow(base_color.with_alpha(alpha * 0.9), 12.0 * center_scale);
+    c.fill_ellipse(cx_screen, cy_screen, core_r, core_r);
 
-    // 2. Draw radiating spark particles and connecting constellation laser lines
     c.set_shadow(Color::TRANSPARENT, 0.0);
+
+    // 2. Generate 3D Spherical Spark Constellation
+    struct Spark3D {
+      sx: f32,
+      sy: f32,
+      sz: f32,
+      scale: f32,
+      col: Color,
+    }
+    let mut sparks = Vec::with_capacity(sparks_per_burst);
 
     for s in 0..sparks_per_burst {
       let spark_seed = seed + s as f32 * 23.1;
-      let angle = (s as f32 / sparks_per_burst as f32) * std::f32::consts::TAU + (seed * 0.1);
+      let phi = (s as f32 / sparks_per_burst as f32) * std::f32::consts::TAU;
+      let theta = ((s as f32 / sparks_per_burst as f32) * 2.0 - 1.0).acos();
 
-      // Particle distance with slight variance
+      let vx = theta.sin() * phi.cos();
+      let vy = theta.sin() * phi.sin();
+      let vz = theta.cos();
+
       let dist_var = 0.7 + (spark_seed.sin() * 0.3);
-      let px = cx + angle.cos() * (r * dist_var);
-      let py = cy + angle.sin() * (r * dist_var);
+      let px_3d = cx_3d + vx * (r_3d * dist_var);
+      let py_3d = cy_3d + vy * (r_3d * dist_var);
+      let pz_3d = cz_3d + vz * (r_3d * dist_var);
+
+      let z_eff = pz_3d + 500.0;
+      if z_eff <= 50.0 {
+        continue;
+      }
+      let scale = fov / z_eff;
+      let sx = ctx.width * 0.5 + (px_3d - ctx.width * 0.5) * scale;
+      let sy = ctx.height * 0.5 + (py_3d - ctx.height * 0.5) * scale;
 
       let spark_hue = (seed * 50.0 + s as f32 * 18.0 + t * 30.0) % 360.0;
-      let spark_col = hsl_to_color(spark_hue, 0.9, 0.7, alpha * 0.85);
+      let spark_col = if user_color_str.is_empty() {
+        hsl_to_color(spark_hue, 0.9, 0.7, alpha * 0.85)
+      } else {
+        base_color.with_alpha(alpha * 0.85)
+      };
 
-      // Connecting laser/constellation line
-      c.set_stroke(Fill::Solid(spark_col.with_alpha(alpha * 0.4)));
-      c.set_line_width((1.2 * (1.0 - progress)).max(0.5));
-      c.stroke_line(cx, cy, px, py);
+      sparks.push(Spark3D {
+        sx,
+        sy,
+        sz: pz_3d,
+        scale,
+        col: spark_col,
+      });
+    }
 
-      // Radiating spark particle dot
-      let p_size = (3.5 * (1.0 - progress * 0.5)).clamp(1.5, 6.0);
-      c.set_fill(Fill::Solid(spark_col));
-      c.fill_ellipse(px, py, p_size, p_size);
+    // Sort 3D sparks by Z depth
+    sparks.sort_by(|a, b| a.sz.partial_cmp(&b.sz).unwrap_or(std::cmp::Ordering::Equal));
+
+    for spark in &sparks {
+      // 3D Constellation laser line
+      c.set_stroke(Fill::Solid(spark.col.with_alpha(alpha * 0.35 * spark.scale)));
+      c.set_line_width((base_size * 0.3 * spark.scale * (1.0 - progress)).clamp(0.4, 6.0));
+      c.stroke_line(cx_screen, cy_screen, spark.sx, spark.sy);
+
+      // 3D Spark particle dot
+      let p_size = (base_size * spark.scale * (1.0 - progress * 0.4)).clamp(1.0, 14.0);
+      c.set_fill(Fill::Solid(spark.col));
+      c.fill_ellipse(spark.sx, spark.sy, p_size, p_size);
     }
   }
 
@@ -693,143 +751,404 @@ pub fn render_fireworks(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 }
 
 // ---------------------------------------------------------------------------
-// 1. FLOATING MATRIX CODE RAIN EFFECT
+// 1. FLOATING MATRIX CODE RAIN EFFECT (3D PERSPECTIVE)
 // ---------------------------------------------------------------------------
 pub fn render_matrix_rain(c: &mut GpuCanvas, ctx: &RenderContext) {
   if ctx.width <= 0.0 || ctx.height <= 0.0 {
     return;
   }
-  let t = ctx.frame_time;
+
+  let bg = &ctx.config.background;
+  let cols = bg.matrix_rain_count.unwrap_or(40).clamp(10, 90) as usize;
+  let glyph_size = bg.matrix_rain_size.unwrap_or(5.0).max(1.0);
+  let speed_mult = bg.matrix_rain_speed.unwrap_or(1.0).max(0.1);
+  let depth_mult = bg.matrix_rain_depth.unwrap_or(1.0).max(0.1);
+  let user_color_str = bg.matrix_rain_color.as_deref().unwrap_or("#00ff66");
+  let main_col = if user_color_str.is_empty() {
+    Color::hex("#00ff66")
+  } else {
+    Color::hex(user_color_str)
+  };
+
+  let t = ctx.frame_time * speed_mult;
   let be = ctx.bass_energy;
-  let cols = (ctx.width / 24.0) as usize;
   let col_w = ctx.width / cols.max(1) as f32;
 
   c.save();
+
+  struct MatrixStream3D {
+    screen_x: f32,
+    fall_y: f32,
+    scale: f32,
+    z_depth: f32,
+  }
+
+  let fov = 400.0f32;
+  let mut streams = Vec::with_capacity(cols);
+
   for i in 0..cols {
     let seed = i as f32 * 37.1;
-    let speed = 60.0 + (seed % 40.0) + be * 50.0;
-    let fall_y = (t * speed + seed * 100.0) % (ctx.height + 200.0) - 100.0;
-    let x = i as f32 * col_w + col_w * 0.5;
+    // 3D Z layer depth
+    let z_3d = ((seed * 0.17).sin() * 200.0) * depth_mult;
+    let z_eff = z_3d + 450.0;
+    if z_eff <= 40.0 {
+      continue;
+    }
+    let scale = fov / z_eff;
 
-    let num_chars = 8usize;
+    let speed = (60.0 + (seed % 40.0) + be * 50.0) / scale;
+    let fall_y = (t * speed + seed * 100.0) % (ctx.height / scale + 250.0) - 100.0;
+    let world_x = i as f32 * col_w + col_w * 0.5;
+    let screen_x = ctx.width * 0.5 + (world_x - ctx.width * 0.5) * scale;
+
+    streams.push(MatrixStream3D {
+      screen_x,
+      fall_y,
+      scale,
+      z_depth: z_3d,
+    });
+  }
+
+  // Sort 3D streams by Z-depth
+  streams.sort_by(|a, b| a.z_depth.partial_cmp(&b.z_depth).unwrap_or(std::cmp::Ordering::Equal));
+
+  for stream in streams {
+    let num_chars = 9usize;
+
     for j in 0..num_chars {
-      let cy = fall_y - j as f32 * 18.0;
-      if cy < 0.0 || cy > ctx.height {
+      let cy = (stream.fall_y - j as f32 * 18.0) * stream.scale;
+      if cy < -20.0 || cy > ctx.height + 20.0 {
         continue;
       }
-      let alpha = ((num_chars - j) as f32 / num_chars as f32).clamp(0.1, 0.95);
+      let alpha = (((num_chars - j) as f32 / num_chars as f32).clamp(0.1, 0.95) * stream.scale.clamp(0.4, 1.2)).min(1.0);
       let col = if j == 0 {
-        Color::rgba(0.9, 1.0, 0.95, alpha) // Lead white character
+        Color::rgba(0.95, 1.0, 0.95, alpha) // Lead white character
       } else {
-        Color::rgba(0.0, 0.95, 0.4, alpha * 0.8) // Phosphor matrix green
+        main_col.with_alpha(alpha * 0.85)
       };
+
       c.set_fill(Fill::Solid(col));
       if j == 0 {
-        c.set_shadow(Color::rgba(0.0, 1.0, 0.4, 0.8), 8.0);
+        c.set_shadow(main_col.with_alpha(0.8), 8.0 * stream.scale);
       } else {
         c.set_shadow(Color::TRANSPARENT, 0.0);
       }
-      c.fill_ellipse(x, cy, 3.5, 6.0);
+
+      let size_x = (glyph_size * 0.7 * stream.scale).clamp(1.0, 15.0);
+      let size_y = (glyph_size * 1.2 * stream.scale).clamp(1.5, 22.0);
+      c.fill_ellipse(stream.screen_x, cy, size_x, size_y);
     }
   }
+
   c.restore();
 }
 
 // ---------------------------------------------------------------------------
-// 2. FLOATING FIREFLIES & MAGIC DUST EFFECT
+// 2. FLOATING FIREFLIES & MAGIC DUST EFFECT (3D SWARM)
 // ---------------------------------------------------------------------------
 pub fn render_fireflies(c: &mut GpuCanvas, ctx: &RenderContext) {
   if ctx.width <= 0.0 || ctx.height <= 0.0 {
     return;
   }
-  let t = ctx.frame_time;
+
+  let bg = &ctx.config.background;
+  let num_fireflies = bg.fireflies_count.unwrap_or(36).clamp(10, 100) as usize;
+  let base_size = bg.fireflies_size.unwrap_or(6.0).max(1.0);
+  let speed_mult = bg.fireflies_speed.unwrap_or(1.0).max(0.1);
+  let depth_mult = bg.fireflies_depth.unwrap_or(1.0).max(0.1);
+  let user_color_str = bg.fireflies_color.as_deref().unwrap_or("#ffcc00");
+  let main_col = if user_color_str.is_empty() {
+    Color::hex("#ffcc00")
+  } else {
+    Color::hex(user_color_str)
+  };
+
+  let t = ctx.frame_time * speed_mult;
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
-  let num_fireflies = 36usize;
+  let fov = 400.0f32;
 
   c.save();
+
+  struct Firefly3D {
+    screen_x: f32,
+    screen_y: f32,
+    z_depth: f32,
+    scale: f32,
+    pulse: f32,
+    seed: f32,
+  }
+
+  let mut list = Vec::with_capacity(num_fireflies);
+
   for i in 0..num_fireflies {
     let seed = i as f32 * 83.7;
     let speed = 0.12 + (seed % 0.15);
-    let fx = ((seed * 0.2 + t * speed).sin() * 0.45 + 0.5) * ctx.width;
-    let fy = ((seed * 0.3 + t * speed * 0.8).cos() * 0.45 + 0.5) * ctx.height;
 
-    let pulse = 0.4 + (t * 3.0 + seed).sin() * 0.6 + bs * 0.4;
-    let size = (4.0 + (seed % 4.0) + be * 3.0) * pulse.max(0.2);
-    let col = Color::rgba(1.0, 0.85, 0.25, (0.5 + pulse * 0.5).min(0.95));
+    // 3D Lissajous & harmonic swarm motion
+    let fx_3d = ((seed * 0.2 + t * speed).sin() * 0.45 + 0.5) * ctx.width;
+    let fy_3d = ((seed * 0.3 + t * speed * 0.8).cos() * 0.45 + 0.5) * ctx.height;
+    let fz_3d = ((seed * 0.5 + t * speed * 0.6).sin() * 200.0) * depth_mult;
 
-    c.set_fill(Fill::Solid(col));
-    c.set_shadow(Color::rgba(1.0, 0.75, 0.1, 0.8), 12.0 + be * 8.0);
-    c.fill_ellipse(fx, fy, size, size);
+    let z_eff = fz_3d + 450.0;
+    if z_eff <= 40.0 {
+      continue;
+    }
+    let scale = fov / z_eff;
+
+    let screen_x = ctx.width * 0.5 + (fx_3d - ctx.width * 0.5) * scale;
+    let screen_y = ctx.height * 0.5 + (fy_3d - ctx.height * 0.5) * scale;
+    let pulse = (0.4 + (t * 3.0 + seed).sin() * 0.6 + bs * 0.4).max(0.15);
+
+    list.push(Firefly3D {
+      screen_x,
+      screen_y,
+      z_depth: fz_3d,
+      scale,
+      pulse,
+      seed,
+    });
   }
+
+  // Z-Depth sorting for 3D swarm depth perception
+  list.sort_by(|a, b| a.z_depth.partial_cmp(&b.z_depth).unwrap_or(std::cmp::Ordering::Equal));
+
+  for ff in list {
+    let size = (base_size * (0.8 + (ff.seed % 0.5)) + be * 3.0) * ff.pulse * ff.scale;
+    let alpha = (0.5 + ff.pulse * 0.5).min(0.95) * ff.scale.clamp(0.4, 1.2);
+    let col = main_col.with_alpha(alpha);
+
+    // 1. Volumetric Halo Aura
+    c.set_fill(Fill::Solid(col));
+    c.set_shadow(main_col.with_alpha(alpha * 0.8), (12.0 + be * 8.0) * ff.scale);
+    c.fill_ellipse(ff.screen_x, ff.screen_y, size.max(1.0), size.max(1.0));
+
+    // 2. Orbiting 3D Magic Dust Micro-sparkles
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+    for d in 0..3 {
+      let dust_angle = t * 2.5 + ff.seed + d as f32 * 2.094;
+      let orbit_r = (size * 1.8 + (d as f32 * 3.0)).max(4.0);
+      let dx = ff.screen_x + dust_angle.cos() * orbit_r;
+      let dy = ff.screen_y + dust_angle.sin() * orbit_r;
+      let dust_size = (size * 0.35).clamp(1.0, 4.0);
+
+      c.set_fill(Fill::Solid(main_col.with_alpha(alpha * 0.7)));
+      c.fill_ellipse(dx, dy, dust_size, dust_size);
+    }
+  }
+
   c.restore();
 }
 
 // ---------------------------------------------------------------------------
-// 3. FLOATING SAKURA PETALS EFFECT
+// 3. FLOATING SAKURA PETALS EFFECT (3D TUMBLING & SHADED)
 // ---------------------------------------------------------------------------
 pub fn render_sakura(c: &mut GpuCanvas, ctx: &RenderContext) {
   if ctx.width <= 0.0 || ctx.height <= 0.0 {
     return;
   }
-  let t = ctx.frame_time;
+
+  let bg = &ctx.config.background;
+  let num_petals = bg.sakura_count.unwrap_or(28).clamp(10, 80) as usize;
+  let base_size = bg.sakura_size.unwrap_or(10.0).max(2.0);
+  let speed_mult = bg.sakura_speed.unwrap_or(1.0).max(0.1);
+  let depth_mult = bg.sakura_depth.unwrap_or(1.0).max(0.1);
+  let user_color_str = bg.sakura_color.as_deref().unwrap_or("#ffb7c5");
+  let pink_base = if user_color_str.is_empty() {
+    Color::hex("#ffb7c5")
+  } else {
+    Color::hex(user_color_str)
+  };
+
+  let t = ctx.frame_time * speed_mult;
   let be = ctx.bass_energy;
-  let num_petals = 28usize;
+  let fov = 400.0f32;
 
   c.save();
+
+  struct SakuraPetal3D {
+    screen_x: f32,
+    screen_y: f32,
+    z_depth: f32,
+    scale: f32,
+    pitch: f32,
+    yaw: f32,
+    roll: f32,
+  }
+
+  let mut list = Vec::with_capacity(num_petals);
+
   for i in 0..num_petals {
     let seed = i as f32 * 53.3;
     let fall_speed = 35.0 + (seed % 25.0) + be * 30.0;
-    let drift_x = (t * 1.2 + seed).sin() * 40.0;
+    let drift_x = (t * 1.2 + seed).sin() * 50.0;
 
-    let py = (t * fall_speed + seed * 80.0) % (ctx.height + 60.0) - 30.0;
-    let px = (seed * 11.0 + drift_x) % ctx.width;
+    let py_3d = (t * fall_speed + seed * 80.0) % (ctx.height + 100.0) - 50.0;
+    let px_3d = ((seed * 11.0 + drift_x) % (ctx.width + 100.0)) - 50.0;
+    let pz_3d = ((seed * 0.31 + t * 0.4).sin() * 180.0) * depth_mult;
 
-    let petal_w = 6.0 + (seed % 4.0);
-    let petal_h = 10.0 + (seed % 6.0);
-    let pink_col = Color::rgba(1.0, 0.65, 0.8, 0.75);
+    let z_eff = pz_3d + 450.0;
+    if z_eff <= 40.0 {
+      continue;
+    }
+    let scale = fov / z_eff;
 
-    c.set_fill(Fill::Solid(pink_col));
-    c.set_shadow(Color::rgba(1.0, 0.4, 0.7, 0.4), 6.0);
-    c.fill_ellipse(px, py, petal_w, petal_h);
+    let screen_x = ctx.width * 0.5 + (px_3d - ctx.width * 0.5) * scale;
+    let screen_y = ctx.height * 0.5 + (py_3d - ctx.height * 0.5) * scale;
+
+    // 3D Tumbling Euler angles
+    let pitch = t * 1.8 * depth_mult + seed;
+    let yaw = t * 2.4 * depth_mult + seed * 1.5;
+    let roll = (t * 0.9 + seed).sin() * 0.8;
+
+    list.push(SakuraPetal3D {
+      screen_x,
+      screen_y,
+      z_depth: pz_3d,
+      scale,
+      pitch,
+      yaw,
+      roll,
+    });
   }
+
+  // Sort 3D petals by Z-depth
+  list.sort_by(|a, b| a.z_depth.partial_cmp(&b.z_depth).unwrap_or(std::cmp::Ordering::Equal));
+
+  for p in list {
+    // Calculate 3D Normal Vector for dynamic surface lighting shading
+    let (sin_p, cos_p) = (p.pitch.sin(), p.pitch.cos());
+    let (sin_y, cos_y) = (p.yaw.sin(), p.yaw.cos());
+
+    // Light source coming from top-right (+0.3, -0.6, +0.7)
+    let normal_z = cos_p * cos_y;
+    let normal_x = sin_y * cos_p;
+    let normal_y = -sin_p;
+
+    let light_dot = (normal_x * 0.3 + normal_y * (-0.6) + normal_z * 0.7).abs();
+    let shading = (light_dot * 0.6 + 0.45).clamp(0.3, 1.2);
+
+    let shaded_col = Color::rgba(
+      (pink_base.r * shading).min(1.0),
+      (pink_base.g * shading).min(1.0),
+      (pink_base.b * shading).min(1.0),
+      0.75 * p.scale.clamp(0.4, 1.1),
+    );
+
+    c.set_fill(Fill::Solid(shaded_col));
+    c.set_shadow(Color::rgba(pink_base.r * 0.8, pink_base.g * 0.3, pink_base.b * 0.5, 0.35), 6.0 * p.scale);
+
+    // Render 3D Tumbling Organic Petal Polygon Mesh
+    let w = (base_size * 0.6 * p.scale * (cos_y.abs() * 0.7 + 0.3)).max(1.5);
+    let h = (base_size * 1.0 * p.scale * (cos_p.abs() * 0.7 + 0.3)).max(2.5);
+
+    let rot = p.roll;
+    let points = [
+      (0.0, -h * 0.9),
+      (w * 0.75, -h * 0.4),
+      (w * 0.9, h * 0.3),
+      (0.0, h * 0.9),
+      (-w * 0.9, h * 0.3),
+      (-w * 0.75, -h * 0.4),
+    ].map(|(pt_x, pt_y)| {
+      let rx = pt_x * rot.cos() - pt_y * rot.sin() + p.screen_x;
+      let ry = pt_x * rot.sin() + pt_y * rot.cos() + p.screen_y;
+      (rx, ry)
+    });
+
+    c.fill_polygon(&points);
+  }
+
   c.restore();
 }
 
 // ---------------------------------------------------------------------------
-// 4. FLOATING CYBER LIGHTNING EFFECT
+// 4. FLOATING CYBER LIGHTNING EFFECT (3D VOLUMETRIC PLASMA)
 // ---------------------------------------------------------------------------
 pub fn render_cyber_lightning(c: &mut GpuCanvas, ctx: &RenderContext) {
   if ctx.width <= 0.0 || ctx.height <= 0.0 {
     return;
   }
-  let t = ctx.frame_time;
+
+  let bg = &ctx.config.background;
+  let num_arcs = bg.cyber_lightning_count.unwrap_or(4).clamp(2, 12) as usize;
+  let thickness = bg.cyber_lightning_size.unwrap_or(3.0).max(0.5);
+  let speed_mult = bg.cyber_lightning_speed.unwrap_or(1.0).max(0.1);
+  let depth_mult = bg.cyber_lightning_depth.unwrap_or(1.0).max(0.1);
+  let user_color_str = bg.cyber_lightning_color.as_deref().unwrap_or("#00f0ff");
+  let main_col = if user_color_str.is_empty() {
+    Color::hex("#00f0ff")
+  } else {
+    Color::hex(user_color_str)
+  };
+
+  let t = ctx.frame_time * speed_mult;
   let bs = ctx.beat_strength;
   let be = ctx.bass_energy;
 
-  if bs < 0.25 {
+  if bs < 0.15 {
     return;
   }
 
-  let num_arcs = 4usize;
+  let fov = 400.0f32;
+
   c.save();
 
   for i in 0..num_arcs {
-    let seed = i as f32 * 97.1 + (t * 10.0).floor() * 13.0;
-    let x1 = ((seed * 0.1).sin() * 0.4 + 0.5) * ctx.width;
-    let y1 = ((seed * 0.2).cos() * 0.4 + 0.5) * ctx.height;
-    let x2 = x1 + (seed * 0.3).sin() * 120.0;
-    let y2 = y1 + (seed * 0.4).cos() * 120.0;
+    let seed = i as f32 * 97.1 + (t * 12.0).floor() * 13.0;
 
-    let mid_x = (x1 + x2) * 0.5 + (seed * 0.7).sin() * 30.0;
-    let mid_y = (y1 + y2) * 0.5 + (seed * 0.9).cos() * 30.0;
+    // 3D Orbital node points
+    let x1_3d = ((seed * 0.1).sin() * 0.4 + 0.5) * ctx.width;
+    let y1_3d = ((seed * 0.2).cos() * 0.4 + 0.5) * ctx.height;
+    let z1_3d = ((seed * 0.3).sin() * 150.0) * depth_mult;
 
-    let cyan_col = Color::rgba(0.0, 0.95, 1.0, (0.7 + be * 0.3).min(1.0));
-    c.set_stroke(Fill::Solid(cyan_col));
-    c.set_line_width(2.2 + bs * 2.0);
-    c.set_shadow(cyan_col, 14.0);
+    let x2_3d = x1_3d + (seed * 0.4).sin() * 140.0;
+    let y2_3d = y1_3d + (seed * 0.5).cos() * 140.0;
+    let z2_3d = z1_3d + (seed * 0.6).cos() * 100.0;
 
-    c.stroke_polyline(&[(x1, y1), (mid_x, mid_y), (x2, y2)]);
+    let z_eff1 = z1_3d + 450.0;
+    let z_eff2 = z2_3d + 450.0;
+    if z_eff1 <= 40.0 || z_eff2 <= 40.0 {
+      continue;
+    }
+
+    let scale1 = fov / z_eff1;
+    let scale2 = fov / z_eff2;
+
+    let p1_x = ctx.width * 0.5 + (x1_3d - ctx.width * 0.5) * scale1;
+    let p1_y = ctx.height * 0.5 + (y1_3d - ctx.height * 0.5) * scale1;
+
+    let p2_x = ctx.width * 0.5 + (x2_3d - ctx.width * 0.5) * scale2;
+    let p2_y = ctx.height * 0.5 + (y2_3d - ctx.height * 0.5) * scale2;
+
+    // Midpoints with 3D fractal jitter
+    let avg_scale = (scale1 + scale2) * 0.5;
+    let mid_x = (p1_x + p2_x) * 0.5 + (seed * 0.7).sin() * 40.0 * avg_scale;
+    let mid_y = (p1_y + p2_y) * 0.5 + (seed * 0.9).cos() * 40.0 * avg_scale;
+
+    let alpha = (0.7 + be * 0.3).min(1.0);
+
+    // 1. Outer Volumetric 3D Plasma Glow
+    c.set_stroke(Fill::Solid(main_col.with_alpha(alpha * 0.4)));
+    c.set_line_width((thickness * 3.5 * avg_scale).clamp(1.5, 25.0));
+    c.set_shadow(main_col.with_alpha(alpha * 0.9), 16.0 * avg_scale);
+    c.stroke_polyline(&[(p1_x, p1_y), (mid_x, mid_y), (p2_x, p2_y)]);
+
+    // 2. High-Voltage Inner White Core
+    let core_col = Color::rgba(0.95, 1.0, 1.0, alpha);
+    c.set_stroke(Fill::Solid(core_col));
+    c.set_line_width((thickness * avg_scale).clamp(0.8, 8.0));
+    c.set_shadow(Color::TRANSPARENT, 0.0);
+    c.stroke_polyline(&[(p1_x, p1_y), (mid_x, mid_y), (p2_x, p2_y)]);
+
+    // 3. Audio Shockwave Ring in 3D Perspective
+    if bs > 0.35 {
+      let ring_r = (30.0 + bs * 50.0) * avg_scale;
+      c.set_stroke(Fill::Solid(main_col.with_alpha(alpha * 0.6)));
+      c.set_line_width(1.5 * avg_scale);
+      c.stroke_circle(p1_x, p1_y, ring_r);
+    }
   }
+
   c.restore();
 }

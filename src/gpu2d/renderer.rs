@@ -805,8 +805,8 @@ impl GpuRenderer {
       return Some((w, h));
     }
     let scale = LAYER_SIZE as f32 / w.max(h) as f32;
-    let tw = ((w as f32 * scale) as u32).max(1).min(LAYER_SIZE);
-    let th = ((h as f32 * scale) as u32).max(1).min(LAYER_SIZE);
+    let tw = ((w as f32 * scale) as u32).clamp(1, LAYER_SIZE);
+    let th = ((h as f32 * scale) as u32).clamp(1, LAYER_SIZE);
     let resized = Self::area_average_resize(rgba, w, h, tw, th);
     self.upload_layer(layer, &resized, tw, th);
     Some((tw, th))
@@ -915,7 +915,7 @@ impl GpuRenderer {
         let n = (sy1 - sy0).max(1);
         let mut acc = [0u32; 4];
         for sy in sy0..sy1 {
-          let o = ((sy as usize) * (dw as usize) + x as usize) * 4;
+          let o = (sy * (dw as usize) + x as usize) * 4;
           for c in 0..4 {
             acc[c] += tmp[o + c] as u32;
           }
@@ -1098,7 +1098,7 @@ impl GpuRenderer {
     let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
       label: Some("gpu2d pass"),
       color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-        view: &view,
+        view,
         resolve_target: None,
         ops: wgpu::Operations {
           load,

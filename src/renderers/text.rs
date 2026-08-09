@@ -434,7 +434,8 @@ pub fn draw_text_overlay(c: &mut GpuCanvas, ctx: &RenderContext, global_fade: f3
 
   for b in &txt.blocks {
     if b.enabled && !b.text.trim().is_empty() {
-      items.push(Item { block: b, text: b.text.clone() });
+      let shaped = crate::text_shaper::shape_text(&b.text);
+      items.push(Item { block: b, text: shaped });
     }
   }
   if items.is_empty() {

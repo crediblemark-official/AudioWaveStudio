@@ -62,7 +62,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(lotus_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. 5 LAYERS OF ORGANIC SMOOTH BLOOMING LOTUS PETALS (OUTER TO INNER)

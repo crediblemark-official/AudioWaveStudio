@@ -69,7 +69,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     ],
   );
   c.set_fill(bg_haze);
-  c.fill_rect(0.0, 0.0, width, height);
+//   c.fill_rect(0.0, 0.0, width, height);
 
   // User Radial Center Image as backdrop disc behind the hologram orb (if set)
   draw_radial_center_image(c, ctx, center_x, center_y, base_r * 0.22);

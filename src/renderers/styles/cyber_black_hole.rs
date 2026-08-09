@@ -59,7 +59,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(bg_glow);
-    c.fill_rect(0.0, 0.0, width, height);
+//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
     // 1. 8 GRAVITATIONAL ACCRETION PLASMA RINGS (SWIRLING LENSING DISK)
