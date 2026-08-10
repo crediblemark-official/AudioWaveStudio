@@ -7,18 +7,45 @@ pub fn resolve_ffmpeg(app_data_dir: Option<&Path>) -> Result<String, String> {
     return Ok("ffmpeg".to_string());
   }
 
-  // 2. Check app data dir (previously auto-installed)
+  // 2. Check candidates list
+  let mut candidates = Vec::new();
+
+  // Next to the running application binary
+  if let Ok(exe_path) = std::env::current_exe() {
+    if let Some(parent) = exe_path.parent() {
+      candidates.push(parent.join("ffmpeg"));
+      candidates.push(parent.join("ffmpeg.exe"));
+      candidates.push(parent.join("ffmpeg").join("ffmpeg.exe"));
+    }
+  }
+
+  // Explicit app data dir
   if let Some(data_dir) = app_data_dir {
-    let candidates = [
-      data_dir.join("ffmpeg").join("ffmpeg"),
-      data_dir.join("ffmpeg").join("ffmpeg.exe"),
-      data_dir.join("bin").join("ffmpeg"),
-      data_dir.join("bin").join("ffmpeg.exe"),
-    ];
-    for c in &candidates {
-      if c.exists() {
-        return Ok(c.to_string_lossy().to_string());
-      }
+    candidates.push(data_dir.join("ffmpeg").join("ffmpeg"));
+    candidates.push(data_dir.join("ffmpeg").join("ffmpeg.exe"));
+    candidates.push(data_dir.join("bin").join("ffmpeg"));
+    candidates.push(data_dir.join("bin").join("ffmpeg.exe"));
+  }
+
+  // Common Windows installation paths
+  #[cfg(target_os = "windows")]
+  {
+    if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
+      let p = Path::new(&local_appdata);
+      candidates.push(p.join("ffmpeg").join("bin").join("ffmpeg.exe"));
+      candidates.push(p.join("ffmpeg").join("ffmpeg.exe"));
+    }
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+      let p = Path::new(&user_profile);
+      candidates.push(p.join("ffmpeg").join("bin").join("ffmpeg.exe"));
+    }
+    candidates.push(PathBuf::from(r"C:\ffmpeg\bin\ffmpeg.exe"));
+    candidates.push(PathBuf::from(r"C:\Program Files\ffmpeg\bin\ffmpeg.exe"));
+  }
+
+  for c in &candidates {
+    if c.exists() {
+      return Ok(c.to_string_lossy().to_string());
     }
   }
 
@@ -26,6 +53,52 @@ pub fn resolve_ffmpeg(app_data_dir: Option<&Path>) -> Result<String, String> {
     "FFmpeg not found. Install it via package manager or download from:\n  {}",
     download_url()
   ))
+}
+
+pub fn resolve_ffplay(app_data_dir: Option<&Path>) -> Option<String> {
+  if is_in_path("ffplay") {
+    return Some("ffplay".to_string());
+  }
+
+  let mut candidates = Vec::new();
+
+  if let Ok(exe_path) = std::env::current_exe() {
+    if let Some(parent) = exe_path.parent() {
+      candidates.push(parent.join("ffplay"));
+      candidates.push(parent.join("ffplay.exe"));
+      candidates.push(parent.join("ffmpeg").join("ffplay.exe"));
+    }
+  }
+
+  if let Some(data_dir) = app_data_dir {
+    candidates.push(data_dir.join("ffmpeg").join("ffplay"));
+    candidates.push(data_dir.join("ffmpeg").join("ffplay.exe"));
+    candidates.push(data_dir.join("bin").join("ffplay"));
+    candidates.push(data_dir.join("bin").join("ffplay.exe"));
+  }
+
+  #[cfg(target_os = "windows")]
+  {
+    if let Ok(local_appdata) = std::env::var("LOCALAPPDATA") {
+      let p = Path::new(&local_appdata);
+      candidates.push(p.join("ffmpeg").join("bin").join("ffplay.exe"));
+      candidates.push(p.join("ffmpeg").join("ffplay.exe"));
+    }
+    if let Ok(user_profile) = std::env::var("USERPROFILE") {
+      let p = Path::new(&user_profile);
+      candidates.push(p.join("ffmpeg").join("bin").join("ffplay.exe"));
+    }
+    candidates.push(PathBuf::from(r"C:\ffmpeg\bin\ffplay.exe"));
+    candidates.push(PathBuf::from(r"C:\Program Files\ffmpeg\bin\ffplay.exe"));
+  }
+
+  for c in &candidates {
+    if c.exists() {
+      return Some(c.to_string_lossy().to_string());
+    }
+  }
+
+  None
 }
 
 pub fn download_url() -> &'static str {

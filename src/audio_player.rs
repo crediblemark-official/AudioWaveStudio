@@ -74,8 +74,13 @@ impl AudioPlayer {
 
         // Launch system audio player process
         let vol_str = format!("{:.2}", self.volume);
-        let child = if let Ok(c) = Command::new("ffplay")
-            .env("SDL_AUDIO_DRIVER", "pulse")
+
+        let ffplay_bin = crate::ffmpeg::resolve_ffplay(None).unwrap_or_else(|| "ffplay".to_string());
+        let mut ffplay_cmd = Command::new(&ffplay_bin);
+        #[cfg(target_os = "linux")]
+        ffplay_cmd.env("SDL_AUDIO_DRIVER", "pulse");
+
+        let child = if let Ok(c) = ffplay_cmd
             .arg("-nodisp")
             .arg("-autoexit")
             .arg("-loglevel")
@@ -135,6 +140,9 @@ impl AudioPlayer {
         {
             println!("[AudioPlayer] Playing via paplay (start_sec={:.2}s): {}", start_sec, file_path);
             Some(c)
+        } else if let Ok(c) = spawn_powershell_player(&file_path, start_sec, vol_pct) {
+            println!("[AudioPlayer] Playing via powershell (start_sec={:.2}s): {}", start_sec, file_path);
+            Some(c)
         } else {
             eprintln!("[AudioPlayer] Failed to launch audio process for: {}", file_path);
             None
@@ -148,7 +156,7 @@ impl AudioPlayer {
             self.start_instant = None;
             self.is_playing = false;
             return Err(
-                "No audio player available — install ffplay, mpv, pw-play or paplay".to_string(),
+                "No audio player available — install ffplay or mpv".to_string(),
             );
         };
 
@@ -333,3 +341,34 @@ impl AudioPlayer {
         Err("pw-play not available".to_string())
     }
 }
+
+/// Fallback audio player for Windows systems using PowerShell and Windows Media Player COM object.
+fn spawn_powershell_player(file_path: &str, start_sec: f64, vol_pct: u32) -> std::io::Result<Child> {
+    let escaped_path = file_path.replace('\'', "''");
+    let script = format!(
+        "$p = New-Object -ComObject WMPlayer.OCX; \
+         $p.URL = '{escaped_path}'; \
+         $p.settings.volume = {vol_pct}; \
+         if ({start_sec:.2} -gt 0) {{ \
+             for ($i = 0; $i -lt 20; $i++) {{ \
+                 if ($p.openState -eq 13) {{ break }}; \
+                 Start-Sleep -Milliseconds 50 \
+             }}; \
+             $p.controls.currentPosition = {start_sec:.2} \
+         }}; \
+         $p.controls.play(); \
+         while ($p.playState -ne 1) {{ Start-Sleep -Milliseconds 200 }}"
+    );
+    Command::new("powershell")
+        .arg("-NoProfile")
+        .arg("-NonInteractive")
+        .arg("-WindowStyle")
+        .arg("Hidden")
+        .arg("-Command")
+        .arg(script)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+}
+
