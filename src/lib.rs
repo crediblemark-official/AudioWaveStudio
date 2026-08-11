@@ -33,8 +33,10 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
         s.to_string()
     } else if let Some(s) = payload.downcast_ref::<String>() {
         s.clone()
+    } else if let Some(s) = payload.downcast_ref::<Box<str>>() {
+        s.to_string()
     } else {
-        "unknown panic".to_string()
+        "panic with non-string payload".to_string()
     }
 }
 
