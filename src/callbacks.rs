@@ -73,6 +73,7 @@ const MAIN_EFFECT_PAIRS: &[(&str, &str)] = &[
     ("Tilt", "tilt"),
     ("Heat Haze", "heatHaze"),
     ("Hue Shift", "hueShift"),
+    ("Glass Crack", "glassCrack"),
 ];
 
 /// (display label, raw serde id) pairs for the theme preset combo.
@@ -1034,6 +1035,7 @@ pub fn bind_app_callbacks(
             s.config.screen_effects.tilt_intensity = w.get_tilt_intensity();
             s.config.screen_effects.heat_haze_intensity = w.get_heat_haze_intensity();
             s.config.screen_effects.hue_shift_intensity = w.get_hue_shift_intensity();
+            s.config.screen_effects.glass_crack_intensity = w.get_glass_crack_intensity();
             s.config.screen_effects.background_only = Some(w.get_bg_only_effect());
 
             // Export settings
@@ -1473,6 +1475,7 @@ fn sync_ui_from_config(w: &crate::AppWindow, c: &crate::config::VisualizerConfig
     w.set_tilt_intensity(c.screen_effects.tilt_intensity);
     w.set_heat_haze_intensity(c.screen_effects.heat_haze_intensity);
     w.set_hue_shift_intensity(c.screen_effects.hue_shift_intensity);
+    w.set_glass_crack_intensity(c.screen_effects.glass_crack_intensity);
     w.set_bg_only_effect(c.screen_effects.background_only.unwrap_or(true));
 
     let aspect = match c.export.aspect_ratio {

@@ -652,6 +652,7 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> tilt-intensity: 0.6;
     in-out property <float> heat-haze-intensity: 0.6;
     in-out property <float> hue-shift-intensity: 0.6;
+    in-out property <float> glass-crack-intensity: 0.6;
     in-out property <bool> bg-only-effect: true;
 
     in-out property <string> track-title: "";
@@ -1624,9 +1625,9 @@ export component ControlPanel inherits Rectangle {
                         Text { text: "Effect Type"; color: #a3a3a3; font-size: 11px; }
                         ComboBox {
                             height: 34px;
-                            model: ["None", "Shake", "Glitch", "Vignette", "Pulse", "Spotlight", "Strobe", "Scanline", "Chromatic Aberration", "Zoom", "Invert", "Bars", "Shockwave", "Pixelate", "Tilt", "Heat Haze", "Hue Shift"];
+                            model: ["None", "Shake", "Glitch", "Vignette", "Pulse", "Spotlight", "Strobe", "Scanline", "Chromatic Aberration", "Zoom", "Invert", "Bars", "Shockwave", "Pixelate", "Tilt", "Heat Haze", "Hue Shift", "Glass Crack"];
                             current-value: root.main-effect;
-                            current-index: root.main-effect == "None" ? 0 : root.main-effect == "Shake" ? 1 : root.main-effect == "Glitch" ? 2 : root.main-effect == "Vignette" ? 3 : root.main-effect == "Pulse" ? 4 : root.main-effect == "Spotlight" ? 5 : root.main-effect == "Strobe" ? 6 : root.main-effect == "Scanline" ? 7 : root.main-effect == "Chromatic Aberration" ? 8 : root.main-effect == "Zoom" ? 9 : root.main-effect == "Invert" ? 10 : root.main-effect == "Bars" ? 11 : root.main-effect == "Shockwave" ? 12 : root.main-effect == "Pixelate" ? 13 : root.main-effect == "Tilt" ? 14 : root.main-effect == "Heat Haze" ? 15 : 16;
+                            current-index: root.main-effect == "None" ? 0 : root.main-effect == "Shake" ? 1 : root.main-effect == "Glitch" ? 2 : root.main-effect == "Vignette" ? 3 : root.main-effect == "Pulse" ? 4 : root.main-effect == "Spotlight" ? 5 : root.main-effect == "Strobe" ? 6 : root.main-effect == "Scanline" ? 7 : root.main-effect == "Chromatic Aberration" ? 8 : root.main-effect == "Zoom" ? 9 : root.main-effect == "Invert" ? 10 : root.main-effect == "Bars" ? 11 : root.main-effect == "Shockwave" ? 12 : root.main-effect == "Pixelate" ? 13 : root.main-effect == "Tilt" ? 14 : root.main-effect == "Heat Haze" ? 15 : root.main-effect == "Hue Shift" ? 16 : 17;
                             selected(val) => { root.main-effect = val; root.config-changed(); }
                         }
 
@@ -1647,6 +1648,7 @@ export component ControlPanel inherits Rectangle {
                                 : root.main-effect == "Tilt" ? "Canvas tilts back & forth with the music"
                                 : root.main-effect == "Heat Haze" ? "Wavy air distortion shimmering on bass"
                                 : root.main-effect == "Hue Shift" ? "Colors drift continuously through the spectrum"
+                                : root.main-effect == "Glass Crack" ? "Cracked glass shards refraction & geometric break lines"
                                 : "No active screen effect";
                             color: #737373;
                             font-size: 11px;
@@ -1859,6 +1861,18 @@ export component ControlPanel inherits Rectangle {
                                 maximum: 1.0;
                                 value: root.hue-shift-intensity;
                                 changed(val) => { root.hue-shift-intensity = val; root.config-changed(); }
+                            }
+                        }
+
+                        if (root.main-effect == "Glass Crack") : VerticalLayout {
+                            spacing: 10px;
+                            SliderRow {
+                                label: "Glass Crack Intensity";
+                                value-text: Math.round(root.glass-crack-intensity * 100) + "%";
+                                minimum: 0.0;
+                                maximum: 1.0;
+                                value: root.glass-crack-intensity;
+                                changed(val) => { root.glass-crack-intensity = val; root.config-changed(); }
                             }
                         }
                     }

@@ -268,6 +268,7 @@ export component AppWindow inherits Window {
     in-out property <float> tilt-intensity: 0.6;
     in-out property <float> heat-haze-intensity: 0.6;
     in-out property <float> hue-shift-intensity: 0.6;
+    in-out property <float> glass-crack-intensity: 0.6;
     in-out property <bool> bg-only-effect: true;
 
     // Text Overlay & Typography
@@ -663,6 +664,7 @@ export component AppWindow inherits Window {
                     tilt-intensity <=> root.tilt-intensity;
                     heat-haze-intensity <=> root.heat-haze-intensity;
                     hue-shift-intensity <=> root.hue-shift-intensity;
+                    glass-crack-intensity <=> root.glass-crack-intensity;
                     bg-only-effect <=> root.bg-only-effect;
 
                     track-title <=> root.track-title;

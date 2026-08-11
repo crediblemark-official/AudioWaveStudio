@@ -230,6 +230,8 @@ pub enum ScreenEffect {
   HeatHaze,
   #[serde(rename = "hueShift")]
   HueShift,
+  #[serde(rename = "glassCrack")]
+  GlassCrack,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -671,6 +673,7 @@ pub struct ScreenEffectsSettings {
   pub tilt_intensity: f32,
   pub heat_haze_intensity: f32,
   pub hue_shift_intensity: f32,
+  pub glass_crack_intensity: f32,
 }
 
 impl Default for ScreenEffectsSettings {
@@ -700,6 +703,7 @@ impl Default for ScreenEffectsSettings {
       tilt_intensity: 0.6,
       heat_haze_intensity: 0.6,
       hue_shift_intensity: 0.6,
+      glass_crack_intensity: 0.6,
     }
   }
 }

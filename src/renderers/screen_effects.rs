@@ -119,18 +119,27 @@ pub fn post_fx(
     ScreenEffect::Tilt => 8,
     ScreenEffect::HeatHaze => 9,
     ScreenEffect::HueShift => 10,
+    ScreenEffect::GlassCrack => 11,
     _ => return None,
   };
   let eff_beat = |v: f32| if beat > 0.15 { v * beat } else { 0.0 };
   let intensity = match settings.main_effect {
-    ScreenEffect::Glitch => settings.glitch_intensity * use_be * 0.8 + eff_beat(settings.glitch_intensity * 8.0),
-    ScreenEffect::Chromatic => settings.chromatic_intensity * use_be * 0.5 + eff_beat(settings.chromatic_intensity),
-    ScreenEffect::Zoom => settings.zoom_intensity * use_be * 0.5 + eff_beat(settings.zoom_intensity),
-    ScreenEffect::Invert => {
-      let amount = (settings.invert_intensity * use_be * 0.4 + eff_beat(settings.invert_intensity)) * 2.0;
-      return if amount < 0.05 { None } else { Some(PostFx { mode, intensity: amount.min(1.0), time: ft, beat, fps }) };
+    ScreenEffect::Glitch => {
+      settings.glitch_intensity * 0.25 + settings.glitch_intensity * use_be * 0.8 + eff_beat(settings.glitch_intensity * 8.0)
     }
-    ScreenEffect::Bars => (settings.bars_amount * use_be * 0.3 + eff_beat(settings.bars_amount)).min(0.5),
+    ScreenEffect::Chromatic => {
+      settings.chromatic_intensity * 0.3 + settings.chromatic_intensity * use_be * 0.5 + eff_beat(settings.chromatic_intensity)
+    }
+    ScreenEffect::Zoom => {
+      (settings.zoom_intensity * 0.4 + settings.zoom_intensity * use_be * 0.5 + eff_beat(settings.zoom_intensity)).min(0.5)
+    }
+    ScreenEffect::Invert => {
+      let amount = settings.invert_intensity * 0.35 + (settings.invert_intensity * use_be * 0.4 + eff_beat(settings.invert_intensity)) * 2.0;
+      return if amount < 0.01 { None } else { Some(PostFx { mode, intensity: amount.min(1.0), time: ft, beat, fps }) };
+    }
+    ScreenEffect::Bars => {
+      (settings.bars_amount * 0.4 + settings.bars_amount * use_be * 0.3 + eff_beat(settings.bars_amount)).min(0.5)
+    }
     ScreenEffect::Shockwave => {
       let beat_high = beat > 0.15;
       if beat_high && !state.prev_beat_high {
@@ -138,26 +147,34 @@ pub fn post_fx(
       }
       state.prev_beat_high = beat_high;
       let elapsed = (ft * 1000.0 - state.shock_start) / 650.0;
-      if elapsed < 0.0 || elapsed >= 1.0 {
-        return None;
+      if elapsed >= 0.0 && elapsed < 1.0 {
+        settings.shockwave_intensity * (1.0 - elapsed) * 1.1
+      } else if settings.shockwave_intensity > 0.001 {
+        // Preview ripple when audio is paused / between beats
+        let preview_ripple = ((ft * 4.0).sin().abs() * 0.4 + 0.3) * settings.shockwave_intensity * 0.5;
+        preview_ripple
+      } else {
+        0.0
       }
-      settings.shockwave_intensity * (1.0 - elapsed) * 1.1
     }
-    ScreenEffect::Pixelate => settings.pixelate_intensity * use_be * 0.4 + eff_beat(settings.pixelate_intensity),
-    ScreenEffect::Tilt => settings.tilt_intensity * use_be * 0.4 + eff_beat(settings.tilt_intensity),
-    ScreenEffect::HeatHaze => settings.heat_haze_intensity * use_be * 0.3 + eff_beat(settings.heat_haze_intensity),
+    ScreenEffect::Pixelate => {
+      settings.pixelate_intensity * 0.35 + settings.pixelate_intensity * use_be * 0.4 + eff_beat(settings.pixelate_intensity)
+    }
+    ScreenEffect::Tilt => {
+      settings.tilt_intensity * 0.4 + settings.tilt_intensity * use_be * 0.4 + eff_beat(settings.tilt_intensity)
+    }
+    ScreenEffect::HeatHaze => {
+      settings.heat_haze_intensity * 0.4 + settings.heat_haze_intensity * use_be * 0.3 + eff_beat(settings.heat_haze_intensity)
+    }
     ScreenEffect::HueShift => {
-      (settings.hue_shift_intensity * use_be * 0.3 + eff_beat(settings.hue_shift_intensity)).min(0.9)
+      (settings.hue_shift_intensity * 0.4 + settings.hue_shift_intensity * use_be * 0.3 + eff_beat(settings.hue_shift_intensity)).min(0.9)
+    }
+    ScreenEffect::GlassCrack => {
+      (settings.glass_crack_intensity * 0.4 + settings.glass_crack_intensity * use_be * 0.4 + eff_beat(settings.glass_crack_intensity * 0.8)).min(1.0)
     }
     _ => return None,
   };
-  let threshold = match mode {
-    1 => 0.05,
-    2 => 0.03,
-    3 => 0.01,
-    5 => 0.01,
-    _ => 0.02,
-  };
+  let threshold = 0.005;
   if intensity < threshold {
     return None;
   }
@@ -870,6 +887,45 @@ fn cpu_post_fx(
         px[0] = r;
         px[1] = g;
         px[2] = b;
+      }
+    }
+    11 => {
+      // glass crack: polygonal shard displacement & white edge fracture highlights.
+      let amp = intensity * wf * 0.03;
+      let center_x = wf * 0.5;
+      let center_y = hf * 0.5;
+      for y in 0..h {
+        let yf = y as f32;
+        let dy = yf - center_y;
+        for x in 0..w {
+          let xf = x as f32;
+          let dx = xf - center_x;
+          let angle = dy.atan2(dx);
+          let dist = (dx * dx + dy * dy).sqrt();
+          // Radial crack lines + cross fractures
+          let crack_pattern = (angle * 6.0 + (dist * 0.02).sin() * 2.0).sin();
+          let line_dist = crack_pattern.abs();
+          let idx = ((y * w + x) * 3) as usize;
+
+          if line_dist < 0.08 {
+            // Bright white glass fracture line highlight
+            let hl = ((1.0 - line_dist / 0.08) * intensity * 220.0) as u8;
+            rgb[idx] = rgb[idx].saturating_add(hl);
+            rgb[idx + 1] = rgb[idx + 1].saturating_add(hl);
+            rgb[idx + 2] = rgb[idx + 2].saturating_add(hl);
+          } else {
+            // Refractive shard displacement
+            let shard_id = (crack_pattern * 4.0).floor();
+            let shift_x = (shard_id * 1.3).sin() * amp;
+            let shift_y = (shard_id * 2.7).cos() * amp;
+            let ux = (xf + shift_x).clamp(0.0, wf - 1.0);
+            let uy = (yf + shift_y).clamp(0.0, hf - 1.0);
+            let s = cpu_sample_f(src, w, h, ux, uy);
+            rgb[idx] = s[0];
+            rgb[idx + 1] = s[1];
+            rgb[idx + 2] = s[2];
+          }
+        }
       }
     }
     _ => {}

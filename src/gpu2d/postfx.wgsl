@@ -229,6 +229,30 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let cs = hsl_to_rgb(vec3(hue2 - floor(hue2 / 360.0) * 360.0, 0.85, 0.5));
     let cb = textureSample(src, samp, uv).rgb;
     col = vec4(mix(cb, hueBlend(cb, cs), p.intensity), 1.0);
+  } else if (p.mode == 11u) {
+    // glass crack — Voronoi shard displacement + sharp fracture edge highlights & refractions.
+    let center = vec2(0.5, 0.5);
+    let delta = uv - center;
+    let dist = length(delta * vec2(w / h, 1.0));
+    let angle = atan2(delta.y, delta.x);
+
+    // Multi-radial fracture web pattern
+    let crackVal = sin(angle * 7.0 + sin(dist * 28.0) * 1.8 + cos(angle * 3.0) * 2.0);
+    let edgeDist = abs(crackVal);
+
+    let shardId = floor(crackVal * 5.0 + dist * 10.0);
+    let shardShift = vec2(sin(shardId * 12.3), cos(shardId * 7.1)) * amount * 0.035;
+
+    let sampleUv = clamp(uv + shardShift, vec2(0.0), vec2(1.0));
+    var sampled = textureSample(src, samp, sampleUv);
+
+    if (edgeDist < 0.07 * amount) {
+      let edgeStrength = (1.0 - edgeDist / (0.07 * amount)) * amount;
+      let highlight = vec4(1.0, 1.0, 1.0, 1.0);
+      col = mix(sampled, highlight, edgeStrength * 0.85);
+    } else {
+      col = sampled;
+    }
   }
 
   return col;

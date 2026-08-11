@@ -212,7 +212,7 @@ pub fn export_gpu(
         &mut rstate.screen_fx,
         &config.screen_effects,
         env.above_floor,
-        rstate.beat_strength,
+        env.beat_strength,
         config.export.fps.max(1) as f32,
       );
       let bg_only = config.screen_effects.background_only.unwrap_or(true);
@@ -437,7 +437,7 @@ pub fn render_preview_frame_inner(
     &mut rstate.screen_fx,
     &config.screen_effects,
     env.above_floor,
-    rstate.beat_strength,
+    env.beat_strength,
     fps,
   );
   let bg_only = config.screen_effects.background_only.unwrap_or(true);
