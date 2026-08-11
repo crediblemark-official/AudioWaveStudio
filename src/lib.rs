@@ -44,6 +44,21 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
 /// second.
 static LAST_PANIC_LOG: AtomicU64 = AtomicU64::new(0);
 
+/// Set native OS window & taskbar icon on a Slint window handle.
+fn setup_window_icon(window: &slint::Window) {
+    use i_slint_backend_winit::WinitWindowAccessor;
+    window.with_winit_window(|winit_win| {
+        let icon_bytes = include_bytes!("../assets/icon.png");
+        if let Ok(img) = image::load_from_memory(icon_bytes) {
+            let rgba = img.to_rgba8();
+            let (width, height) = rgba.dimensions();
+            if let Ok(winit_icon) = i_slint_backend_winit::winit::window::Icon::from_rgba(rgba.into_raw(), width, height) {
+                winit_win.set_window_icon(Some(winit_icon));
+            }
+        }
+    });
+}
+
 /// Intercepts OS-level file drag & drop from winit.
 ///
 /// Slint 1.17's winit backend IGNORES winit's DroppedFile/HoveredFile events
@@ -166,12 +181,18 @@ pub fn run() {
     let window = AppWindow::new().expect("Failed to create Slint AppWindow");
     *app_slot.borrow_mut() = Some(window.as_weak());
 
+    // Load and set embedded taskbar/window icon
+    setup_window_icon(window.window());
+
     // Second native window for the pop-out preview (hidden until the user
     // clicks the navbar "Preview" button; shown on demand). Creating a second
     // surface/renderer can fail on constrained systems, so degrade gracefully
     // instead of panicking the whole app over an optional window.
     let preview = match PreviewWindow::new() {
-        Ok(p) => Some(p),
+        Ok(p) => {
+            setup_window_icon(p.window());
+            Some(p)
+        }
         Err(e) => {
             eprintln!("[Preview] Pop-out preview unavailable: {}", e);
             None
