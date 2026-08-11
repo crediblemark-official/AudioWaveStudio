@@ -119,8 +119,8 @@ jobs:
           EOF
           cp AppDir/audiowave-studio.desktop AppDir/usr/share/applications/
 
-          convert -size 256x256 xc:gold -fill black -draw "circle 128,128 128,40" AppDir/audiowave-studio.png 2>/dev/null || touch AppDir/audiowave-studio.png
-          cp AppDir/audiowave-studio.png AppDir/usr/share/icons/hicolor/256x256/apps/
+          cp assets/icon.png AppDir/audiowave-studio.png
+          cp assets/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/audiowave-studio.png
 
           cat << 'EOF' > AppDir/AppRun
           #!/bin/sh
@@ -145,42 +145,67 @@ jobs:
           New-Item -ItemType Directory -Force -Path staging_win
           Copy-Item target/${{ matrix.target }}/release/audiowave-studio.exe -Destination staging_win/
           if (Test-Path README.md) { Copy-Item README.md -Destination staging_win/ }
+
+          # Bundle static FFmpeg and FFplay binaries into the Windows release bundle
+          try {
+            Invoke-WebRequest -Uri "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip" -OutFile ffmpeg_dl.zip
+            Expand-Archive -Path ffmpeg_dl.zip -DestinationPath ffmpeg_temp -Force
+            Get-ChildItem -Path ffmpeg_temp -Recurse -Filter "ffmpeg.exe" | Select-Object -First 1 | Copy-Item -Destination staging_win/
+            Get-ChildItem -Path ffmpeg_temp -Recurse -Filter "ffplay.exe" | Select-Object -First 1 | Copy-Item -Destination staging_win/
+            Remove-Item -Recurse -Force ffmpeg_temp, ffmpeg_dl.zip
+          } catch {
+            Write-Host "Warning: Could not bundle static FFmpeg binaries automatically"
+          }
+
+          # Sign binary with Authenticode certificate if available
+          if ("$env:WIN_CERT" -ne "") {
+            $certPath = "$env:TEMP\cert.pfx"
+            [System.Convert]::FromBase64String("$env:WIN_CERT") | Set-Content -Path $certPath -Encoding Byte
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "$env:WIN_PASS" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "staging_win\audiowave-studio.exe"
+            Remove-Item -Path $certPath -Force
+          }
+
           Compress-Archive -Path staging_win/* -DestinationPath ${{ matrix.artifact_name }}.zip
 
           # Build Inno Setup Executable Installer (.exe setup)
           $issContent = @"
           [Setup]
+          AppId={{8F5419A2-3498-4B2E-8E5A-61788277A8F3}}
           AppName=AudioWave Studio
-          AppVersion=1.12.0
+          AppVersion=1.13.0
           AppPublisher=CredibleMark Studio
           DefaultDirName={autopf}\AudioWave Studio
           DefaultGroupName=AudioWave Studio
+          Uninstallable=yes
+          UninstallDisplayName=AudioWave Studio
           UninstallDisplayIcon={app}\audiowave-studio.exe
           Compression=lzma2/ultra64
           SolidCompression=yes
+          CloseApplications=yes
+          RestartApplications=yes
+          UsePreviousAppDir=yes
           OutputDir=.
           OutputBaseFilename=${{ matrix.artifact_name }}-setup
 
           [Files]
-          Source: "target\${{ matrix.target }}\release\audiowave-studio.exe"; DestDir: "{app}"; Flags: ignoreversion
-          Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+          Source: "staging_win\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
-          Name: "{autoprograms}\AudioWave Studio"; Filename: "{app}\audiowave-studio.exe"
+          Name: "{autoprograms}\AudioWave Studio\AudioWave Studio"; Filename: "{app}\audiowave-studio.exe"
+          Name: "{autoprograms}\AudioWave Studio\Uninstall AudioWave Studio"; Filename: "{uninstallexe}"
           Name: "{autodesktop}\AudioWave Studio"; Filename: "{app}\audiowave-studio.exe"
+
+          [UninstallDelete]
+          Type: filesandordirs; Name: "{app}"
           "@
           Set-Content -Path installer.iss -Value $issContent
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
 
-          # Create .msi installer copy for Windows MSI deployment
-          Copy-Item ${{ matrix.artifact_name }}-setup.exe ${{ matrix.artifact_name }}.msi
-
-          # Sign Installer Executables if Code Signing Cert is present
+          # Sign Setup Installer Executable if Code Signing Cert is present
           if ("$env:WIN_CERT" -ne "") {
             $certPath = "$env:TEMP\cert.pfx"
             [System.Convert]::FromBase64String("$env:WIN_CERT") | Set-Content -Path $certPath -Encoding Byte
             & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "$env:WIN_PASS" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}-setup.exe"
-            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /f $certPath /p "$env:WIN_PASS" /tr http://timestamp.digicert.com /td sha256 /fd sha256 "${{ matrix.artifact_name }}.msi"
             Remove-Item -Path $certPath -Force
           }
 

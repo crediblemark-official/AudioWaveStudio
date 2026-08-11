@@ -195,7 +195,7 @@ export component AudioBar inherits Rectangle {
             cross-axis-alignment: center;
 
             ControlBtn {
-                icon: root.is-muted ? "✕" : "🔊";
+                icon: root.is-muted ? "🔇" : "🔊";
                 tip: root.is-muted ? "Unmute" : "Mute";
                 clicked => { root.mute-toggle-clicked(); }
             }

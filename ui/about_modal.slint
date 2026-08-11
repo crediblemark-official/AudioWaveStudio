@@ -18,10 +18,17 @@ export component AboutModal inherits Rectangle {
             spacing: 10px;
 
             HorizontalLayout {
-                spacing: 8px;
+                spacing: 10px;
+                cross-axis-alignment: center;
+
+                Image {
+                    source: @image-url("assets/icon.png");
+                    width: 28px;
+                    height: 28px;
+                }
 
                 Text {
-                    text: "⚡ AudioWave Studio v1.13.0";
+                    text: "AudioWave Studio v1.13.0";
                     font-size: 17px;
                     font-weight: 700;
                     color: #ffd700;
@@ -54,12 +61,15 @@ export component AboutModal inherits Rectangle {
                         clicked => { root.close-clicked(); }
                     }
 
-                    Text {
-                        text: "✕";
-                        color: close-ta.has-hover ? #ffffff : #94a3b8;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                    Path {
+                        width: 10px;
+                        height: 10px;
+                        stroke: close-ta.has-hover ? #ffffff : #94a3b8;
+                        stroke-width: 1.5px;
+                        MoveTo { x: 0; y: 0; }
+                        LineTo { x: 10; y: 10; }
+                        MoveTo { x: 10; y: 0; }
+                        LineTo { x: 0; y: 10; }
                     }
 
                     Tooltip {

@@ -104,7 +104,13 @@ pub fn test_encoder(ffmpeg_exe: &str, encoder_id: &str) -> bool {
       return false;
     };
 
-    let output = Command::new(ffmpeg_exe)
+    let mut cmd = Command::new(ffmpeg_exe);
+    #[cfg(target_os = "windows")]
+    {
+      use std::os::windows::process::CommandExt;
+      cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let output = cmd
       .args([
         "-hide_banner",
         "-vaapi_device",
@@ -130,7 +136,13 @@ pub fn test_encoder(ffmpeg_exe: &str, encoder_id: &str) -> bool {
     return output.map(|o| o.status.success()).unwrap_or(false);
   }
 
-  let output = Command::new(ffmpeg_exe)
+  let mut cmd = Command::new(ffmpeg_exe);
+  #[cfg(target_os = "windows")]
+  {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+  }
+  let output = cmd
     .args([
       "-hide_banner",
       "-f",

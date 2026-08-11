@@ -147,8 +147,9 @@ export component Navbar inherits Rectangle {
         alignment: space-between;
         cross-axis-alignment: center;
 
-        // ============ LEFT / CENTER TOOLBAR CLUSTER ============
+        // ============ LEFT TOOLBAR CLUSTER ============
         left-cluster := HorizontalLayout {
+            horizontal-stretch: 0;
             spacing: 10px;
             cross-axis-alignment: center;
 
@@ -162,9 +163,11 @@ export component Navbar inherits Rectangle {
                     height: 32px;
                     border-radius: 8px;
                     background: @linear-gradient(135deg, #ffd70040 0%, #d4af3726 100%);
-                    Text {
-                        text: "⚡";
-                        font-size: 16px;
+                    clip: true;
+                    Image {
+                        source: @image-url("assets/icon.png");
+                        width: 28px;
+                        height: 28px;
                         horizontal-alignment: center;
                         vertical-alignment: center;
                     }
@@ -244,82 +247,77 @@ export component Navbar inherits Rectangle {
                     }
                 }
             }
+        }
 
+        // FLEXIBLE CENTER TICKER (Shrinks automatically on smaller screen width)
+        Rectangle {
+            horizontal-stretch: 1;
+            min-width: 0px;
+            max-width: 320px;
+            height: 28px;
+            border-radius: 6px;
+            background: ticker-ta.has-hover ? #ffd70024 : #ffd70010;
+            border-width: 1px;
+            border-color: #ffd70025;
+            clip: true;
 
-            Rectangle {
-                width: 1px;
-                height: 20px;
-                background: #ffffff1f;
-            }
+            ticker-ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                clicked => { root.ticker-clicked(); }
 
-            // PROMO TICKER with smooth gradient fade/blur edges
-            Rectangle {
-                width: 340px;
-                height: 28px;
-                border-radius: 6px;
-                background: ticker-ta.has-hover ? #ffd70024 : #ffd70010;
-                border-width: 1px;
-                border-color: #ffd70025;
-                clip: true;
-
-                ticker-ta := TouchArea {
-                    width: parent.width;
+                ticker-scroll := Rectangle {
+                    x: -1 * root.ticker-progress * measure.width;
+                    y: 0;
+                    width: 2 * measure.width;
                     height: parent.height;
-                    mouse-cursor: pointer;
-                    clicked => { root.ticker-clicked(); }
 
-                    ticker-scroll := Rectangle {
-                        x: -1 * root.ticker-progress * measure.width;
-                        y: 0;
-                        width: 2 * measure.width;
-                        height: parent.height;
-
-                        HorizontalLayout {
-                            spacing: 0;
-                            Text {
-                                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                                color: #ffd700;
-                                font-size: 11px;
-                                font-weight: 500;
-                                vertical-alignment: center;
-                            }
-                            Text {
-                                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                                color: #ffd700;
-                                font-size: 11px;
-                                font-weight: 500;
-                                vertical-alignment: center;
-                            }
+                    HorizontalLayout {
+                        spacing: 0;
+                        Text {
+                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                            color: #ffd700;
+                            font-size: 11px;
+                            font-weight: 500;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                            color: #ffd700;
+                            font-size: 11px;
+                            font-weight: 500;
+                            vertical-alignment: center;
                         }
                     }
                 }
+            }
 
-                // Left Edge Fade Blur Overlay
-                Rectangle {
-                    x: 0;
-                    y: 0;
-                    width: 20px;
-                    height: parent.height;
-                    background: @linear-gradient(90deg, #0d0d0d 0%, #0d0d0d00 100%);
-                }
+            // Left Edge Fade Blur Overlay
+            Rectangle {
+                x: 0;
+                y: 0;
+                width: 20px;
+                height: parent.height;
+                background: @linear-gradient(90deg, #0d0d0d 0%, #0d0d0d00 100%);
+            }
 
-                // Right Edge Fade Blur Overlay
-                Rectangle {
-                    x: parent.width - 20px;
-                    y: 0;
-                    width: 20px;
-                    height: parent.height;
-                    background: @linear-gradient(270deg, #0d0d0d 0%, #0d0d0d00 100%);
-                }
+            // Right Edge Fade Blur Overlay
+            Rectangle {
+                x: parent.width - 20px;
+                y: 0;
+                width: 20px;
+                height: parent.height;
+                background: @linear-gradient(270deg, #0d0d0d 0%, #0d0d0d00 100%);
+            }
 
-                measure := Text {
-                    x: -10000px;
-                    y: -10000px;
-                    text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                    color: transparent;
-                    font-size: 11px;
-                    font-weight: 500;
-                }
+            measure := Text {
+                x: -10000px;
+                y: -10000px;
+                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                color: transparent;
+                font-size: 11px;
+                font-weight: 500;
             }
         }
 
@@ -341,6 +339,7 @@ export component Navbar inherits Rectangle {
 
         // ============ RIGHT CLUSTER ============
         HorizontalLayout {
+            horizontal-stretch: 0;
             spacing: 6px;
             cross-axis-alignment: center;
 
@@ -396,8 +395,6 @@ export component Navbar inherits Rectangle {
                     border-radius: 4px;
                     background: min-ta.has-hover ? #ffffff1a : transparent;
 
-                    // Micro-interaction: gentle lift + white glow (close gets a
-                    // red glow matching its hover fill).
                     transform-scale-x: min-ta.has-hover ? 1.06 : 1.0;
                     transform-scale-y: min-ta.has-hover ? 1.06 : 1.0;
                     transform-origin: { x: self.width / 2, y: self.height / 2 };
@@ -413,12 +410,13 @@ export component Navbar inherits Rectangle {
                         mouse-cursor: pointer;
                         clicked => { root.minimize-clicked(); }
                     }
-                    Text {
-                        text: "–";
-                        color: min-ta.has-hover ? #ffffff : #94a3b8;
-                        font-size: 14px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+
+                    // Vector horizontal bar for Minimize
+                    Rectangle {
+                        width: 10px;
+                        height: 2px;
+                        border-radius: 1px;
+                        background: min-ta.has-hover ? #ffffff : #94a3b8;
                     }
                 }
 
@@ -443,12 +441,15 @@ export component Navbar inherits Rectangle {
                         mouse-cursor: pointer;
                         clicked => { root.maximize-clicked(); }
                     }
-                    Text {
-                        text: "▢";
-                        color: max-ta.has-hover ? #ffffff : #94a3b8;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+
+                    // Vector square outline for Maximize
+                    Rectangle {
+                        width: 10px;
+                        height: 10px;
+                        border-width: 1.5px;
+                        border-color: max-ta.has-hover ? #ffffff : #94a3b8;
+                        border-radius: 1px;
+                        background: transparent;
                     }
                 }
 
@@ -473,12 +474,17 @@ export component Navbar inherits Rectangle {
                         mouse-cursor: pointer;
                         clicked => { root.close-clicked(); }
                     }
-                    Text {
-                        text: "✕";
-                        color: close-ta.has-hover ? #ffffff : #94a3b8;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+
+                    // Vector X cross for Close
+                    Path {
+                        width: 10px;
+                        height: 10px;
+                        stroke: close-ta.has-hover ? #ffffff : #94a3b8;
+                        stroke-width: 1.5px;
+                        MoveTo { x: 0; y: 0; }
+                        LineTo { x: 10; y: 10; }
+                        MoveTo { x: 10; y: 0; }
+                        LineTo { x: 0; y: 10; }
                     }
                 }
             }

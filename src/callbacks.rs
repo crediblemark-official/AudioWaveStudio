@@ -1318,43 +1318,18 @@ pub fn bind_app_callbacks(
     // window ourselves. Works on X11 / Windows / macOS; Wayland ignores
     // set_position (documented Slint limitation) — there the window manager
     // titlebar-less drag rules apply.
-    struct DragState {
-        start_win: slint::LogicalPosition,
-        start_ptr: (f32, f32),
-    }
-    let drag_state: Rc<RefCell<Option<DragState>>> = Rc::new(RefCell::new(None));
-
     let win_weak = window.as_weak();
-    let drag = drag_state.clone();
-    window.on_drag_pressed(move |x, y| {
+    window.on_drag_pressed(move |_x, _y| {
         if let Some(w) = win_weak.upgrade() {
-            let win = w.window();
-            let pos = win.position().to_logical(win.scale_factor());
-            *drag.borrow_mut() = Some(DragState {
-                start_win: pos,
-                start_ptr: (x, y),
+            use i_slint_backend_winit::WinitWindowAccessor;
+            let _ = w.window().with_winit_window(|winit_window| {
+                let _ = winit_window.drag_window();
             });
         }
     });
 
-    let win_weak = window.as_weak();
-    let drag = drag_state.clone();
-    window.on_drag_moved(move |x, y| {
-        if let Some(w) = win_weak.upgrade() {
-            if let Some(st) = drag.borrow().as_ref() {
-                let dx = x - st.start_ptr.0;
-                let dy = y - st.start_ptr.1;
-                let new_pos =
-                    slint::LogicalPosition::new(st.start_win.x + dx, st.start_win.y + dy);
-                w.window().set_position(slint::WindowPosition::Logical(new_pos));
-            }
-        }
-    });
-
-    let drag = drag_state.clone();
-    window.on_drag_released(move || {
-        *drag.borrow_mut() = None;
-    });
+    window.on_drag_moved(move |_x, _y| {});
+    window.on_drag_released(move || {});
 }
 
 /// Push a freshly loaded config into the Slint UI properties.

@@ -193,7 +193,13 @@ pub fn install_ffmpeg(
 
     on_progress("downloading");
     let curl = if cfg!(target_os = "windows") { "curl.exe" } else { "curl" };
-    let dl_output = Command::new(curl)
+    let mut curl_cmd = Command::new(curl);
+    #[cfg(target_os = "windows")]
+    {
+      use std::os::windows::process::CommandExt;
+      curl_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let dl_output = curl_cmd
       .args(["-L", "-o"])
       .arg(&zip_path)
       .arg(url)
@@ -212,9 +218,18 @@ pub fn install_ffmpeg(
     std::fs::create_dir_all(&extract_dir).map_err(|e| format!("Failed to create extract dir: {}", e))?;
 
     let extract_status = if cfg!(target_os = "windows") {
-      Command::new("powershell")
+      let mut ps_cmd = Command::new("powershell");
+      #[cfg(target_os = "windows")]
+      {
+        use std::os::windows::process::CommandExt;
+        ps_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+      }
+      ps_cmd
         .args([
           "-NoProfile",
+          "-NonInteractive",
+          "-WindowStyle",
+          "Hidden",
           "-Command",
           &format!(
             "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",

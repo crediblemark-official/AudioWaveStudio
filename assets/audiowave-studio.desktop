@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=AudioWave Studio
+Comment=Professional High-Performance Desktop Audio Visualizer
+Exec=audiowave-studio
+Icon=audiowave-studio
+Terminal=false
+Type=Application
+Categories=AudioVideo;Audio;Player;

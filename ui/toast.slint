@@ -33,8 +33,8 @@ component ToastCard inherits Rectangle {
         : (root.item.kind == "success" ? #34d399 : #ffd700);
     private property <color> glow: root.item.kind == "error" ? #ff5c5c55
         : (root.item.kind == "success" ? #34d39955 : #ffd70055);
-    private property <string> icon: root.item.kind == "error" ? "⚠️"
-        : (root.item.kind == "success" ? "✅" : "ℹ️");
+    private property <string> icon-symbol: root.item.kind == "error" ? "!"
+        : (root.item.kind == "success" ? "✓" : "i");
 
     // Auto-dismiss: wait for the reveal tick, then keep the toast up for the
     // item's duration (switching the interval restarts the timer).
@@ -71,10 +71,20 @@ component ToastCard inherits Rectangle {
             spacing: 10px;
             cross-axis-alignment: center;
 
-            Text {
-                text: root.icon;
-                font-size: 15px;
-                vertical-alignment: center;
+            Rectangle {
+                width: 22px;
+                height: 22px;
+                border-radius: 11px;
+                background: root.accent;
+
+                Text {
+                    text: root.icon-symbol;
+                    color: #000000;
+                    font-size: 12px;
+                    font-weight: 800;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
             }
 
             Text {
@@ -99,12 +109,15 @@ component ToastCard inherits Rectangle {
                     clicked => { root.dismissed(root.item.id); }
                 }
 
-                Text {
-                    text: "✕";
-                    color: close-ta.has-hover ? #ffffff : #94a3b8;
-                    font-size: 12px;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
+                Path {
+                    width: 9px;
+                    height: 9px;
+                    stroke: close-ta.has-hover ? #ffffff : #94a3b8;
+                    stroke-width: 1.5px;
+                    MoveTo { x: 0; y: 0; }
+                    LineTo { x: 9; y: 9; }
+                    MoveTo { x: 9; y: 0; }
+                    LineTo { x: 0; y: 9; }
                 }
 
                 Tooltip {

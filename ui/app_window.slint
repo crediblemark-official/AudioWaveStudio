@@ -113,6 +113,7 @@ component EmptyStateOverlay {
 
 export component AppWindow inherits Window {
     title: "AudioWave Studio - Native Pure Rust & Slint UI";
+    icon: @image-url("assets/icon.png");
     preferred-width: 1280px;
     preferred-height: 800px;
     min-width: 1024px;
@@ -849,6 +850,7 @@ export component AppWindow inherits Window {
 // draggable via its native frame.
 export component PreviewWindow inherits Window {
     title: "AudioWave Studio - Live Preview";
+    icon: @image-url("assets/icon.png");
     preferred-width: 960px;
     preferred-height: 540px;
     min-width: 320px;

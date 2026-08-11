@@ -61,12 +61,15 @@ export component HardwareModal inherits Rectangle {
                         clicked => { root.close-clicked(); }
                     }
 
-                    Text {
-                        text: "✕";
-                        color: close-ta.has-hover ? #ffffff : #94a3b8;
-                        font-size: 13px;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+                    Path {
+                        width: 10px;
+                        height: 10px;
+                        stroke: close-ta.has-hover ? #ffffff : #94a3b8;
+                        stroke-width: 1.5px;
+                        MoveTo { x: 0; y: 0; }
+                        LineTo { x: 10; y: 10; }
+                        MoveTo { x: 10; y: 0; }
+                        LineTo { x: 0; y: 10; }
                     }
 
                     Tooltip {

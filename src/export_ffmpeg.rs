@@ -89,6 +89,11 @@ pub fn spawn_ffmpeg(
   let encoder_name = crate::hardware::pick_encoder(&ffmpeg_exe, encoder_preference);
 
   let mut cmd = Command::new(&ffmpeg_exe);
+  #[cfg(target_os = "windows")]
+  {
+    use std::os::windows::process::CommandExt;
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+  }
   cmd.arg("-y").arg("-loglevel").arg("warning");
 
   if encoder_name.ends_with("_vaapi") {

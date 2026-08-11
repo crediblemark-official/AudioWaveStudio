@@ -77,9 +77,25 @@ impl AudioPlayer {
 
         let ffplay_bin = crate::ffmpeg::resolve_ffplay(None).unwrap_or_else(|| "ffplay".to_string());
         let mut ffplay_cmd = Command::new(&ffplay_bin);
+        hide_cmd(&mut ffplay_cmd);
         #[cfg(target_os = "linux")]
         ffplay_cmd.env("SDL_AUDIO_DRIVER", "pulse");
 
+        let mut mpv_cmd = Command::new("mpv");
+        hide_cmd(&mut mpv_cmd);
+
+        let mut afplay_cmd = Command::new("afplay");
+        hide_cmd(&mut afplay_cmd);
+
+        let mut pwplay_cmd = Command::new("pw-play");
+        hide_cmd(&mut pwplay_cmd);
+
+        let mut paplay_cmd = Command::new("paplay");
+        hide_cmd(&mut paplay_cmd);
+
+        // Preferred backends first: ffplay (bundled/resolved) and mpv, both of
+        // which can seek, set volume, and are headless. If neither is available
+        // the OS-native fallbacks in `spawn_os_fallback` take over.
         let child = if let Ok(c) = ffplay_cmd
             .arg("-nodisp")
             .arg("-autoexit")
@@ -97,7 +113,7 @@ impl AudioPlayer {
         {
             println!("[AudioPlayer] Playing via ffplay (start_sec={:.2}s): {}", start_sec, file_path);
             Some(c)
-        } else if let Ok(c) = Command::new("mpv")
+        } else if let Ok(c) = mpv_cmd
             .arg("--no-video")
             .arg(format!("--start={:.2}", start_sec))
             .arg(format!("--volume={}", vol_pct))
@@ -109,43 +125,16 @@ impl AudioPlayer {
         {
             println!("[AudioPlayer] Playing via mpv (start_sec={:.2}s): {}", start_sec, file_path);
             Some(c)
-        } else if let Ok(c) = Command::new("afplay")
-            .arg("-ss")
-            .arg(format!("{:.2}", start_sec))
-            .arg(&file_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        {
-            println!("[AudioPlayer] Playing via afplay (start_sec={:.2}s): {}", start_sec, file_path);
-            Some(c)
-        } else if let Ok(c) = Command::new("pw-play")
-            .arg("--volume")
-            .arg(&vol_str)
-            .arg(&file_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        {
-            println!("[AudioPlayer] Playing via pw-play (start_sec={:.2}s): {}", start_sec, file_path);
-            Some(c)
-        } else if let Ok(c) = Command::new("paplay")
-            .arg(&file_path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        {
-            println!("[AudioPlayer] Playing via paplay (start_sec={:.2}s): {}", start_sec, file_path);
-            Some(c)
-        } else if let Ok(c) = spawn_powershell_player(&file_path, start_sec, vol_pct) {
-            println!("[AudioPlayer] Playing via powershell (start_sec={:.2}s): {}", start_sec, file_path);
-            Some(c)
         } else {
-            eprintln!("[AudioPlayer] Failed to launch audio process for: {}", file_path);
-            None
+            spawn_os_fallback(
+                afplay_cmd,
+                pwplay_cmd,
+                paplay_cmd,
+                &file_path,
+                start_sec,
+                &vol_str,
+                vol_pct,
+            )
         };
 
         let Some(child) = child else {
@@ -198,41 +187,37 @@ impl AudioPlayer {
 
     pub fn seek(&mut self, target_sec: f64) {
         let was_playing = self.is_playing;
-        if was_playing {
-            self.pause();
-        }
-        self.accumulated_sec = target_sec.max(0.0).min(self.duration_sec);
+        self.stop();
+        self.accumulated_sec = target_sec.clamp(0.0, self.duration_sec);
         if was_playing {
             let _ = self.play();
         }
     }
 
     pub fn set_volume(&mut self, vol: f32) {
-        let v = vol.clamp(0.0, 1.0);
-        if (self.volume - v).abs() < 0.001 {
+        let new_vol = vol.clamp(0.0, 1.0);
+        let changed = (self.volume - new_vol).abs() > 0.001;
+        self.volume = new_vol;
+
+        if !changed || !self.is_playing {
             return;
         }
-        self.volume = v;
 
-        // App-local volume: NEVER touch the system sink volume (the old
-        // wpctl/pactl calls muted/un-muted the whole PipeWire/PulseAudio
-        // default sink, so the app's slider controlled the entire OS).
-        // External players only accept a volume at launch, so a live change
-        // restarts playback at the same position with the new `-volume`.
-        // Restarts are throttled (~6/s) so a drag doesn't churn the child.
-        if self.is_playing {
-            let now = Instant::now();
-            let due = self
-                .last_restart
-                .map(|t| now.duration_since(t) >= RESTART_THROTTLE)
-                .unwrap_or(true);
-            if due {
-                self.last_restart = Some(now);
-                let pos = self.accumulated_sec + self.start_instant.map(|i| i.elapsed().as_secs_f64()).unwrap_or(0.0);
-                self.pause();
-                self.accumulated_sec = pos;
-                let _ = self.play();
+        let now = Instant::now();
+        if let Some(last) = self.last_restart {
+            if now.duration_since(last) < RESTART_THROTTLE {
+                return;
             }
+        }
+        self.last_restart = Some(now);
+
+        let was_playing = self.is_playing;
+        if let Some(instant) = self.start_instant.take() {
+            self.accumulated_sec += instant.elapsed().as_secs_f64();
+        }
+        self.kill_process();
+        if was_playing {
+            let _ = self.play();
         }
     }
 
@@ -240,15 +225,15 @@ impl AudioPlayer {
         self.volume
     }
 
+    pub fn get_duration_sec(&self) -> f64 {
+        self.duration_sec
+    }
+
     pub fn get_current_time_sec(&mut self) -> f64 {
         if self.is_playing {
             if let Some(instant) = self.start_instant {
                 let current = self.accumulated_sec + instant.elapsed().as_secs_f64();
                 if current >= self.duration_sec && self.duration_sec > 0.0 {
-                    // Natural end of track: stop the child but keep the position
-                    // pinned at the end so the progress bar stays at 100% (a
-                    // plain `stop()` would reset accumulated_sec to 0 and make
-                    // the bar snap back to the start on the next frame).
                     self.accumulated_sec = self.duration_sec;
                     self.kill_process();
                     self.is_playing = false;
@@ -259,10 +244,6 @@ impl AudioPlayer {
             }
         }
         self.accumulated_sec.min(self.duration_sec)
-    }
-
-    pub fn get_duration_sec(&self) -> f64 {
-        self.duration_sec
     }
 
     pub fn is_playing(&self) -> bool {
@@ -326,7 +307,9 @@ impl AudioPlayer {
     /// until killed — used to verify the shutdown path reaps the child instead
     /// of leaving audio playing).
     pub fn play_pwplay_for_test(&mut self, path: &str) -> Result<(), String> {
-        if let Ok(c) = Command::new("pw-play")
+        let mut cmd = Command::new("pw-play");
+        hide_cmd(&mut cmd);
+        if let Ok(c) = cmd
             .arg("--volume")
             .arg("0.5")
             .arg(path)
@@ -342,33 +325,116 @@ impl AudioPlayer {
     }
 }
 
-/// Fallback audio player for Windows systems using PowerShell and Windows Media Player COM object.
-fn spawn_powershell_player(file_path: &str, start_sec: f64, vol_pct: u32) -> std::io::Result<Child> {
-    let escaped_path = file_path.replace('\'', "''");
-    let script = format!(
-        "$p = New-Object -ComObject WMPlayer.OCX; \
-         $p.URL = '{escaped_path}'; \
-         $p.settings.volume = {vol_pct}; \
-         if ({start_sec:.2} -gt 0) {{ \
-             for ($i = 0; $i -lt 20; $i++) {{ \
-                 if ($p.openState -eq 13) {{ break }}; \
-                 Start-Sleep -Milliseconds 50 \
-             }}; \
-             $p.controls.currentPosition = {start_sec:.2} \
-         }}; \
-         $p.controls.play(); \
-         while ($p.playState -ne 1) {{ Start-Sleep -Milliseconds 200 }}"
-    );
-    Command::new("powershell")
-        .arg("-NoProfile")
-        .arg("-NonInteractive")
-        .arg("-WindowStyle")
-        .arg("Hidden")
-        .arg("-Command")
-        .arg(script)
+/// Try the OS-native fallback players, in priority order:
+///
+/// 1. `afplay` (built into macOS) — only when starting at 0:00, because afplay
+///    has NO seek option. The old code passed the ffplay-only `-ss` flag to it,
+///    which afplay rejects (exit 1), so on macOS playback silently produced no
+///    sound while the UI showed "playing".
+/// 2. `pw-play` (PipeWire) / `paplay` (PulseAudio) — Linux.
+/// 3. Windows PowerShell MediaPlayer (see [`spawn_powershell_player`]).
+fn spawn_os_fallback(
+    mut afplay_cmd: Command,
+    mut pwplay_cmd: Command,
+    mut paplay_cmd: Command,
+    file_path: &str,
+    start_sec: f64,
+    vol_str: &str,
+    vol_pct: u32,
+) -> Option<Child> {
+    if start_sec <= 0.001 {
+        if let Ok(c) = afplay_cmd
+            .arg("-v")
+            .arg(vol_str)
+            .arg(file_path)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            println!("[AudioPlayer] Playing via afplay (start_sec={:.2}s): {}", start_sec, file_path);
+            return Some(c);
+        }
+    }
+
+    if let Ok(c) = pwplay_cmd
+        .arg("--volume")
+        .arg(vol_str)
+        .arg(file_path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
+    {
+        println!("[AudioPlayer] Playing via pw-play (start_sec={:.2}s): {}", start_sec, file_path);
+        return Some(c);
+    }
+
+    if let Ok(c) = paplay_cmd
+        .arg(file_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+    {
+        println!("[AudioPlayer] Playing via paplay (start_sec={:.2}s): {}", start_sec, file_path);
+        return Some(c);
+    }
+
+    if let Ok(c) = spawn_powershell_player(file_path, start_sec, vol_pct) {
+        println!("[AudioPlayer] Playing via powershell (start_sec={:.2}s): {}", start_sec, file_path);
+        return Some(c);
+    }
+
+    eprintln!("[AudioPlayer] Failed to launch audio process for: {}", file_path);
+    None
 }
 
+/// Suppress console window creation on Windows platform.
+fn hide_cmd(cmd: &mut Command) -> &mut Command {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd
+}
+
+/// Native audio player for Windows systems using .NET WPF System.Windows.Media.MediaPlayer.
+fn spawn_powershell_player(file_path: &str, start_sec: f64, vol_pct: u32) -> std::io::Result<Child> {
+    let forward_slash_path = file_path.replace('\\', "/");
+    let escaped_path = forward_slash_path.replace('\'', "''");
+    let start_ms = (start_sec * 1000.0).round() as u64;
+
+    let script = format!(
+        "Add-Type -AssemblyName PresentationCore; \
+         $path = [System.IO.Path]::GetFullPath('{escaped_path}'); \
+         $player = New-Object System.Windows.Media.MediaPlayer; \
+         $player.Open([System.Uri]::new($path)); \
+         $player.Volume = {vol_pct} / 100.0; \
+         if ({start_ms} -gt 0) {{ $player.Position = [Timespan]::FromMilliseconds({start_ms}) }}; \
+         $player.Play(); \
+         while ($true) {{ Start-Sleep -Seconds 1 }}"
+    );
+
+    let mut cmd = Command::new("powershell");
+    cmd.arg("-NoProfile")
+       .arg("-NonInteractive")
+       .arg("-ExecutionPolicy")
+       .arg("Bypass")
+       .arg("-WindowStyle")
+       .arg("Hidden")
+       .arg("-Command")
+       .arg(script)
+       .stdin(Stdio::null())
+       .stdout(Stdio::null())
+       .stderr(Stdio::null());
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+
+    cmd.spawn()
+}
