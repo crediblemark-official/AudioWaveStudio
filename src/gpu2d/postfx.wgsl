@@ -97,9 +97,11 @@ fn voronoi_glass(p: vec2<f32>) -> vec3<f32> {
       let g_vec = mg + vec2(f32(r), f32(g));
       let o = hash22(n + g_vec);
       let r_vec = g_vec + o - f;
+      let diff = r_vec - mr;
+      let len2 = dot(diff, diff);
 
-      if (dot(mr - r_vec, mr - r_vec) > 0.00001) {
-        md = min(md, dot(0.5 * (mr + r_vec), normalize(r_vec - mr)));
+      if (len2 > 0.00001) {
+        md = min(md, dot(0.5 * (mr + r_vec), diff / sqrt(len2)));
       }
     }
   }
