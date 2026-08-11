@@ -230,26 +230,37 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let cb = textureSample(src, samp, uv).rgb;
     col = vec4(mix(cb, hueBlend(cb, cs), p.intensity), 1.0);
   } else if (p.mode == 11u) {
-    // glass crack — Voronoi shard displacement + sharp fracture edge highlights & refractions.
-    let center = vec2(0.5, 0.5);
-    let delta = uv - center;
-    let dist = length(delta * vec2(w / h, 1.0));
-    let angle = atan2(delta.y, delta.x);
+    // glass crack — organic jagged fault lines, micro-shards, and bright fracture line highlights.
+    let beatshake = select(0.0, p.beat * 0.015, p.beat > 0.15);
+    let uvt = uv + vec2(beatshake * sin(p.time * 30.0), beatshake * cos(p.time * 25.0));
 
-    // Multi-radial fracture web pattern
-    let crackVal = sin(angle * 7.0 + sin(dist * 28.0) * 1.8 + cos(angle * 3.0) * 2.0);
-    let edgeDist = abs(crackVal);
+    // Primary sweeping jagged fault lines traversing across the canvas
+    let seam1 = abs(uvt.y - 0.46 + sin(uvt.x * 5.0 + 0.8) * 0.14 + sin(uvt.x * 22.0) * 0.02 + cos(uvt.x * 45.0) * 0.008);
+    let seam2 = abs(uvt.y - (uvt.x * 0.55 + 0.18) + sin(uvt.x * 12.0) * 0.035 + cos(uvt.x * 33.0) * 0.012);
+    let seam3 = abs(uvt.y - (0.95 - uvt.x * 0.7) + cos(uvt.x * 9.0 + 1.1) * 0.04 + sin(uvt.x * 28.0) * 0.015);
+    let seam4 = abs(uvt.x - 0.72 + sin(uvt.y * 14.0 + 0.5) * 0.03 + cos(uvt.y * 38.0) * 0.01);
 
-    let shardId = floor(crackVal * 5.0 + dist * 10.0);
-    let shardShift = vec2(sin(shardId * 12.3), cos(shardId * 7.1)) * amount * 0.035;
+    // Minimum distance to nearest main fault seam
+    let minSeam = min(min(seam1, seam2), min(seam3, seam4));
+
+    // Micro-shard slivers clustered along primary fault seams
+    let microNoise = sin(uvt.y * 60.0 + sin(uvt.x * 50.0) * 4.0) * 0.5 + 0.5;
+    let microSeam = select(1.0, microNoise * 0.02, minSeam < 0.08);
+
+    let crackDist = min(minSeam, microSeam);
+
+    // Refractive shard displacement per glass plate
+    let shardId = floor(uvt.y * 6.0 + sin(uvt.x * 8.0) * 3.0 + select(0.0, 5.0, minSeam < 0.05));
+    let shardShift = vec2(sin(shardId * 17.1), cos(shardId * 11.3)) * amount * 0.022;
 
     let sampleUv = clamp(uv + shardShift, vec2(0.0), vec2(1.0));
     var sampled = textureSample(src, samp, sampleUv);
 
-    if (edgeDist < 0.07 * amount) {
-      let edgeStrength = (1.0 - edgeDist / (0.07 * amount)) * amount;
-      let highlight = vec4(1.0, 1.0, 1.0, 1.0);
-      col = mix(sampled, highlight, edgeStrength * 0.85);
+    let widthThreshold = (0.006 + amount * 0.012);
+    if (crackDist < widthThreshold) {
+      let edgeStrength = clamp(1.0 - crackDist / widthThreshold, 0.0, 1.0) * amount;
+      let whiteHighlight = vec4(1.0, 1.0, 1.0, 1.0);
+      col = mix(sampled, whiteHighlight, edgeStrength * 0.9);
     } else {
       col = sampled;
     }

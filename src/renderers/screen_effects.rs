@@ -890,34 +890,38 @@ fn cpu_post_fx(
       }
     }
     11 => {
-      // glass crack: polygonal shard displacement & white edge fracture highlights.
-      let amp = intensity * wf * 0.03;
-      let center_x = wf * 0.5;
-      let center_y = hf * 0.5;
+      // glass crack: organic jagged fault lines, micro-shards, and bright fracture line highlights.
+      let amp = intensity * wf * 0.022;
       for y in 0..h {
         let yf = y as f32;
-        let dy = yf - center_y;
+        let uv_y = yf / hf;
         for x in 0..w {
           let xf = x as f32;
-          let dx = xf - center_x;
-          let angle = dy.atan2(dx);
-          let dist = (dx * dx + dy * dy).sqrt();
-          // Radial crack lines + cross fractures
-          let crack_pattern = (angle * 6.0 + (dist * 0.02).sin() * 2.0).sin();
-          let line_dist = crack_pattern.abs();
-          let idx = ((y * w + x) * 3) as usize;
+          let uv_x = xf / wf;
 
-          if line_dist < 0.08 {
-            // Bright white glass fracture line highlight
-            let hl = ((1.0 - line_dist / 0.08) * intensity * 220.0) as u8;
+          // Primary sweeping jagged fault lines
+          let seam1 = (uv_y - 0.46 + (uv_x * 5.0 + 0.8).sin() * 0.14 + (uv_x * 22.0).sin() * 0.02 + (uv_x * 45.0).cos() * 0.008).abs();
+          let seam2 = (uv_y - (uv_x * 0.55 + 0.18) + (uv_x * 12.0).sin() * 0.035 + (uv_x * 33.0).cos() * 0.012).abs();
+          let seam3 = (uv_y - (0.95 - uv_x * 0.7) + (uv_x * 9.0 + 1.1).cos() * 0.04 + (uv_x * 28.0).sin() * 0.015).abs();
+          let seam4 = (uv_x - 0.72 + (uv_y * 14.0 + 0.5).sin() * 0.03 + (uv_y * 38.0).cos() * 0.01).abs();
+
+          let min_seam = seam1.min(seam2).min(seam3).min(seam4);
+          let micro_noise = (uv_y * 60.0 + (uv_x * 50.0).sin() * 4.0).sin() * 0.5 + 0.5;
+          let micro_seam = if min_seam < 0.08 { micro_noise * 0.02 } else { 1.0 };
+          let crack_dist = min_seam.min(micro_seam);
+
+          let idx = ((y * w + x) * 3) as usize;
+          let width_threshold = 0.006 + intensity * 0.012;
+
+          if crack_dist < width_threshold {
+            let hl = ((1.0 - crack_dist / width_threshold).clamp(0.0, 1.0) * intensity * 230.0) as u8;
             rgb[idx] = rgb[idx].saturating_add(hl);
             rgb[idx + 1] = rgb[idx + 1].saturating_add(hl);
             rgb[idx + 2] = rgb[idx + 2].saturating_add(hl);
           } else {
-            // Refractive shard displacement
-            let shard_id = (crack_pattern * 4.0).floor();
-            let shift_x = (shard_id * 1.3).sin() * amp;
-            let shift_y = (shard_id * 2.7).cos() * amp;
+            let shard_id = (uv_y * 6.0 + (uv_x * 8.0).sin() * 3.0 + if min_seam < 0.05 { 5.0 } else { 0.0 }).floor();
+            let shift_x = (shard_id * 17.1).sin() * amp;
+            let shift_y = (shard_id * 11.3).cos() * amp;
             let ux = (xf + shift_x).clamp(0.0, wf - 1.0);
             let uy = (yf + shift_y).clamp(0.0, hf - 1.0);
             let s = cpu_sample_f(src, w, h, ux, uy);
