@@ -60,16 +60,52 @@ fn hueComponent(n: f32, h: f32, l: f32, a: f32) -> f32 {
   return l - a * max(-1.0, min(min(k - 3.0, 9.0 - k), 1.0));
 }
 
-fn hsl_to_rgb(hsl: vec3<f32>) -> vec3<f32> {
-  let h = hsl.x / 360.0;
-  let s = hsl.y;
-  let l = hsl.z;
-  let a = s * min(l, 1.0 - l);
-  return vec3(
-    hueComponent(0.0, h, l, a),
-    hueComponent(8.0, h, l, a),
-    hueComponent(4.0, h, l, a),
-  );
+fn hash22(p: vec2<f32>) -> vec2<f32> {
+  var p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.xx + p3.yz) * p3.zy);
+}
+
+// 2D Voronoi: returns vec3(d1, edge_distance, cell_id)
+fn voronoi_glass(p: vec2<f32>) -> vec3<f32> {
+  let n = floor(p);
+  let f = fract(p);
+
+  var mg = vec2(0.0);
+  var mr = vec2(0.0);
+  var md1 = 8.0;
+
+  for (var g = -1; g <= 1; g++) {
+    for (var r = -1; r <= 1; r++) {
+      let g_vec = vec2(f32(r), f32(g));
+      let o = hash22(n + g_vec);
+      let r_vec = g_vec + o - f;
+      let d = dot(r_vec, r_vec);
+
+      if (d < md1) {
+        md1 = d;
+        mr = r_vec;
+        mg = g_vec;
+      }
+    }
+  }
+
+  // Second pass for exact edge distance
+  var md = 8.0;
+  for (var g = -2; g <= 2; g++) {
+    for (var r = -2; r <= 2; r++) {
+      let g_vec = mg + vec2(f32(r), f32(g));
+      let o = hash22(n + g_vec);
+      let r_vec = g_vec + o - f;
+
+      if (dot(mr - r_vec, mr - r_vec) > 0.00001) {
+        md = min(md, dot(0.5 * (mr + r_vec), normalize(r_vec - mr)));
+      }
+    }
+  }
+
+  let cell_id = hash22(n + mg).x;
+  return vec3(sqrt(md1), md, cell_id);
 }
 
 @fragment
@@ -230,37 +266,30 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let cb = textureSample(src, samp, uv).rgb;
     col = vec4(mix(cb, hueBlend(cb, cs), p.intensity), 1.0);
   } else if (p.mode == 11u) {
-    // glass crack — organic jagged fault lines, micro-shards, and bright fracture line highlights.
-    let beatshake = select(0.0, p.beat * 0.015, p.beat > 0.15);
-    let uvt = uv + vec2(beatshake * sin(p.time * 30.0), beatshake * cos(p.time * 25.0));
+    // glass crack — sharp Voronoi polygonal shard fractures & razor-thin specular line highlights.
+    let beat_shake = select(0.0, p.beat * 0.02, p.beat > 0.15);
+    let uvt = uv + vec2(beat_shake * sin(p.time * 20.0), beat_shake * cos(p.time * 17.0));
 
-    // Primary sweeping jagged fault lines traversing across the canvas
-    let seam1 = abs(uvt.y - 0.46 + sin(uvt.x * 5.0 + 0.8) * 0.14 + sin(uvt.x * 22.0) * 0.02 + cos(uvt.x * 45.0) * 0.008);
-    let seam2 = abs(uvt.y - (uvt.x * 0.55 + 0.18) + sin(uvt.x * 12.0) * 0.035 + cos(uvt.x * 33.0) * 0.012);
-    let seam3 = abs(uvt.y - (0.95 - uvt.x * 0.7) + cos(uvt.x * 9.0 + 1.1) * 0.04 + sin(uvt.x * 28.0) * 0.015);
-    let seam4 = abs(uvt.x - 0.72 + sin(uvt.y * 14.0 + 0.5) * 0.03 + cos(uvt.y * 38.0) * 0.01);
+    // Scale grid for glass cell size
+    let st = uvt * vec2(w / h, 1.0) * 4.5;
+    let v = voronoi_glass(st);
+    let edge_dist = v.y; // distance to nearest straight Voronoi edge
+    let cell_id = v.z;
 
-    // Minimum distance to nearest main fault seam
-    let minSeam = min(min(seam1, seam2), min(seam3, seam4));
+    // Piece-wise constant shard UV refraction displacement per polygon plate
+    let shard_rand = hash22(vec2(cell_id * 100.0, cell_id * 43.0));
+    let shard_offset = (shard_rand - vec2(0.5)) * amount * 0.035;
 
-    // Micro-shard slivers clustered along primary fault seams
-    let microNoise = sin(uvt.y * 60.0 + sin(uvt.x * 50.0) * 4.0) * 0.5 + 0.5;
-    let microSeam = select(1.0, microNoise * 0.02, minSeam < 0.08);
+    let sample_uv = clamp(uv + shard_offset, vec2(0.0), vec2(1.0));
+    var sampled = textureSample(src, samp, sample_uv);
 
-    let crackDist = min(minSeam, microSeam);
+    // Razor-sharp 1-2px specular line highlight along straight cell edges
+    let crack_width = 0.012 + amount * 0.018;
+    let line_intensity = 1.0 - smoothstep(0.0, crack_width, edge_dist);
 
-    // Refractive shard displacement per glass plate
-    let shardId = floor(uvt.y * 6.0 + sin(uvt.x * 8.0) * 3.0 + select(0.0, 5.0, minSeam < 0.05));
-    let shardShift = vec2(sin(shardId * 17.1), cos(shardId * 11.3)) * amount * 0.022;
-
-    let sampleUv = clamp(uv + shardShift, vec2(0.0), vec2(1.0));
-    var sampled = textureSample(src, samp, sampleUv);
-
-    let widthThreshold = (0.006 + amount * 0.012);
-    if (crackDist < widthThreshold) {
-      let edgeStrength = clamp(1.0 - crackDist / widthThreshold, 0.0, 1.0) * amount;
-      let whiteHighlight = vec4(1.0, 1.0, 1.0, 1.0);
-      col = mix(sampled, whiteHighlight, edgeStrength * 0.9);
+    if (line_intensity > 0.001) {
+      let specular_highlight = vec4(1.0, 1.0, 1.0, 1.0);
+      col = mix(sampled, specular_highlight, line_intensity * amount * 0.95);
     } else {
       col = sampled;
     }

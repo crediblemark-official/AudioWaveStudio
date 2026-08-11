@@ -890,8 +890,11 @@ fn cpu_post_fx(
       }
     }
     11 => {
-      // glass crack: organic jagged fault lines, micro-shards, and bright fracture line highlights.
-      let amp = intensity * wf * 0.022;
+      // glass crack: sharp Voronoi polygonal glass shard fractures & razor-thin specular line highlights.
+      let amp = intensity * wf * 0.035;
+      let grid_scale = 4.5;
+      let aspect = wf / hf;
+
       for y in 0..h {
         let yf = y as f32;
         let uv_y = yf / hf;
@@ -899,29 +902,51 @@ fn cpu_post_fx(
           let xf = x as f32;
           let uv_x = xf / wf;
 
-          // Primary sweeping jagged fault lines
-          let seam1 = (uv_y - 0.46 + (uv_x * 5.0 + 0.8).sin() * 0.14 + (uv_x * 22.0).sin() * 0.02 + (uv_x * 45.0).cos() * 0.008).abs();
-          let seam2 = (uv_y - (uv_x * 0.55 + 0.18) + (uv_x * 12.0).sin() * 0.035 + (uv_x * 33.0).cos() * 0.012).abs();
-          let seam3 = (uv_y - (0.95 - uv_x * 0.7) + (uv_x * 9.0 + 1.1).cos() * 0.04 + (uv_x * 28.0).sin() * 0.015).abs();
-          let seam4 = (uv_x - 0.72 + (uv_y * 14.0 + 0.5).sin() * 0.03 + (uv_y * 38.0).cos() * 0.01).abs();
+          let px = uv_x * aspect * grid_scale;
+          let py = uv_y * grid_scale;
 
-          let min_seam = seam1.min(seam2).min(seam3).min(seam4);
-          let micro_noise = (uv_y * 60.0 + (uv_x * 50.0).sin() * 4.0).sin() * 0.5 + 0.5;
-          let micro_seam = if min_seam < 0.08 { micro_noise * 0.02 } else { 1.0 };
-          let crack_dist = min_seam.min(micro_seam);
+          let cell_x = px.floor() as i32;
+          let cell_y = py.floor() as i32;
+          let fx = px.fract();
+          let fy = py.fract();
 
+          let mut min_d1 = 8.0f32;
+          let mut min_d2 = 8.0f32;
+          let mut best_cell_id = 0.0f32;
+
+          for gy in -1..=1 {
+            for gx in -1..=1 {
+              let cx = cell_x + gx;
+              let cy = cell_y + gy;
+              // Deterministic hash for seed point inside grid cell
+              let seed = ((cx as f32 * 12.9898 + cy as f32 * 78.233).sin() * 43758.5453).fract().abs();
+              let seed2 = ((cx as f32 * 39.346 + cy as f32 * 11.135).sin() * 23421.631).fract().abs();
+              let rx = gx as f32 + seed - fx;
+              let ry = gy as f32 + seed2 - fy;
+              let d = rx * rx + ry * ry;
+
+              if d < min_d1 {
+                min_d2 = min_d1;
+                min_d1 = d;
+                best_cell_id = seed;
+              } else if d < min_d2 {
+                min_d2 = d;
+              }
+            }
+          }
+
+          let edge_dist = (min_d2.sqrt() - min_d1.sqrt()).abs();
+          let crack_threshold = 0.04;
           let idx = ((y * w + x) * 3) as usize;
-          let width_threshold = 0.006 + intensity * 0.012;
 
-          if crack_dist < width_threshold {
-            let hl = ((1.0 - crack_dist / width_threshold).clamp(0.0, 1.0) * intensity * 230.0) as u8;
+          if edge_dist < crack_threshold {
+            let hl = ((1.0 - edge_dist / crack_threshold).clamp(0.0, 1.0) * intensity * 240.0) as u8;
             rgb[idx] = rgb[idx].saturating_add(hl);
             rgb[idx + 1] = rgb[idx + 1].saturating_add(hl);
             rgb[idx + 2] = rgb[idx + 2].saturating_add(hl);
           } else {
-            let shard_id = (uv_y * 6.0 + (uv_x * 8.0).sin() * 3.0 + if min_seam < 0.05 { 5.0 } else { 0.0 }).floor();
-            let shift_x = (shard_id * 17.1).sin() * amp;
-            let shift_y = (shard_id * 11.3).cos() * amp;
+            let shift_x = (best_cell_id * 100.0).sin() * amp;
+            let shift_y = (best_cell_id * 43.0).cos() * amp;
             let ux = (xf + shift_x).clamp(0.0, wf - 1.0);
             let uy = (yf + shift_y).clamp(0.0, hf - 1.0);
             let s = cpu_sample_f(src, w, h, ux, uy);
