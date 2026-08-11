@@ -102,13 +102,6 @@ component ToastCard inherits Rectangle {
                 border-radius: 6px;
                 background: close-ta.has-hover ? #ffffff1f : transparent;
 
-                close-ta := TouchArea {
-                    width: parent.width;
-                    height: parent.height;
-                    mouse-cursor: pointer;
-                    clicked => { root.dismissed(root.item.id); }
-                }
-
                 Path {
                     width: 9px;
                     height: 9px;
@@ -118,6 +111,13 @@ component ToastCard inherits Rectangle {
                     LineTo { x: 9; y: 9; }
                     MoveTo { x: 9; y: 0; }
                     LineTo { x: 0; y: 9; }
+                }
+
+                close-ta := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+                    clicked => { root.dismissed(root.item.id); }
                 }
 
                 Tooltip {
@@ -135,6 +135,7 @@ export component ToastHost inherits Rectangle {
     in-out property <[ToastItem]> toasts: [];
     callback dismissed(int);
 
+    visible: root.toasts.length > 0;
     width: 340px;
     background: transparent;
 

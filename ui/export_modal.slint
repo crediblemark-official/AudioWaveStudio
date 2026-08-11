@@ -51,13 +51,6 @@ export component ModalBtn inherits Rectangle {
             animate transform-scale-y { duration: 120ms; easing: ease-out; }
             animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-            ta := TouchArea {
-                width: parent.width;
-                height: parent.height;
-                mouse-cursor: pointer;
-                clicked => { root.clicked(); }
-            }
-
             Text {
                 text: root.text;
                 color: root.primary ? #000000 : (ta.has-hover ? #f8fafc : #a3a3a3);
@@ -65,6 +58,13 @@ export component ModalBtn inherits Rectangle {
                 font-weight: 600;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+            }
+
+            ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                clicked => { root.clicked(); }
             }
         }
     }
@@ -130,6 +130,17 @@ export component ExportModal inherits Rectangle {
                     animate transform-scale-y { duration: 120ms; easing: ease-out; }
                     animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
+                    Path {
+                        width: 10px;
+                        height: 10px;
+                        stroke: close-ta.has-hover ? #ffffff : #94a3b8;
+                        stroke-width: 1.5px;
+                        MoveTo { x: 0; y: 0; }
+                        LineTo { x: 10; y: 10; }
+                        MoveTo { x: 10; y: 0; }
+                        LineTo { x: 0; y: 10; }
+                    }
+
                     close-ta := TouchArea {
                         width: parent.width;
                         height: parent.height;
@@ -140,17 +151,6 @@ export component ExportModal inherits Rectangle {
                             if (root.is-exporting) { root.cancel-export-clicked(); }
                             root.close-clicked();
                         }
-                    }
-
-                    Path {
-                        width: 10px;
-                        height: 10px;
-                        stroke: close-ta.has-hover ? #ffffff : #94a3b8;
-                        stroke-width: 1.5px;
-                        MoveTo { x: 0; y: 0; }
-                        LineTo { x: 10; y: 10; }
-                        MoveTo { x: 10; y: 0; }
-                        LineTo { x: 0; y: 10; }
                     }
 
                     Tooltip {

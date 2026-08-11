@@ -19,19 +19,19 @@ component PlayBtn inherits Rectangle {
     animate transform-scale-x { duration: 120ms; easing: ease-out; }
     animate transform-scale-y { duration: 120ms; easing: ease-out; }
 
-    ta := TouchArea {
-        width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-
     Text {
         text: root.playing ? "⏸" : "▶";
         color: #000000;
         font-size: 16px;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
     }
 
     Tooltip {
@@ -56,19 +56,19 @@ component ControlBtn inherits Rectangle {
     animate transform-scale-x { duration: 120ms; easing: ease-out; }
     animate transform-scale-y { duration: 120ms; easing: ease-out; }
 
-    ta := TouchArea {
-        width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-
     Text {
         text: root.icon;
         color: ta.has-hover ? #f8fafc : #a3a3a3;
         font-size: 13px;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
     }
 
     Tooltip {

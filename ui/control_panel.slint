@@ -171,13 +171,6 @@ component TabBtn inherits Rectangle {
         animate transform-scale-y { duration: 120ms; easing: ease-out; }
         animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-        ta := TouchArea {
-            width: parent.width;
-            height: parent.height;
-            mouse-cursor: pointer;
-            clicked => { root.clicked(); }
-        }
-
         Text {
             text: root.label;
             color: root.active ? #000000 : (ta.has-hover ? #f8fafc : #a3a3a3);
@@ -185,6 +178,13 @@ component TabBtn inherits Rectangle {
             font-weight: 600;
             horizontal-alignment: center;
             vertical-alignment: center;
+        }
+
+        ta := TouchArea {
+            width: parent.width;
+            height: parent.height;
+            mouse-cursor: pointer;
+            clicked => { root.clicked(); }
         }
 
         Tooltip {

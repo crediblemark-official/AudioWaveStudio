@@ -22,13 +22,6 @@ component IconBtn inherits Rectangle {
     animate transform-scale-y { duration: 120ms; easing: ease-out; }
     animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-    ta := TouchArea {
-        width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-
     Text {
         text: root.icon;
         color: ta.has-hover ? #ffffff : #cbd5e1;
@@ -36,6 +29,13 @@ component IconBtn inherits Rectangle {
         font-weight: 600;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
     }
 
     Tooltip {
@@ -62,13 +62,6 @@ component NavPrimaryBtn inherits Rectangle {
     animate transform-scale-y { duration: 120ms; easing: ease-out; }
     animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-    ta := TouchArea {
-        width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer;
-        clicked => { root.clicked(); }
-    }
-
     HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
@@ -81,6 +74,13 @@ component NavPrimaryBtn inherits Rectangle {
             font-size: 12px;
             font-weight: 700;
         }
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
     }
 }
 
@@ -261,34 +261,27 @@ export component Navbar inherits Rectangle {
             border-color: #ffd70025;
             clip: true;
 
-            ticker-ta := TouchArea {
-                width: parent.width;
+            ticker-scroll := Rectangle {
+                x: -1 * root.ticker-progress * measure.width;
+                y: 0;
+                width: 2 * measure.width;
                 height: parent.height;
-                mouse-cursor: pointer;
-                clicked => { root.ticker-clicked(); }
 
-                ticker-scroll := Rectangle {
-                    x: -1 * root.ticker-progress * measure.width;
-                    y: 0;
-                    width: 2 * measure.width;
-                    height: parent.height;
-
-                    HorizontalLayout {
-                        spacing: 0;
-                        Text {
-                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                            color: #ffd700;
-                            font-size: 11px;
-                            font-weight: 500;
-                            vertical-alignment: center;
-                        }
-                        Text {
-                            text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                            color: #ffd700;
-                            font-size: 11px;
-                            font-weight: 500;
-                            vertical-alignment: center;
-                        }
+                HorizontalLayout {
+                    spacing: 0;
+                    Text {
+                        text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                        color: #ffd700;
+                        font-size: 11px;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+                        color: #ffd700;
+                        font-size: 11px;
+                        font-weight: 500;
+                        vertical-alignment: center;
                     }
                 }
             }
@@ -309,6 +302,13 @@ export component Navbar inherits Rectangle {
                 width: 20px;
                 height: parent.height;
                 background: @linear-gradient(270deg, #0d0d0d 0%, #0d0d0d00 100%);
+            }
+
+            ticker-ta := TouchArea {
+                width: parent.width;
+                height: parent.height;
+                mouse-cursor: pointer;
+                clicked => { root.ticker-clicked(); }
             }
 
             measure := Text {
@@ -404,19 +404,19 @@ export component Navbar inherits Rectangle {
                     animate transform-scale-y { duration: 100ms; easing: ease-out; }
                     animate drop-shadow-blur { duration: 100ms; easing: ease-out; }
 
-                    min-ta := TouchArea {
-                        width: parent.width;
-                        height: parent.height;
-                        mouse-cursor: pointer;
-                        clicked => { root.minimize-clicked(); }
-                    }
-
                     // Vector horizontal bar for Minimize
                     Rectangle {
                         width: 10px;
                         height: 2px;
                         border-radius: 1px;
                         background: min-ta.has-hover ? #ffffff : #94a3b8;
+                    }
+
+                    min-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.minimize-clicked(); }
                     }
                 }
 
@@ -435,13 +435,6 @@ export component Navbar inherits Rectangle {
                     animate transform-scale-y { duration: 100ms; easing: ease-out; }
                     animate drop-shadow-blur { duration: 100ms; easing: ease-out; }
 
-                    max-ta := TouchArea {
-                        width: parent.width;
-                        height: parent.height;
-                        mouse-cursor: pointer;
-                        clicked => { root.maximize-clicked(); }
-                    }
-
                     // Vector square outline for Maximize
                     Rectangle {
                         width: 10px;
@@ -450,6 +443,13 @@ export component Navbar inherits Rectangle {
                         border-color: max-ta.has-hover ? #ffffff : #94a3b8;
                         border-radius: 1px;
                         background: transparent;
+                    }
+
+                    max-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.maximize-clicked(); }
                     }
                 }
 
@@ -468,13 +468,6 @@ export component Navbar inherits Rectangle {
                     animate transform-scale-y { duration: 100ms; easing: ease-out; }
                     animate drop-shadow-blur { duration: 100ms; easing: ease-out; }
 
-                    close-ta := TouchArea {
-                        width: parent.width;
-                        height: parent.height;
-                        mouse-cursor: pointer;
-                        clicked => { root.close-clicked(); }
-                    }
-
                     // Vector X cross for Close
                     Path {
                         width: 10px;
@@ -485,6 +478,13 @@ export component Navbar inherits Rectangle {
                         LineTo { x: 10; y: 10; }
                         MoveTo { x: 10; y: 0; }
                         LineTo { x: 0; y: 10; }
+                    }
+
+                    close-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.close-clicked(); }
                     }
                 }
             }

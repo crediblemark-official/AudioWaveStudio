@@ -54,13 +54,6 @@ export component AboutModal inherits Rectangle {
                     animate transform-scale-y { duration: 120ms; easing: ease-out; }
                     animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-                    close-ta := TouchArea {
-                        width: parent.width;
-                        height: parent.height;
-                        mouse-cursor: pointer;
-                        clicked => { root.close-clicked(); }
-                    }
-
                     Path {
                         width: 10px;
                         height: 10px;
@@ -70,6 +63,13 @@ export component AboutModal inherits Rectangle {
                         LineTo { x: 10; y: 10; }
                         MoveTo { x: 10; y: 0; }
                         LineTo { x: 0; y: 10; }
+                    }
+
+                    close-ta := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        mouse-cursor: pointer;
+                        clicked => { root.close-clicked(); }
                     }
 
                     Tooltip {
