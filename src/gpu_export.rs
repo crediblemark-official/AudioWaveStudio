@@ -412,6 +412,8 @@ pub fn render_preview_frame_inner(
   }
   if let Some((tw, th)) = engine.bg_image_info {
     rstate.background_image = Some(BackgroundImage { layer: IMAGE_LAYER, w: tw, h: th });
+  } else {
+    rstate.background_image = None;
   }
 
   let cur_radial_uri = config.background.radial_center_image_uri.clone();
@@ -429,6 +431,8 @@ pub fn render_preview_frame_inner(
   }
   if let Some((tw, th)) = engine.radial_image_info {
     rstate.radial_center_image = Some(BackgroundImage { layer: RADIAL_CENTER_IMAGE_LAYER, w: tw, h: th });
+  } else {
+    rstate.radial_center_image = None;
   }
 
   // Advance the envelope once; the passes below only read it.
