@@ -86,7 +86,11 @@ pub fn spawn_ffmpeg(
 ) -> Result<(Child, Arc<Mutex<String>>, JoinHandle<()>), String> {
   let ffmpeg_exe = resolve_ffmpeg(app_data_dir)?;
 
-  let encoder_name = crate::hardware::pick_encoder(&ffmpeg_exe, encoder_preference);
+  let mut encoder_name = crate::hardware::pick_encoder(&ffmpeg_exe, encoder_preference);
+  let is_webm = output_mp4_path.to_lowercase().ends_with(".webm");
+  if is_webm && (encoder_name.contains("264") || encoder_name.contains("hevc") || encoder_name.contains("h265")) {
+    encoder_name = "libvpx-vp9".to_string();
+  }
 
   let mut cmd = Command::new(&ffmpeg_exe);
   #[cfg(target_os = "windows")]

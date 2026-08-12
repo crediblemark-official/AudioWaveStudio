@@ -890,10 +890,14 @@ fn cpu_post_fx(
       }
     }
     11 => {
-      // glass crack: sharp Voronoi polygonal glass shard fractures & razor-thin specular line highlights.
-      let amp = intensity * wf * 0.035;
-      let grid_scale = 4.5;
-      let aspect = wf / hf;
+      // glass crack: realistic 3D impact spiderweb, chromatic dispersion & bevel depth.
+      let aspect = wf / hf.max(1.0);
+      let imp0_x = 0.22 * aspect;
+      let imp0_y = 0.88;
+      let imp1_x = 0.78 * aspect;
+      let imp1_y = 0.40;
+      let imp2_x = 0.35 * aspect;
+      let imp2_y = 0.12;
 
       for y in 0..h {
         let yf = y as f32;
@@ -902,58 +906,124 @@ fn cpu_post_fx(
           let xf = x as f32;
           let uv_x = xf / wf;
 
-          let px = uv_x * aspect * grid_scale;
-          let py = uv_y * grid_scale;
+          let px = uv_x * aspect;
+          let py = uv_y;
 
-          let cell_x = px.floor() as i32;
-          let cell_y = py.floor() as i32;
-          let fx = px.fract();
-          let fy = py.fract();
+          let warp_x = (py * 14.0 + px * 8.0).sin() * 0.015;
+          let warp_y = (px * 16.0 - py * 10.0).cos() * 0.015;
+          let pw_x = px + warp_x;
+          let pw_y = py + warp_y;
 
-          let mut min_d1 = 8.0f32;
-          let mut min_d2 = 8.0f32;
-          let mut best_cell_id = 0.0f32;
+          // Impact 0: Primary dense spiderweb & radial rays
+          let d0_x = pw_x - imp0_x;
+          let d0_y = pw_y - imp0_y;
+          let dist0 = (d0_x * d0_x + d0_y * d0_y).sqrt();
+          let ang0 = d0_y.atan2(d0_x);
+          let n_ang0 = (ang0 + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
+          let ray_phase0 = (n_ang0 + (n_ang0 * 48.0 + dist0 * 12.0).sin() * 0.03) * 22.0;
+          let ray_id0 = ray_phase0.floor();
+          let ray_dist0 = (ray_phase0.fract() - 0.5).abs() * (dist0 * 0.14 + 0.005);
 
-          for gy in -1..=1 {
-            for gx in -1..=1 {
-              let cx = cell_x + gx;
-              let cy = cell_y + gy;
-              // Deterministic hash for seed point inside grid cell
-              let seed = ((cx as f32 * 12.9898 + cy as f32 * 78.233).sin() * 43758.5453).fract().abs();
-              let seed2 = ((cx as f32 * 39.346 + cy as f32 * 11.135).sin() * 23421.631).fract().abs();
-              let rx = gx as f32 + seed - fx;
-              let ry = gy as f32 + seed2 - fy;
-              let d = rx * rx + ry * ry;
+          let ring_scale0 = 16.0 + ((ray_id0 * 12.9898).sin() * 43758.5453).fract().abs() * 8.0;
+          let ring_phase0 = (dist0 + 0.005).sqrt() * ring_scale0;
+          let ring_id0 = ring_phase0.floor();
+          let ring_dist0 = (ring_phase0.fract() - 0.5).abs() * (0.010 + dist0 * 0.025);
 
-              if d < min_d1 {
-                min_d2 = min_d1;
-                min_d1 = d;
-                best_cell_id = seed;
-              } else if d < min_d2 {
-                min_d2 = d;
-              }
-            }
-          }
+          let core_factor0 = if dist0 < 0.20 { 2.5 } else { 1.0 };
+          let crack_d0 = ray_dist0.min(ring_dist0) / core_factor0;
 
-          let edge_dist = (min_d2.sqrt() - min_d1.sqrt()).abs();
-          let crack_threshold = 0.04;
-          let idx = ((y * w + x) * 3) as usize;
+          // Impact 1: Secondary impact web
+          let d1_x = pw_x - imp1_x;
+          let d1_y = pw_y - imp1_y;
+          let dist1 = (d1_x * d1_x + d1_y * d1_y).sqrt();
+          let ang1 = d1_y.atan2(d1_x);
+          let n_ang1 = (ang1 + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
+          let ray_phase1 = (n_ang1 + (n_ang1 * 36.0 + dist1 * 10.0).cos() * 0.03) * 14.0;
+          let ray_id1 = ray_phase1.floor();
+          let ray_dist1 = (ray_phase1.fract() - 0.5).abs() * (dist1 * 0.16 + 0.008);
 
-          if edge_dist < crack_threshold {
-            let hl = ((1.0 - edge_dist / crack_threshold).clamp(0.0, 1.0) * intensity * 240.0) as u8;
-            rgb[idx] = rgb[idx].saturating_add(hl);
-            rgb[idx + 1] = rgb[idx + 1].saturating_add(hl);
-            rgb[idx + 2] = rgb[idx + 2].saturating_add(hl);
+          let ring_scale1 = 12.0 + (((ray_id1 + 100.0) * 12.9898).sin() * 43758.5453).fract().abs() * 6.0;
+          let ring_phase1 = (dist1 + 0.008).sqrt() * ring_scale1;
+          let ring_id1 = ring_phase1.floor();
+          let ring_dist1 = (ring_phase1.fract() - 0.5).abs() * (0.014 + dist1 * 0.03);
+          let crack_d1 = ray_dist1.min(ring_dist1);
+
+          // Impact 2: Top-left impact web
+          let d2_x = pw_x - imp2_x;
+          let d2_y = pw_y - imp2_y;
+          let dist2 = (d2_x * d2_x + d2_y * d2_y).sqrt();
+          let ang2 = d2_y.atan2(d2_x);
+          let n_ang2 = (ang2 + std::f32::consts::PI) / (2.0 * std::f32::consts::PI);
+          let ray_phase2 = (n_ang2 + (n_ang2 * 30.0).sin() * 0.04) * 12.0;
+          let crack_d2 = (ray_phase2.fract() - 0.5).abs() * (dist2 * 0.18 + 0.01);
+
+          // Sweeping diagonal primary cracks
+          let diag1 = ((px * 0.5 + py * 1.1) - (0.35 * aspect + 0.45) + (px * 6.0).sin() * 0.035).abs();
+          let diag2 = ((px * 1.0 - py * 0.8) - (0.1 * aspect) + (py * 7.0).cos() * 0.03).abs();
+          let sweeping_crack = diag1.min(diag2) * 0.12;
+
+          let min_dist = crack_d0.min(crack_d1).min(crack_d2).min(sweeping_crack);
+
+          let (shard_id, frac_dx, frac_dy) = if min_dist == crack_d0 {
+            (((ray_id0 * 17.1 + ring_id0 * 31.3).sin() * 43758.54).fract().abs(), d0_x / dist0.max(0.001), d0_y / dist0.max(0.001))
+          } else if min_dist == crack_d1 {
+            (((ray_id1 * 23.3 + ring_id1 * 41.7).sin() * 43758.54).fract().abs(), d1_x / dist1.max(0.001), d1_y / dist1.max(0.001))
           } else {
-            let shift_x = (best_cell_id * 100.0).sin() * amp;
-            let shift_y = (best_cell_id * 43.0).cos() * amp;
-            let ux = (xf + shift_x).clamp(0.0, wf - 1.0);
-            let uy = (yf + shift_y).clamp(0.0, hf - 1.0);
-            let s = cpu_sample_f(src, w, h, ux, uy);
-            rgb[idx] = s[0];
-            rgb[idx + 1] = s[1];
-            rgb[idx + 2] = s[2];
+            (((ray_phase2.floor() * 37.1).sin() * 43758.54).fract().abs(), 0.707, -0.707)
+          };
+
+          let shift_x = (shard_id * 100.0).sin() * intensity * wf * 0.022;
+          let shift_y = (shard_id * 43.0).cos() * intensity * hf * 0.022;
+
+          // 3D Chromatic Aberration dispersion vector
+          let ca_factor = if min_dist < 0.02 { (1.0 - min_dist / 0.02) * intensity * 0.008 } else { 0.0 };
+          let ca_dx = -frac_dy * ca_factor * wf;
+          let ca_dy = frac_dx * ca_factor * hf;
+
+          let ux_r = (xf + shift_x + ca_dx).clamp(0.0, wf - 1.0);
+          let uy_r = (yf + shift_y + ca_dy).clamp(0.0, hf - 1.0);
+          let ux_g = (xf + shift_x).clamp(0.0, wf - 1.0);
+          let uy_g = (yf + shift_y).clamp(0.0, hf - 1.0);
+          let ux_b = (xf + shift_x - ca_dx).clamp(0.0, wf - 1.0);
+          let uy_b = (yf + shift_y - ca_dy).clamp(0.0, hf - 1.0);
+
+          let s_r = cpu_sample_f(src, w, h, ux_r, uy_r)[0];
+          let s_g = cpu_sample_f(src, w, h, ux_g, uy_g)[1];
+          let s_b = cpu_sample_f(src, w, h, ux_b, uy_b)[2];
+
+          // 3D Bevel & Shadow
+          let shadow_factor = if min_dist > 0.001 && min_dist < 0.018 {
+            let t = if min_dist < 0.006 { min_dist / 0.006 } else { 1.0 - (min_dist - 0.006) / 0.012 };
+            t.clamp(0.0, 1.0) * 0.4 * intensity
+          } else {
+            0.0
+          };
+
+          let crack_w = (0.0025 + intensity * 0.004) * if min_dist == crack_d0 && dist0 < 0.2 { 1.5 } else { 1.0 };
+          let line_core = (1.0 - min_dist / crack_w).clamp(0.0, 1.0);
+          let line_halo = (1.0 - min_dist / (crack_w * 4.0)).clamp(0.0, 1.0) * 0.35;
+          let spec_intensity = (line_core + line_halo) * intensity;
+
+          let idx = ((y * w + x) * 3) as usize;
+          let mut r_val = s_r as f32 * (1.0 - shadow_factor);
+          let mut g_val = s_g as f32 * (1.0 - shadow_factor);
+          let mut b_val = s_b as f32 * (1.0 - shadow_factor);
+
+          r_val = r_val * (1.0 - spec_intensity * 0.92) + 235.0 * spec_intensity * 0.92;
+          g_val = g_val * (1.0 - spec_intensity * 0.92) + 242.0 * spec_intensity * 0.92;
+          b_val = b_val * (1.0 - spec_intensity * 0.92) + 255.0 * spec_intensity * 0.92;
+
+          let impact_glow = if dist0 < 0.25 { (1.0 - dist0 / 0.25) * 0.35 } else { 0.0 };
+          if impact_glow > 0.01 {
+            let glow_val = impact_glow * intensity * 0.45;
+            r_val = r_val * (1.0 - glow_val) + 255.0 * glow_val;
+            g_val = g_val * (1.0 - glow_val) + 255.0 * glow_val;
+            b_val = b_val * (1.0 - glow_val) + 255.0 * glow_val;
           }
+
+          rgb[idx] = r_val.clamp(0.0, 255.0) as u8;
+          rgb[idx + 1] = g_val.clamp(0.0, 255.0) as u8;
+          rgb[idx + 2] = b_val.clamp(0.0, 255.0) as u8;
         }
       }
     }

@@ -680,7 +680,7 @@ impl GpuCanvas {
       let saved_width = self.state.stroke_width;
       let saved_cap = self.state.line_cap;
       let saved_shadow = (self.state.shadow_color, self.state.shadow_blur);
-      self.state.line_cap = LineCap::Butt;
+      self.state.line_cap = LineCap::Round;
       for i in 0..2 {
         self.state.stroke = Fill::Solid(sc.with_alpha(sc.a * (0.12 - 0.04 * i as f32)));
         self.state.stroke_width = saved_width + blur * (1.0 - 0.35 * i as f32);
@@ -700,33 +700,88 @@ impl GpuCanvas {
       return;
     }
     let hw = self.state.stroke_width / 2.0;
+    if hw <= 0.0 {
+      return;
+    }
+
+    let stroke = self.state.stroke.clone();
+    let xform = self.state.transform;
+    let do_round = self.state.line_cap == LineCap::Round || self.state.shadow_blur > 0.0;
+
+    // Compute segment normals
+    let mut normals: Vec<(f32, f32)> = Vec::with_capacity(pts.len() - 1);
     for seg in pts.windows(2) {
-      let (p0, p1) = (seg[0], seg[1]);
-      let dx = p1.0 - p0.0;
-      let dy = p1.1 - p0.1;
+      let dx = seg[1].0 - seg[0].0;
+      let dy = seg[1].1 - seg[0].1;
       let len = dx.hypot(dy);
       if len < 1e-6 {
+        normals.push((0.0, 0.0));
+      } else {
+        normals.push((-dy / len, dx / len));
+      }
+    }
+
+    for i in 0..pts.len() - 1 {
+      let p0 = pts[i];
+      let p1 = pts[i + 1];
+      let n = normals[i];
+      if n.0 == 0.0 && n.1 == 0.0 {
         continue;
       }
-      let nx = -dy / len;
-      let ny = dx / len;
-      let a = (p0.0 + nx * hw, p0.1 + ny * hw);
-      let b = (p0.0 - nx * hw, p0.1 - ny * hw);
-      let c = (p1.0 + nx * hw, p1.1 + ny * hw);
-      let d = (p1.0 - nx * hw, p1.1 - ny * hw);
-      let stroke = self.state.stroke.clone();
-      let xform = self.state.transform;
+
+      // Miter normal at p0
+      let (n0_x, n0_y) = if i > 0 && normals[i - 1] != (0.0, 0.0) {
+        let prev_n = normals[i - 1];
+        let mx = n.0 + prev_n.0;
+        let my = n.1 + prev_n.1;
+        let mlen = mx.hypot(my);
+        if mlen > 1e-4 {
+          let dot = (1.0 + n.0 * prev_n.0 + n.1 * prev_n.1).max(0.2);
+          let scale = (1.0 / dot.sqrt()).min(2.5);
+          (mx / mlen * scale, my / mlen * scale)
+        } else {
+          n
+        }
+      } else {
+        n
+      };
+
+      // Miter normal at p1
+      let (n1_x, n1_y) = if i + 1 < normals.len() && normals[i + 1] != (0.0, 0.0) {
+        let next_n = normals[i + 1];
+        let mx = n.0 + next_n.0;
+        let my = n.1 + next_n.1;
+        let mlen = mx.hypot(my);
+        if mlen > 1e-4 {
+          let dot = (1.0 + n.0 * next_n.0 + n.1 * next_n.1).max(0.2);
+          let scale = (1.0 / dot.sqrt()).min(2.5);
+          (mx / mlen * scale, my / mlen * scale)
+        } else {
+          n
+        }
+      } else {
+        n
+      };
+
+      let a = (p0.0 + n0_x * hw, p0.1 + n0_y * hw);
+      let b = (p0.0 - n0_x * hw, p0.1 - n0_y * hw);
+      let c = (p1.0 + n1_x * hw, p1.1 + n1_y * hw);
+      let d = (p1.0 - n1_x * hw, p1.1 - n1_y * hw);
+
       self.push_quad(a, b, d, c, &stroke, &xform);
-    }
-    if self.state.line_cap == LineCap::Round {
-      if let Some(&p0) = pts.first() {
+
+      if do_round {
         self.cap_round(p0, hw);
       }
-      if let Some(&p1) = pts.last() {
-        self.cap_round(p1, hw);
+    }
+
+    if do_round {
+      if let Some(&p_last) = pts.last() {
+        self.cap_round(p_last, hw);
       }
     }
   }
+
 
   fn cap_round(&mut self, p: (f32, f32), radius: f32) {
     if radius <= 0.0 {

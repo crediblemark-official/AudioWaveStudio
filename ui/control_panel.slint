@@ -1,6 +1,12 @@
 import { CustomTextBlockData } from "custom_text.slint";
 import { Button, Slider, ComboBox, LineEdit, ScrollView, CheckBox } from "std-widgets.slint";
 
+export struct StyleItem {
+    id: string,
+    label: string,
+    category: string,
+}
+
 component StyleVisualIcon inherits Rectangle {
     in property <string> style-id: "";
     in property <color> icon-color: #ffd700;
@@ -18,7 +24,7 @@ component StyleVisualIcon inherits Rectangle {
         Rectangle { width: 3px; height: 14px; border-radius: 1px; background: root.icon-color; }
     }
 
-    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" || root.style-id == "radialRipple3D" || root.style-id == "vinylRecord" || root.style-id == "orbitSpike" || root.style-id == "cyberRing3D" || root.style-id == "dualPortalBridge" || root.style-id == "cyberBlackHole" || root.style-id == "supernovaBurst" || root.style-id == "quantumEye" || root.style-id == "chronoReactor" || root.style-id == "solarFlareCrown" || root.style-id == "warpDrive" || root.style-id == "neonBiohazard" || root.style-id == "neonLotus" || root.style-id == "holographicVinyl" || root.style-id == "acousticCymascope" || root.style-id == "waveformOscillatingRings" : HorizontalLayout {
+    if root.style-id == "radial" || root.style-id == "circularBars" || root.style-id == "pulseRings" || root.style-id == "radialRipple3D" || root.style-id == "vinylRecord" || root.style-id == "orbitSpike" || root.style-id == "cyberRing3D" || root.style-id == "dualPortalBridge" || root.style-id == "cyberBlackHole" || root.style-id == "supernovaBurst" || root.style-id == "quantumEye" || root.style-id == "chronoReactor" || root.style-id == "solarFlareCrown" || root.style-id == "warpDrive" || root.style-id == "neonBiohazard" || root.style-id == "neonLotus" || root.style-id == "holographicVinyl" || root.style-id == "acousticCymascope" || root.style-id == "waveformOscillatingRings" || root.style-id == "radialSpikeBlade" || root.style-id == "radialPlasmaAura" || root.style-id == "radialCyberRune" || root.style-id == "radialNeonOrbiter" || root.style-id == "radialStarlightHalo" || root.style-id == "radialVortexSpiral" || root.style-id == "radialBioShuriken" || root.style-id == "radialHexCore" || root.style-id == "radialSonicMandala" || root.style-id == "radialLaserCurtain" || root.style-id == "radialSolarFlareBurst" || root.style-id == "radialApertureIris" || root.style-id == "radialRadarSweep" || root.style-id == "radialGearMechanism" || root.style-id == "radialFireworksBurst" || root.style-id == "radialKaleidoscope" || root.style-id == "radialOrrery" || root.style-id == "radialClockwork" || root.style-id == "radialGeodesicWeb" || root.style-id == "pulsingPillRing" || root.style-id == "pulsingLiquidAura" || root.style-id == "pulsingDualRing" || root.style-id == "pulsingShockwave" || root.style-id == "pulsingNeonArcade" || root.style-id == "pulsingLaserWeb" || root.style-id == "pulsingCosmicDust" || root.style-id == "pulsingCyberShield" || root.style-id == "pulsingSunburstCorona" || root.style-id == "pulsingBarcodePill" : HorizontalLayout {
         alignment: center;
         cross-axis-alignment: center;
         Rectangle {
@@ -93,55 +99,67 @@ component StyleCard inherits Rectangle {
     in property <string> style-id: "";
     in property <string> label: "";
     in property <string> current: "";
+    in property <bool> is-visible: true;
     in-out property <bool> has-hover: ta.has-hover;
     callback style-clicked(string);
 
-    height: 56px;
+    visible: root.is-visible;
+    height: root.is-visible ? 40px : 0px;
+    horizontal-stretch: 1;
 
     ta := TouchArea {
         width: parent.width;
-        height: parent.height;
-        mouse-cursor: pointer; // legacy .style-card { cursor: pointer }
+        height: 34px;
+        mouse-cursor: pointer;
         clicked => { root.style-clicked(root.style-id); }
 
         Rectangle {
             width: parent.width;
-            height: parent.height;
-            border-radius: 8px;
+            height: 34px;
+            border-radius: 6px;
             border-width: 1px;
-            border-color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #ffd70066 : #ffd70029);
-            background: root.current == root.style-id ? #ffd7001a : (root.has-hover ? #ffd70014 : #ffd70008);
+            border-color: root.current == root.style-id ? #ffd70080 : (root.has-hover ? #ffffff20 : #ffffff0a);
+            background: root.current == root.style-id ? #ffd7001a : (root.has-hover ? #ffffff0d : #ffffff04);
 
-            // Hover: lift + glow; selected: persistent glow (legacy box-shadow).
-            // `transform-scale-*` is a builtin reserved property (1.0 = normal).
-            transform-scale-x: root.has-hover ? 1.04 : 1.0;
-            transform-scale-y: root.has-hover ? 1.04 : 1.0;
-            transform-origin: { x: self.width / 2, y: self.height / 2 };
-            drop-shadow-blur: root.current == root.style-id ? 12px : (root.has-hover ? 8px : 0px);
-            drop-shadow-color: #ffd70066;
-            animate transform-scale-x { duration: 150ms; easing: ease-out; }
-            animate transform-scale-y { duration: 150ms; easing: ease-out; }
-            animate drop-shadow-blur { duration: 150ms; easing: ease-out; }
+            drop-shadow-blur: root.current == root.style-id ? 6px : 0px;
+            drop-shadow-color: #ffd70040;
+            animate background { duration: 100ms; easing: ease-out; }
+            animate border-color { duration: 100ms; easing: ease-out; }
 
-            VerticalLayout {
-                padding: 4px;
-                spacing: 4px;
-                alignment: center;
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 10px;
+                cross-axis-alignment: center;
 
-                HorizontalLayout {
-                    alignment: center;
-                    StyleVisualIcon {
-                        style-id: root.style-id;
-                        icon-color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #f8fafc : #a3a3a3);
-                    }
+                Rectangle {
+                    width: 3px;
+                    height: 16px;
+                    border-radius: 1.5px;
+                    background: root.current == root.style-id ? #ffd700 : transparent;
+                }
+
+                StyleVisualIcon {
+                    style-id: root.style-id;
+                    icon-color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #f8fafc : #94a3b8);
                 }
 
                 Text {
+                    horizontal-stretch: 1;
                     text: root.label;
-                    color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #f8fafc : #a3a3a3);
-                    font-size: 11px;
-                    font-weight: 600;
-                    horizontal-alignment: center;
+                    color: root.current == root.style-id ? #ffd700 : (root.has-hover ? #f8fafc : #cbd5e1);
+                    font-size: 12px;
+                    font-weight: root.current == root.style-id ? 700 : 500;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+
+                if root.current == root.style-id : Text {
+                    text: "✓";
+                    color: #ffd700;
+                    font-size: 12px;
+                    font-weight: 700;
+                    vertical-alignment: center;
                 }
             }
         }
@@ -171,13 +189,19 @@ component TabBtn inherits Rectangle {
         animate transform-scale-y { duration: 120ms; easing: ease-out; }
         animate drop-shadow-blur { duration: 120ms; easing: ease-out; }
 
-        Text {
-            text: root.label;
-            color: root.active ? #000000 : (ta.has-hover ? #f8fafc : #a3a3a3);
-            font-size: 11px;
-            font-weight: 600;
-            horizontal-alignment: center;
-            vertical-alignment: center;
+        HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            alignment: center;
+
+            Text {
+                text: root.label;
+                color: root.active ? #000000 : (ta.has-hover ? #f8fafc : #a3a3a3);
+                font-size: 11px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
         }
 
         ta := TouchArea {
@@ -230,6 +254,8 @@ component SliderRow {
     // and update the same property in their `changed` handler, so the binding
     // stays live and the slider re-syncs — writing back here would break it.
     in property <float> value: 0.0;
+    // default-value: the value to restore when the user clicks reset.
+    in property <float> default-value: 0.0;
     callback changed(float);
 
     VerticalLayout {
@@ -253,6 +279,34 @@ component SliderRow {
                 font-size: 11px;
                 font-weight: 600;
                 vertical-alignment: center;
+            }
+
+            // Reset button — always visible, glows on hover
+            reset-btn := Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: 9px;
+                background: reset-ta.has-hover ? #ffffff18 : transparent;
+                border-width: 1px;
+                border-color: reset-ta.has-hover ? #ffffff44 : transparent;
+
+                animate background { duration: 150ms; }
+                animate border-color { duration: 150ms; }
+
+                Text {
+                    text: "↺";
+                    font-size: 11px;
+                    color: reset-ta.has-hover ? #ffd700 : #606060;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                    animate color { duration: 150ms; }
+                }
+
+                reset-ta := TouchArea {
+                    clicked => {
+                        root.changed(root.default-value);
+                    }
+                }
             }
         }
 
@@ -655,6 +709,9 @@ export component ControlPanel inherits Rectangle {
     in-out property <float> glass-crack-intensity: 0.6;
     in-out property <bool> bg-only-effect: true;
 
+    in-out property <string> style-search-query: "";
+    in-out property <string> style-category: "all";
+
     in-out property <string> track-title: "";
     in-out property <string> track-artist: "";
     in-out property <string> cassette-label: "AUDIOWAVE VOLUME #1";
@@ -680,6 +737,151 @@ export component ControlPanel inherits Rectangle {
     callback remove-radial-image-clicked();
     callback open-custom-image-clicked();
     callback remove-custom-image-clicked();
+
+    callback filter-changed();
+
+    pure callback matches-search(string, string) -> bool;
+    pure callback matches-category(string, string) -> bool;
+    pure callback has-center-image(string) -> bool;
+    pure function has-bar-count(style-id: string) -> bool { return style-id != "oscilloscope"; }
+
+    in-out property <[StyleItem]> style-items: [
+        { id: "spectrum", label: "Spectrum Bars", category: "waveform" },
+        { id: "radial", label: "Radial Ring", category: "radial" },
+        { id: "oscilloscope", label: "Oscilloscope", category: "waveform" },
+        { id: "equalizer", label: "Matrix Equalizer", category: "waveform" },
+        { id: "minimal", label: "Minimal Wave", category: "waveform" },
+        { id: "waveformFill", label: "Waveform Fill", category: "waveform" },
+        { id: "circularBars", label: "Circular Bars", category: "radial" },
+        { id: "smoothSpectrum", label: "Smooth Spectrum", category: "waveform" },
+        { id: "pulseRings", label: "Pulse Rings", category: "radial" },
+        { id: "vuMeter", label: "VU Meter", category: "waveform" },
+        { id: "auroraWave", label: "Aurora Wave", category: "waveform" },
+        { id: "cyberHorizon", label: "Cyber Horizon", category: "cyber" },
+        { id: "cyberBlackHole", label: "Cyber Black Hole", category: "space" },
+        { id: "supernovaBurst", label: "Supernova Burst", category: "space" },
+        { id: "quantumEye", label: "Quantum Eye", category: "space" },
+        { id: "chronoReactor", label: "Chrono Reactor", category: "cyber" },
+        { id: "solarFlareCrown", label: "Solar Flare Crown", category: "space" },
+        { id: "warpDrive", label: "Warp Drive", category: "space" },
+        { id: "neonBiohazard", label: "Neon Biohazard", category: "cyber" },
+        { id: "neonLotus", label: "Neon Lotus", category: "radial" },
+        { id: "holographicVinyl", label: "Holographic Vinyl", category: "retro" },
+        { id: "acousticCymascope", label: "Acoustic Cymascope", category: "radial" },
+        { id: "synthwaveHighway3D", label: "Synthwave Highway 3D", category: "3d" },
+        { id: "mercuryFluid", label: "Mercury Fluid", category: "liquid" },
+        { id: "neonMetropolis3D", label: "Neon Metropolis 3D", category: "3d" },
+        { id: "matrixRain", label: "Matrix Rain", category: "cyber" },
+        { id: "quantumRibbon", label: "Quantum Ribbon", category: "waveform" },
+        { id: "audioPrism3D", label: "Audio Prism 3D", category: "3d" },
+        { id: "vaporwaveDeck3D", label: "Vaporwave Deck 3D", category: "3d" },
+        { id: "nebulaCloud3D", label: "Nebula Cloud 3D", category: "space" },
+        { id: "cyberTunnel3D", label: "Cyber Tunnel 3D", category: "3d" },
+        { id: "laserWall", label: "Laser Wall", category: "cyber" },
+        { id: "spiralGalaxy", label: "Spiral Galaxy", category: "space" },
+        { id: "threeD", label: "3D Blocks", category: "3d" },
+        { id: "api3D", label: "Fire 3D", category: "3d" },
+        { id: "neonCity3D", label: "Neon City 3D", category: "3d" },
+        { id: "speaker3D", label: "Speaker 3D", category: "3d" },
+        { id: "speakerTrio", label: "Speaker Trio", category: "retro" },
+        { id: "speakerSplatter", label: "Speaker Splatter", category: "retro" },
+        { id: "radialRipple3D", label: "3D Radial Ripple", category: "radial" },
+        { id: "waterfall3D", label: "3D Waterfall", category: "3d" },
+        { id: "cassetteTape", label: "Retro Cassette", category: "retro" },
+        { id: "vinylRecord", label: "Vinyl Record", category: "retro" },
+        { id: "turntable", label: "Turntable", category: "retro" },
+        { id: "retroRadio", label: "Retro Radio", category: "retro" },
+        { id: "djController", label: "DJ Controller", category: "retro" },
+        { id: "speakerExplosion", label: "Speaker Explosion", category: "retro" },
+        { id: "orbitSpike", label: "Orbit Spike", category: "radial" },
+        { id: "cyberRing3D", label: "Cyber Ring 3D", category: "cyber" },
+        { id: "hologramStage", label: "Hologram Stage", category: "cyber" },
+        { id: "dualPortalBridge", label: "Dual Portal Bridge", category: "cyber" },
+        { id: "particleWave3D", label: "Particle Wave 3D", category: "3d" },
+        { id: "cylinderMatrix3D", label: "3D Cylinder Matrix", category: "3d" },
+        { id: "dualWaveHorizon", label: "Dual Wave Horizon", category: "waveform" },
+        { id: "waveformSeismograph", label: "Seismograph Wave", category: "waveform" },
+        { id: "waveformDualTube", label: "Dual Plasma Tube", category: "waveform" },
+        { id: "waveformVoxelTerrain", label: "Voxel Terrain Wave", category: "waveform" },
+        { id: "waveformSineComb", label: "Harmonic Comb Wave", category: "waveform" },
+        { id: "waveformHarmonicWeb", label: "Harmonic Web", category: "waveform" },
+        { id: "waveformSteppedArcade", label: "Stepped Arcade Wave", category: "waveform" },
+        { id: "waveformBarcodePulse", label: "Barcode Pulse Wave", category: "waveform" },
+        { id: "waveformCurtainBeams", label: "Curtain Laser Beams", category: "waveform" },
+        { id: "waveformOscillatingRings", label: "Oscillating Wave Rings", category: "waveform" },
+        { id: "waveformTopographicRibbon", label: "Topographic Ribbon", category: "waveform" },
+        { id: "radialSpikeBlade", label: "Sonic Spike Blade", category: "radial" },
+        { id: "radialPlasmaAura", label: "Plasma Aura Ring", category: "radial" },
+        { id: "radialCyberRune", label: "Cyber Rune Ring", category: "radial" },
+        { id: "radialNeonOrbiter", label: "Neon Orbiter Ring", category: "radial" },
+        { id: "radialStarlightHalo", label: "Starlight Halo Ring", category: "radial" },
+        { id: "radialVortexSpiral", label: "Sonic Vortex Spiral", category: "radial" },
+        { id: "radialBioShuriken", label: "Bio Shuriken Ring", category: "radial" },
+        { id: "radialHexCore", label: "Hex Core Ring", category: "radial" },
+        { id: "radialSonicMandala", label: "Sonic Mandala Ring", category: "radial" },
+        { id: "radialLaserCurtain", label: "Laser Curtain Ring", category: "radial" },
+        { id: "radialSolarFlareBurst", label: "Solar Flare Ring", category: "radial" },
+        { id: "radialApertureIris", label: "Aperture Iris Ring", category: "radial" },
+        { id: "radialRadarSweep", label: "Radar Sweep Ring", category: "radial" },
+        { id: "radialGearMechanism", label: "Gear Mechanism Ring", category: "radial" },
+        { id: "radialFireworksBurst", label: "Fireworks Ring", category: "radial" },
+        { id: "radialKaleidoscope", label: "Kaleidoscope Ring", category: "radial" },
+        { id: "radialOrrery", label: "Orrery Ring", category: "radial" },
+        { id: "radialClockwork", label: "Clockwork Ring", category: "radial" },
+        { id: "radialGeodesicWeb", label: "Geodesic Web Ring", category: "radial" },
+        { id: "pulsingPillRing", label: "Pill Pulse Ring", category: "pulsing" },
+        { id: "pulsingLiquidAura", label: "Liquid Aura Pulse", category: "pulsing" },
+        { id: "pulsingDualRing", label: "Dual Ring Pulse", category: "pulsing" },
+        { id: "pulsingShockwave", label: "Shockwave Pulse", category: "pulsing" },
+        { id: "pulsingNeonArcade", label: "Neon Arcade Pulse", category: "pulsing" },
+        { id: "pulsingLaserWeb", label: "Laser Web Pulse", category: "pulsing" },
+        { id: "pulsingCosmicDust", label: "Cosmic Dust Pulse", category: "pulsing" },
+        { id: "pulsingCyberShield", label: "Cyber Shield Pulse", category: "pulsing" },
+        { id: "pulsingSunburstCorona", label: "Sunburst Corona Pulse", category: "pulsing" },
+        { id: "pulsingBarcodePill", label: "Barcode Pill Pulse", category: "pulsing" },
+        { id: "SaturnHalo", label: "Saturn Halo", category: "space" },
+        { id: "StarHexagon", label: "Star Hexagon", category: "radial" },
+        { id: "QuantumCloud", label: "Quantum Cloud", category: "space" },
+        { id: "HyperdriveTunnel", label: "Hyperdrive Tunnel", category: "space" },
+        { id: "NebulaRing", label: "Nebula Ring", category: "space" },
+        { id: "TacticalHud", label: "Tactical HUD", category: "cyber" },
+        { id: "CrystalPrism", label: "Crystal Prism", category: "3d" },
+        { id: "SynthwaveSun", label: "Synthwave Sun", category: "retro" },
+        { id: "BiomorphicBloom", label: "Biomorphic Bloom", category: "liquid" },
+        { id: "InfinityLoop", label: "Infinity Loop", category: "radial" },
+        { id: "liquidTriLobeAura", label: "Tri-Lobe Aura", category: "liquid" },
+        { id: "liquidFerrofluidSpikes", label: "Ferrofluid Spikes", category: "liquid" },
+        { id: "liquidMoltenMercury", label: "Molten Mercury", category: "liquid" },
+        { id: "liquidConcentricDrop", label: "Concentric Drop", category: "liquid" },
+        { id: "liquidJellyfishTentacles", label: "Jellyfish Tentacles", category: "liquid" },
+        { id: "liquidOilSlick", label: "Iridescent Oil Slick", category: "liquid" },
+        { id: "liquidVortexSwirl", label: "Vortex Swirl", category: "liquid" },
+        { id: "liquidMetaballLava", label: "Metaball Lava", category: "liquid" },
+        { id: "liquidToxicSlime", label: "Toxic Slime", category: "liquid" },
+        { id: "liquidCymascopeWater", label: "Cymascope Water", category: "liquid" },
+        { id: "liquidBioluminescentPlasma", label: "Bio Plasma", category: "liquid" },
+        { id: "liquidPlasmaBlob3D", label: "Plasma Blob 3D", category: "liquid" },
+        { id: "liquidChromaticViscosity", label: "Chromatic Viscosity", category: "liquid" },
+        { id: "liquidHydroElectricArcs", label: "Hydro-Electric Arcs", category: "liquid" },
+        { id: "liquidBioluminescentPlankton", label: "Bioluminescent Plankton", category: "liquid" },
+        { id: "liquidRadioactiveIsotope", label: "Solar Wind Storm", category: "liquid" },
+        { id: "liquidNeonCyberGoo", label: "Neon Cyber Goo", category: "liquid" },
+        { id: "liquidMoltenGoldStream", label: "Molten Gold Stream", category: "liquid" },
+        { id: "liquidMagmaCrustCore", label: "Magma Crust Core", category: "liquid" },
+        { id: "liquidQuantumFluid", label: "Quantum Fluid", category: "liquid" },
+        { id: "glassBoxQuantumPlasma", label: "Glass Box: Quantum", category: "glass" },
+        { id: "glassBoxNeonSpectrum", label: "Glass Box: Spectrum", category: "glass" },
+        { id: "glassBoxCyberGrid", label: "Glass Box: Cyber Grid", category: "glass" },
+        { id: "glassBoxBioluminescentJellyfish", label: "Glass Box: Bio Jellyfish", category: "glass" },
+        { id: "glassBoxMoltenLava", label: "Glass Box: Lava Lamp", category: "glass" },
+        { id: "glassBoxLaserMatrix", label: "Glass Box: Laser Matrix", category: "glass" },
+        { id: "glassBoxLiquidChrome", label: "Glass Box: Liquid Chrome", category: "glass" },
+        { id: "glassBoxCosmicNebula", label: "Glass Box: Nebula", category: "glass" },
+        { id: "glassBoxHologramCore", label: "Glass Box: Hologram Core", category: "glass" },
+        { id: "glassBoxMatrixRain", label: "Glass Box: Matrix Rain", category: "glass" },
+    ];
+
+    in-out property <[StyleItem]> visible-style-items: root.style-items;
 
     VerticalLayout {
         padding: 10px;
@@ -709,112 +911,76 @@ export component ControlPanel inherits Rectangle {
                 if (root.active-tab == "style") : VerticalLayout {
                     spacing: 10px;
 
-                    // 2-column grid of 32 style cards (legacy .style-grid)
-                    GridLayout {
-                        spacing: 8px;
+                    // SEARCH INPUT BAR
+                    HorizontalLayout {
+                        spacing: 6px;
+                        height: 34px;
 
-                        StyleCard { row: 0; col: 0; style-id: "spectrum"; label: "Spectrum Bars"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 0; col: 1; style-id: "radial"; label: "Radial Ring"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                        Rectangle {
+                            background: #1e1e2d;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #ffd70066;
 
-                        StyleCard { row: 1; col: 0; style-id: "oscilloscope"; label: "Oscilloscope"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 1; col: 1; style-id: "equalizer"; label: "Matrix Equalizer"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                alignment: center;
+                                spacing: 6px;
 
-                        StyleCard { row: 2; col: 0; style-id: "minimal"; label: "Minimal Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 2; col: 1; style-id: "waveformFill"; label: "Waveform Fill"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                                Text {
+                                    text: "🔍";
+                                    font-size: 13px;
+                                    color: #ffd700;
+                                    vertical-alignment: center;
+                                }
 
-                        StyleCard { row: 3; col: 0; style-id: "circularBars"; label: "Circular Bars"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 3; col: 1; style-id: "smoothSpectrum"; label: "Smooth Spectrum"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 4; col: 0; style-id: "pulseRings"; label: "Pulse Rings"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 4; col: 1; style-id: "vuMeter"; label: "VU Meter"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 5; col: 0; style-id: "auroraWave"; label: "Aurora Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 5; col: 1; style-id: "spiralGalaxy"; label: "Spiral Galaxy"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 6; col: 0; style-id: "threeD"; label: "3D Blocks"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 6; col: 1; style-id: "api3D"; label: "Fire 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 7; col: 0; style-id: "neonCity3D"; label: "Neon City 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 7; col: 1; style-id: "speaker3D"; label: "Speaker 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 8; col: 0; style-id: "speakerTrio"; label: "Speaker Trio"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 8; col: 1; style-id: "speakerSplatter"; label: "Speaker Splatter"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 9; col: 0; style-id: "radialRipple3D"; label: "3D Radial Ripple"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 9; col: 1; style-id: "waterfall3D"; label: "3D Waterfall"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 10; col: 0; style-id: "cassetteTape"; label: "Retro Cassette"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 10; col: 1; style-id: "vinylRecord"; label: "Vinyl Record"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 11; col: 0; style-id: "turntable"; label: "Turntable"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 11; col: 1; style-id: "retroRadio"; label: "Retro Radio"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 12; col: 0; style-id: "djController"; label: "DJ Controller"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 12; col: 1; style-id: "speakerExplosion"; label: "Speaker Explosion"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 13; col: 0; style-id: "orbitSpike"; label: "Orbit Spike"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 13; col: 1; style-id: "cyberRing3D"; label: "Cyber Ring 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 14; col: 0; style-id: "hologramStage"; label: "Hologram Stage"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 14; col: 1; style-id: "dualPortalBridge"; label: "Dual Portal Bridge"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 15; col: 0; style-id: "particleWave3D"; label: "Particle Wave 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 15; col: 1; style-id: "cylinderMatrix3D"; label: "3D Cylinder Matrix"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 16; col: 0; style-id: "cyberHorizon"; label: "Cyber Horizon"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 16; col: 1; style-id: "cyberBlackHole"; label: "Cyber Black Hole"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 17; col: 0; style-id: "supernovaBurst"; label: "Supernova Burst"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 17; col: 1; style-id: "quantumEye"; label: "Quantum Eye"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 18; col: 0; style-id: "chronoReactor"; label: "Chrono Reactor"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 18; col: 1; style-id: "solarFlareCrown"; label: "Solar Flare Crown"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 19; col: 0; style-id: "warpDrive"; label: "Warp Drive"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 19; col: 1; style-id: "neonBiohazard"; label: "Neon Biohazard"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 20; col: 0; style-id: "neonLotus"; label: "Neon Lotus"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 20; col: 1; style-id: "holographicVinyl"; label: "Holographic Vinyl"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 21; col: 0; style-id: "acousticCymascope"; label: "Acoustic Cymascope"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 21; col: 1; style-id: "synthwaveHighway3D"; label: "Synthwave Highway 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 22; col: 0; style-id: "mercuryFluid"; label: "Mercury Fluid Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 22; col: 1; style-id: "neonMetropolis3D"; label: "Neon Metropolis 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 23; col: 0; style-id: "matrixRain"; label: "Matrix Data Rain"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 23; col: 1; style-id: "quantumRibbon"; label: "Quantum Ribbon 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 24; col: 0; style-id: "audioPrism3D"; label: "Audio Prism 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 24; col: 1; style-id: "vaporwaveDeck3D"; label: "Vaporwave Deck 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 25; col: 0; style-id: "nebulaCloud3D"; label: "Nebula Cloud 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 25; col: 1; style-id: "cyberTunnel3D"; label: "Cyber Tunnel 3D"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 26; col: 0; style-id: "laserWall"; label: "Laser Equalizer Wall"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 26; col: 1; style-id: "dualWaveHorizon"; label: "Dual Wave Horizon"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 27; col: 0; style-id: "waveformSeismograph"; label: "3D Seismograph"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 27; col: 1; style-id: "waveformDualTube"; label: "Neon Dual Tube"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 28; col: 0; style-id: "waveformVoxelTerrain"; label: "3D Voxel Terrain"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 28; col: 1; style-id: "waveformSineComb"; label: "Spring Comb Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 29; col: 0; style-id: "waveformHarmonicWeb"; label: "Harmonic String Web"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 29; col: 1; style-id: "waveformSteppedArcade"; label: "8-Bit Stepped Arcade"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 30; col: 0; style-id: "waveformBarcodePulse"; label: "Barcode Pulse Wave"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 30; col: 1; style-id: "waveformCurtainBeams"; label: "Laser Curtain Beams"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-
-                        StyleCard { row: 31; col: 0; style-id: "waveformOscillatingRings"; label: "Oscillating Rings"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
-                        StyleCard { row: 31; col: 1; style-id: "waveformTopographicRibbon"; label: "Topographic Ribbon"; current: root.style-val; style-clicked(id) => { root.style-val = id; root.config-changed(); } }
+                                LineEdit {
+                                    placeholder-text: "Search style name...";
+                                    text <=> root.style-search-query;
+                                }
+                            }
+                        }
                     }
 
-                    if (root.style-val == "spectrum" || root.style-val == "smoothSpectrum" || root.style-val == "hologramStage" || root.style-val == "orbitSpike" || root.style-val == "speakerExplosion" || root.style-val == "cyberRing3D" || root.style-val == "cylinderMatrix3D" || root.style-val == "neonCity3D" || root.style-val == "turntable" || root.style-val == "retroRadio") : SliderRow {
+                    // Category tab bar with horizontal scrolling
+                    ScrollView {
+                        height: 34px;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+
+                            TabBtn { label: "All"; active: root.style-category == "all"; clicked => { root.style-category = "all"; } }
+                            TabBtn { label: "Wave"; active: root.style-category == "waveform"; clicked => { root.style-category = "waveform"; } }
+                            TabBtn { label: "Radial"; active: root.style-category == "radial"; clicked => { root.style-category = "radial"; } }
+                            TabBtn { label: "3D"; active: root.style-category == "3d"; clicked => { root.style-category = "3d"; } }
+                            TabBtn { label: "Retro"; active: root.style-category == "retro"; clicked => { root.style-category = "retro"; } }
+                            TabBtn { label: "Cyber"; active: root.style-category == "cyber"; clicked => { root.style-category = "cyber"; } }
+                            TabBtn { label: "Liquid"; active: root.style-category == "liquid"; clicked => { root.style-category = "liquid"; } }
+                            TabBtn { label: "Pulse"; active: root.style-category == "pulsing"; clicked => { root.style-category = "pulsing"; } }
+                            TabBtn { label: "Space"; active: root.style-category == "space"; clicked => { root.style-category = "space"; } }
+                            TabBtn { label: "Glass"; active: root.style-category == "glass"; clicked => { root.style-category = "glass"; } }
+                        }
+                    }
+
+                    VerticalLayout {
+                        spacing: 0px;
+                        alignment: start;
+                        for item in root.style-items : StyleCard {
+                            is-visible: root.matches-search(item.label, root.style-search-query) && root.matches-category(item.category, root.style-category);
+                            style-id: item.id;
+                            label: item.label;
+                            current: root.style-val;
+                            style-clicked(id) => { root.style-val = id; root.config-changed(); }
+                        }
+                    }
+                    if (root.has-bar-count(root.style-val)) : SliderRow {
                         label: "Bar Count";
                         value-text: "" + root.bar-count;
                         minimum: 16;
                         maximum: 128;
+                        default-value: 64;
                         value: root.bar-count;
                         changed(val) => { root.bar-count = Math.round(val); root.config-changed(); }
                     }
@@ -826,6 +992,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: root.bar-gap + "px";
                             minimum: 0;
                             maximum: 20;
+                            default-value: 2;
                             value: root.bar-gap;
                             changed(val) => { root.bar-gap = Math.round(val); root.config-changed(); }
                         }
@@ -835,6 +1002,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: root.bar-width + "px";
                             minimum: 2;
                             maximum: 40;
+                            default-value: 6;
                             value: root.bar-width;
                             changed(val) => { root.bar-width = Math.round(val); root.config-changed(); }
                         }
@@ -844,6 +1012,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: root.bar-rounding + "px";
                             minimum: 0;
                             maximum: 20;
+                            default-value: 3;
                             value: root.bar-rounding;
                             changed(val) => { root.bar-rounding = Math.round(val); root.config-changed(); }
                         }
@@ -864,6 +1033,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: "" + (Math.round(root.sensitivity * 10) / 10);
                         minimum: 0.2;
                         maximum: 3.0;
+                        default-value: 1.0;
                         value: root.sensitivity;
                         changed(val) => { root.sensitivity = val; root.config-changed(); }
                     }
@@ -873,6 +1043,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: "" + (Math.round(root.bass-multiplier * 10) / 10);
                         minimum: 0.5;
                         maximum: 4.0;
+                        default-value: 1.0;
                         value: root.bass-multiplier;
                         changed(val) => { root.bass-multiplier = val; root.config-changed(); }
                     }
@@ -882,6 +1053,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: "" + (Math.round(root.smoothing * 100) / 100);
                         minimum: 0.0;
                         maximum: 0.95;
+                        default-value: 0.75;
                         value: root.smoothing;
                         changed(val) => { root.smoothing = val; root.config-changed(); }
                     }
@@ -893,6 +1065,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.fire-width-ratio * 100) + "%";
                             minimum: 0.3;
                             maximum: 1.0;
+                            default-value: 0.75;
                             value: root.fire-width-ratio;
                             changed(val) => { root.fire-width-ratio = val; root.config-changed(); }
                         }
@@ -902,6 +1075,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: "" + (Math.round(root.fire-height-scale * 10) / 10) + "x";
                             minimum: 0.3;
                             maximum: 2.5;
+                            default-value: 1.0;
                             value: root.fire-height-scale;
                             changed(val) => { root.fire-height-scale = val; root.config-changed(); }
                         }
@@ -912,6 +1086,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: "" + (Math.round(root.visualizer-scale * 10) / 10);
                         minimum: 0.2;
                         maximum: 3.0;
+                        default-value: 1.0;
                         value: root.visualizer-scale;
                         changed(val) => { root.visualizer-scale = val; root.config-changed(); }
                     }
@@ -921,6 +1096,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: Math.round(root.position-x * 100) + "%";
                         minimum: -1.0;
                         maximum: 1.0;
+                        default-value: 0.0;
                         value: root.position-x;
                         changed(val) => { root.position-x = val; root.config-changed(); }
                     }
@@ -930,18 +1106,26 @@ export component ControlPanel inherits Rectangle {
                         value-text: Math.round(root.position-y * 100) + "%";
                         minimum: -1.0;
                         maximum: 1.0;
+                        default-value: 0.0;
                         value: root.position-y;
                         changed(val) => { root.position-y = val; root.config-changed(); }
                     }
 
-                    SectionTitle { text: "RADIAL CENTER IMAGE"; }
-                    Button {
-                        text: root.radial-center-image-uri == "" ? "Choose Center Image" : "Change Center Image";
-                        clicked => { root.open-radial-image-clicked(); }
-                    }
-                    if (root.radial-center-image-uri != "") : Button {
-                        text: "Remove Image";
-                        clicked => { root.remove-radial-image-clicked(); }
+                    // RADIAL CENTER IMAGE — only shown for styles that implement
+                    // draw_radial_center_image() in their Rust renderer.
+                    // Excluded: dualPortalBridge (dual portals, no single center),
+                    //           radialRipple3D (3D tilt perspective — no meaningful visual center).
+                    if (root.style-val == "radial" || root.style-val == "circularBars" || root.style-val == "pulseRings" || root.style-val == "cyberRing3D" || root.style-val == "cyberBlackHole" || root.style-val == "chronoReactor" || root.style-val == "quantumEye" || root.style-val == "neonBiohazard" || root.style-val == "neonLotus" || root.style-val == "holographicVinyl" || root.style-val == "acousticCymascope" || root.style-val == "waveformOscillatingRings" || root.style-val == "warpDrive" || root.style-val == "solarFlareCrown" || root.style-val == "supernovaBurst" || root.style-val == "speakerExplosion" || root.style-val == "turntable" || root.style-val == "vinylRecord" || root.style-val == "radialSpikeBlade" || root.style-val == "radialPlasmaAura" || root.style-val == "radialCyberRune" || root.style-val == "radialNeonOrbiter" || root.style-val == "radialStarlightHalo" || root.style-val == "radialVortexSpiral" || root.style-val == "radialBioShuriken" || root.style-val == "radialHexCore" || root.style-val == "radialSonicMandala" || root.style-val == "radialLaserCurtain" || root.style-val == "radialSolarFlareBurst" || root.style-val == "radialApertureIris" || root.style-val == "radialRadarSweep" || root.style-val == "radialGearMechanism" || root.style-val == "radialFireworksBurst" || root.style-val == "radialKaleidoscope" || root.style-val == "radialOrrery" || root.style-val == "radialClockwork" || root.style-val == "radialGeodesicWeb" || root.style-val == "pulsingPillRing" || root.style-val == "pulsingLiquidAura" || root.style-val == "pulsingDualRing" || root.style-val == "pulsingShockwave" || root.style-val == "pulsingNeonArcade" || root.style-val == "pulsingLaserWeb" || root.style-val == "pulsingCosmicDust" || root.style-val == "pulsingCyberShield" || root.style-val == "pulsingSunburstCorona" || root.style-val == "pulsingBarcodePill") : VerticalLayout {
+                        spacing: 8px;
+                        SectionTitle { text: "RADIAL CENTER IMAGE"; }
+                        Button {
+                            text: root.radial-center-image-uri == "" ? "Choose Center Image" : "Change Center Image";
+                            clicked => { root.open-radial-image-clicked(); }
+                        }
+                        if (root.radial-center-image-uri != "") : Button {
+                            text: "Remove Image";
+                            clicked => { root.remove-radial-image-clicked(); }
+                        }
                     }
                 }
 
@@ -1063,6 +1247,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: Math.round(root.image-opacity * 100) + "%";
                         minimum: 0.0;
                         maximum: 1.0;
+                        default-value: 0.15;
                         value: root.image-opacity;
                         changed(val) => { root.image-opacity = val; root.config-changed(); }
                     }
@@ -1096,6 +1281,7 @@ export component ControlPanel inherits Rectangle {
                         value-text: Math.round(root.overlay-opacity * 100) + "%";
                         minimum: 0.0;
                         maximum: 1.0;
+                        default-value: 0.15;
                         value: root.overlay-opacity;
                         changed(val) => { root.overlay-opacity = val; root.config-changed(); }
                     }
@@ -1109,6 +1295,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.grid-size) + "px";
                             minimum: 10.0;
                             maximum: 120.0;
+                            default-value: 40.0;
                             value: root.grid-size;
                             changed(val) => { root.grid-size = val; root.config-changed(); }
                         }
@@ -1117,6 +1304,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.grid-line-width) + "px";
                             minimum: 1.0;
                             maximum: 6.0;
+                            default-value: 1.0;
                             value: root.grid-line-width;
                             changed(val) => { root.grid-line-width = val; root.config-changed(); }
                         }
@@ -1135,6 +1323,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.star-count) + "";
                             minimum: 30.0;
                             maximum: 300.0;
+                            default-value: 100.0;
                             value: root.star-count;
                             changed(val) => { root.star-count = val; root.config-changed(); }
                         }
@@ -1143,6 +1332,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.star-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.star-speed;
                             changed(val) => { root.star-speed = val; root.config-changed(); }
                         }
@@ -1151,6 +1341,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.star-brightness * 100) + "%";
                             minimum: 0.2;
                             maximum: 1.5;
+                            default-value: 1.0;
                             value: root.star-brightness;
                             changed(val) => { root.star-brightness = val; root.config-changed(); }
                         }
@@ -1164,6 +1355,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.nebula-intensity * 100) + "%";
                             minimum: 0.1;
                             maximum: 1.0;
+                            default-value: 0.5;
                             value: root.nebula-intensity;
                             changed(val) => { root.nebula-intensity = val; root.config-changed(); }
                         }
@@ -1172,6 +1364,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.nebula-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.nebula-speed;
                             changed(val) => { root.nebula-speed = val; root.config-changed(); }
                         }
@@ -1185,6 +1378,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.aurora-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.aurora-speed;
                             changed(val) => { root.aurora-speed = val; root.config-changed(); }
                         }
@@ -1193,6 +1387,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.aurora-amplitude) + "px";
                             minimum: 10.0;
                             maximum: 120.0;
+                            default-value: 50.0;
                             value: root.aurora-amplitude;
                             changed(val) => { root.aurora-amplitude = val; root.config-changed(); }
                         }
@@ -1201,6 +1396,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.aurora-opacity * 100) + "%";
                             minimum: 0.05;
                             maximum: 0.6;
+                            default-value: 0.3;
                             value: root.aurora-opacity;
                             changed(val) => { root.aurora-opacity = val; root.config-changed(); }
                         }
@@ -1214,6 +1410,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.grain-opacity * 100) + "%";
                             minimum: 0.01;
                             maximum: 0.3;
+                            default-value: 0.08;
                             value: root.grain-opacity;
                             changed(val) => { root.grain-opacity = val; root.config-changed(); }
                         }
@@ -1227,6 +1424,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.bokeh-count) + "";
                             minimum: 5.0;
                             maximum: 40.0;
+                            default-value: 15.0;
                             value: root.bokeh-count;
                             changed(val) => { root.bokeh-count = val; root.config-changed(); }
                         }
@@ -1235,6 +1433,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.bokeh-size) + "px";
                             minimum: 10.0;
                             maximum: 80.0;
+                            default-value: 40.0;
                             value: root.bokeh-size;
                             changed(val) => { root.bokeh-size = val; root.config-changed(); }
                         }
@@ -1243,6 +1442,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.bokeh-opacity * 100) + "%";
                             minimum: 0.05;
                             maximum: 0.6;
+                            default-value: 0.25;
                             value: root.bokeh-opacity;
                             changed(val) => { root.bokeh-opacity = val; root.config-changed(); }
                         }
@@ -1256,6 +1456,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.psychedelic-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.psychedelic-speed;
                             changed(val) => { root.psychedelic-speed = val; root.config-changed(); }
                         }
@@ -1264,6 +1465,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.psychedelic-bands) + "";
                             minimum: 10.0;
                             maximum: 50.0;
+                            default-value: 20.0;
                             value: root.psychedelic-bands;
                             changed(val) => { root.psychedelic-bands = val; root.config-changed(); }
                         }
@@ -1272,6 +1474,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.psychedelic-line-width) + "px";
                             minimum: 1.0;
                             maximum: 12.0;
+                            default-value: 3.0;
                             value: root.psychedelic-line-width;
                             changed(val) => { root.psychedelic-line-width = val; root.config-changed(); }
                         }
@@ -1298,6 +1501,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.particle-count) + "";
                             minimum: 10.0;
                             maximum: 150.0;
+                            default-value: 50.0;
                             value: root.particle-count;
                             changed(val) => { root.particle-count = val; root.config-changed(); }
                         }
@@ -1306,6 +1510,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.particle-size) + "px";
                             minimum: 1.0;
                             maximum: 12.0;
+                            default-value: 3.0;
                             value: root.particle-size;
                             changed(val) => { root.particle-size = val; root.config-changed(); }
                         }
@@ -1314,6 +1519,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.particle-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.particle-speed;
                             changed(val) => { root.particle-speed = val; root.config-changed(); }
                         }
@@ -1344,6 +1550,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.music-note-count) + "";
                             minimum: 10.0;
                             maximum: 80.0;
+                            default-value: 30.0;
                             value: root.music-note-count;
                             changed(val) => { root.music-note-count = val; root.config-changed(); }
                         }
@@ -1352,6 +1559,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.music-note-size) + "px";
                             minimum: 16.0;
                             maximum: 120.0;
+                            default-value: 40.0;
                             value: root.music-note-size;
                             changed(val) => { root.music-note-size = val; root.config-changed(); }
                         }
@@ -1360,6 +1568,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.music-note-sensitivity * 100) + "%";
                             minimum: 0.0;
                             maximum: 2.0;
+                            default-value: 1.0;
                             value: root.music-note-sensitivity;
                             changed(val) => { root.music-note-sensitivity = val; root.config-changed(); }
                         }
@@ -1382,6 +1591,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.fireworks-count) + "";
                             minimum: 3.0;
                             maximum: 20.0;
+                            default-value: 8.0;
                             value: root.fireworks-count;
                             changed(val) => { root.fireworks-count = val; root.config-changed(); }
                         }
@@ -1390,6 +1600,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.fireworks-size) + "px";
                             minimum: 1.0;
                             maximum: 12.0;
+                            default-value: 4.0;
                             value: root.fireworks-size;
                             changed(val) => { root.fireworks-size = val; root.config-changed(); }
                         }
@@ -1398,6 +1609,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.fireworks-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.fireworks-speed;
                             changed(val) => { root.fireworks-speed = val; root.config-changed(); }
                         }
@@ -1406,6 +1618,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.fireworks-depth * 100) + "%";
                             minimum: 0.5;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.fireworks-depth;
                             changed(val) => { root.fireworks-depth = val; root.config-changed(); }
                         }
@@ -1428,6 +1641,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.matrix-rain-count) + "";
                             minimum: 10.0;
                             maximum: 90.0;
+                            default-value: 40.0;
                             value: root.matrix-rain-count;
                             changed(val) => { root.matrix-rain-count = val; root.config-changed(); }
                         }
@@ -1436,6 +1650,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.matrix-rain-size) + "px";
                             minimum: 2.0;
                             maximum: 12.0;
+                            default-value: 6.0;
                             value: root.matrix-rain-size;
                             changed(val) => { root.matrix-rain-size = val; root.config-changed(); }
                         }
@@ -1444,6 +1659,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.matrix-rain-speed * 100) + "%";
                             minimum: 0.2;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.matrix-rain-speed;
                             changed(val) => { root.matrix-rain-speed = val; root.config-changed(); }
                         }
@@ -1452,6 +1668,7 @@ export component ControlPanel inherits Rectangle {
                             value-text: Math.round(root.matrix-rain-depth * 100) + "%";
                             minimum: 0.5;
                             maximum: 3.0;
+                            default-value: 1.0;
                             value: root.matrix-rain-depth;
                             changed(val) => { root.matrix-rain-depth = val; root.config-changed(); }
                         }

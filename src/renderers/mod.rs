@@ -79,6 +79,9 @@ pub struct RenderState {
   pub prev_raw_bass: f32,
   pub beat_strength: f32,
   pub beat_strength_raw: f32,
+  /// Count of detected beat onsets; styles use it to pick a new pseudo-random
+  /// emphasis angle on every beat instead of advancing in a fixed order.
+  pub beat_count: u64,
   pub rng: Rng,
   pub advanced: helpers::AdvancedState,
   /// Custom background image uploaded once to a persistent atlas layer.
@@ -123,6 +126,7 @@ impl RenderState {
       prev_raw_bass: 0.0,
       beat_strength: 0.0,
       beat_strength_raw: 0.0,
+      beat_count: 0,
       rng: Rng::new(seed),
       advanced: helpers::AdvancedState::default(),
       background_image: None,
@@ -151,6 +155,7 @@ pub struct RenderContext<'a> {
   pub time_data: &'a [u8],
   pub bass_energy: f32,
   pub beat_strength: f32,
+  pub beat_count: u64,
   pub rotation_angle: f32,
   pub frame_time: f32,
   pub state: &'a mut RenderState,
@@ -382,6 +387,7 @@ pub fn render_style(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 pub struct FrameEnvelope {
   pub bass_energy: f32,
   pub beat_strength: f32,
+  pub beat_count: u64,
   pub above_floor: f32,
   pub global_fade: f32,
   pub shake_x: f32,
@@ -425,6 +431,7 @@ pub fn advance_envelope(
   state.prev_target_bass = target_bass;
   if onset > 0.03 {
     state.beat_strength = (onset * 6.0).max(state.beat_strength * 0.6);
+    state.beat_count = state.beat_count.wrapping_add(1);
   } else {
     state.beat_strength *= 0.7;
   }
@@ -461,6 +468,7 @@ pub fn advance_envelope(
   FrameEnvelope {
     bass_energy: state.bass_energy,
     beat_strength: state.beat_strength,
+    beat_count: state.beat_count,
     above_floor,
     global_fade,
     shake_x,
@@ -511,6 +519,7 @@ pub fn draw_frame_pass(
     time_data: time,
     bass_energy: env.bass_energy,
     beat_strength: env.beat_strength,
+    beat_count: env.beat_count,
     rotation_angle: state.rotation_angle,
     frame_time,
     state,

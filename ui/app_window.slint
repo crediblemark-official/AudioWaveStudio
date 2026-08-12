@@ -1,6 +1,6 @@
 import { Navbar } from "navbar.slint";
 import { AudioBar } from "audio_bar.slint";
-import { ControlPanel } from "control_panel.slint";
+import { ControlPanel, StyleItem } from "control_panel.slint";
 import { ExportModal } from "export_modal.slint";
 import { ModalBtn } from "export_modal.slint";
 import { HardwareModal } from "hardware_modal.slint";
@@ -29,27 +29,31 @@ component EmptyStateOverlay {
             alignment: center;
             VerticalLayout {
                 alignment: center;
+                padding-bottom: 70px;
 
                 Rectangle {
-                    width: 480px;
+                    width: 440px;
                     border-radius: 16px;
-                    background: #0b0f19b0;
+                    background: #0b0f19c8;
                     border-width: 1px;
                     border-color: #ffd70038;
                     drop-shadow-blur: 24px;
                     drop-shadow-color: #000000cc;
 
                     VerticalLayout {
-                        padding: 32px;
-                        spacing: 14px;
+                        padding-left: 28px;
+                        padding-right: 28px;
+                        padding-top: 24px;
+                        padding-bottom: 24px;
+                        spacing: 10px;
                         alignment: center;
 
                         HorizontalLayout {
                             alignment: center;
                             Rectangle {
-                                width: 76px;
-                                height: 76px;
-                                border-radius: 38px;
+                                width: 64px;
+                                height: 64px;
+                                border-radius: 32px;
                                 background: #ffd70010;
                                 border-width: 1px;
                                 border-color: #ffd70050;
@@ -60,7 +64,7 @@ component EmptyStateOverlay {
                                 Text {
                                     text: "♪";
                                     color: #ffd700;
-                                    font-size: 36px;
+                                    font-size: 30px;
                                     font-weight: 700;
                                     horizontal-alignment: center;
                                     vertical-alignment: center;
@@ -71,7 +75,7 @@ component EmptyStateOverlay {
                         Text {
                             text: "Drop your music here";
                             color: #f8fafc;
-                            font-size: 22px;
+                            font-size: 20px;
                             font-weight: 700;
                             horizontal-alignment: center;
                         }
@@ -79,14 +83,14 @@ component EmptyStateOverlay {
                         Text {
                             text: "MP3 · WAV · FLAC · OGG · AAC — drag a song onto the canvas";
                             color: #94a3b8;
-                            font-size: 13px;
+                            font-size: 12px;
                             horizontal-alignment: center;
                         }
 
                         Text {
                             text: "or click Browse to pick a file from your computer";
                             color: #64748b;
-                            font-size: 12px;
+                            font-size: 11px;
                             horizontal-alignment: center;
                         }
 
@@ -154,6 +158,8 @@ export component AppWindow inherits Window {
 
     // Configuration Properties
     in-out property <string> style-val: "spectrum";
+    in-out property <string> style-search-query: "";
+    in-out property <string> style-category: "all";
     in-out property <int> bar-count: 64;
     in-out property <float> bar-gap: 2.0;
     in-out property <float> bar-width: 6.0;
@@ -277,17 +283,20 @@ export component AppWindow inherits Window {
     in-out property <string> cassette-label: "AUDIOWAVE VOLUME #1";
     in-out property <string> text-preset: "Bottom Center";
     in-out property <float> title-pos-x: 50.0;
-    in-out property <float> title-pos-y: 78.0;
+    in-out property <float> title-pos-y: 81.0;
     in-out property <float> title-font-size: 36.0;
     in-out property <string> title-color: "#ffffff";
     in-out property <float> artist-pos-x: 50.0;
-    in-out property <float> artist-pos-y: 86.0;
+    in-out property <float> artist-pos-y: 88.0;
     in-out property <float> artist-font-size: 20.0;
     in-out property <string> artist-color: "#a3a3a3";
     in-out property <[CustomTextBlockData]> custom-text-blocks: [];
     callback add-custom-text-clicked();
     callback remove-custom-text-clicked(int);
     callback custom-text-edited(int, string, bool, float, float, float, string, string, string);
+
+    pure callback matches-search(string, string) -> bool;
+    pure callback matches-category(string, string) -> bool;
 
     // Export Settings
     in-out property <string> export-aspect-ratio: "16:9";
@@ -498,7 +507,7 @@ export component AppWindow inherits Window {
                     // ONBOARDING EMPTY STATE — no track loaded yet (no TouchArea
                     // of its own, so canvas double-click/fullscreen still works;
                     // only the Browse button is interactive).
-                    if (!root.has-track) : EmptyStateOverlay {
+                    if (!root.has-track && !root.is-listening) : EmptyStateOverlay {
                         browse-clicked => { root.open-file-clicked(); }
                     }
 
@@ -551,6 +560,10 @@ export component AppWindow inherits Window {
                         width: 380px;
                         active-tab <=> root.active-tab;
                     style-val <=> root.style-val;
+                    style-search-query <=> root.style-search-query;
+                    style-category <=> root.style-category;
+                    matches-search(label, query) => { return root.matches-search(label, query); }
+                    matches-category(category, selected) => { return root.matches-category(category, selected); }
                     bar-count <=> root.bar-count;
                     bar-gap <=> root.bar-gap;
                     bar-width <=> root.bar-width;
@@ -772,10 +785,11 @@ export component AppWindow inherits Window {
         // focus ring). Hidden while a modal is open so it never floats above /
         // steals clicks from the modal surface.
         pt-fs := FocusScope {
-            x: viewport.x + viewport.width - 30px;
+            x: root.panel-open ? (viewport.x + viewport.width - 20px) : (viewport.x + viewport.width - 40px);
             y: viewport.y + viewport.height / 2 - 26px;
             width: 28px;
             height: 52px;
+            animate x { duration: 220ms; easing: ease-in-out; }
             focus-on-click: true;
             focus-on-tab-navigation: true;
             visible: !root.show-export-modal && !root.show-hardware-modal && !root.show-about-modal;

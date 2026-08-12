@@ -1,11 +1,7 @@
-//! Orbit Spike style renderer (`orbitSpike`) — 3D Rainbow Radial Spectrum Engine.
+//! Orbit Spike 3D visualizer style (`orbitSpike`).
 //!
-//! Replaces old orbitSpike with the 3D Rainbow Radial Spectrum Disc:
-//! - Tilted 3D circular disc floating in space with inner black hole.
-//! - 180 high-density radial spokes radiating outward across a 360° continuous rainbow spectrum.
-//! - Audio-reactive vertical 3D frequency spikes rising upward from each spoke.
-//! - Smooth painter's algorithm depth sorting for true 3D perspective layering.
-//! - Bass-driven rotation, tilt pulsation, and vibrant HSL rainbow color gradients.
+//! Tilted 3D audio rainbow spoke disc with vertical frequency fins, smooth depth-sorting,
+//! and glowing rounded spoke tip motes (eliminating blunt/flat line caps).
 
 use std::f32::consts::TAU;
 
@@ -15,19 +11,19 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const SPOKES: usize = 180;
+const SPOKES: usize = 64;
 
-/// Smooth 360-degree rainbow spectral color (HSL: 0..1 -> Red->Yellow->Green->Cyan->Blue->Magenta->Red)
 fn rainbow_color(t: f32, alpha: f32) -> Color {
-    let hue = (t.fract() * 360.0 + 360.0) % 360.0;
-    let h = hue / 60.0;
+    let h = t * 6.0;
     let x = 1.0 - (h % 2.0 - 1.0).abs();
-    let (r, g, b) = if h < 1.0      { (1.0, x,   0.0) }
-                    else if h < 2.0 { (x,   1.0, 0.0) }
-                    else if h < 3.0 { (0.0, 1.0, x)   }
-                    else if h < 4.0 { (0.0, x,   1.0) }
-                    else if h < 5.0 { (x,   0.0, 1.0) }
-                    else             { (1.0, 0.0, x)   };
+    let (r, g, b) = match h as u32 {
+        0 => (1.0, x, 0.0),
+        1 => (x, 1.0, 0.0),
+        2 => (0.0, 1.0, x),
+        3 => (0.0, x, 1.0),
+        4 => (x, 0.0, 1.0),
+        _ => (1.0, 0.0, x),
+    };
     Color::rgba(r, g, b, alpha)
 }
 
@@ -36,20 +32,21 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let height = ctx.height;
     let theme  = &ctx.config.theme;
 
-    let p_col   = theme_primary(theme);
-    let s_col   = theme_secondary(theme);
-    let acc_col = theme_accent(theme);
-    let glow    = theme_glow(theme);
+    let p_col  = theme_primary(theme);
+    let s_col  = theme_secondary(theme);
+    let _accent = theme_accent(theme);
+    let glow   = theme_glow(theme);
 
-    let sensitivity  = ctx.config.reactivity.sensitivity;
-    let user_scale   = ctx.config.scale.clamp(0.1, 5.0);
-    let pos_offset_x = ctx.config.position_x * width  * 0.5;
-    let pos_offset_y = -ctx.config.position_y * height * 0.5;
+    let sensitivity   = ctx.config.reactivity.sensitivity;
+    let _bass_mult    = ctx.config.reactivity.bass_multiplier;
+    let user_scale    = ctx.config.scale.clamp(0.1, 5.0);
+    let pos_offset_x = ctx.config.position_x * width * 0.5;
+    let pos_offset_y = ctx.config.position_y * height * 0.5;
     let bar_count    = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let bs = ctx.beat_strength.clamp(0.0, 1.0);
-    let freq      = ctx.freq_data;
+    let freq       = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
     let cx = width  * 0.5 + pos_offset_x;
@@ -69,12 +66,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
 
-    // -------------------------------------------------------------------------
-    // 1. BACKGROUND & AMBIENT RADIAL GLOW
-    // -------------------------------------------------------------------------
-//     c.set_fill(Fill::Solid(Color::hex("#020108")));
-//     c.fill_rect(0.0, 0.0, width, height);
-
+    // Ambient radial glow
     let bg_glow = Fill::radial_gradient(
         cx, cy, 0.0,
         cx, cy, base_size * 1.5,
@@ -85,10 +77,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(bg_glow);
-//     c.fill_rect(0.0, 0.0, width, height);
 
     // -------------------------------------------------------------------------
-    // 2. PRECOMPUTE ALL SPOKES (Coordinates & Audio Heights)
+    // PRECOMPUTE ALL SPOKES (Coordinates & Audio Heights)
     // -------------------------------------------------------------------------
     struct SpokeData {
         _idx: usize,
@@ -114,8 +105,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         let sin_a = angle.sin();
         let cos_a = angle.cos();
 
-        // Map spoke to frequency bin
-        // Mirror audio data left/right for symmetric balance
         let mirrored_t = if t < 0.5 { t * 2.0 } else { (1.0 - t) * 2.0 };
         let bin_k = ((mirrored_t * bar_count as f32 * 0.5) as usize * step_f)
             .min(freq.len().saturating_sub(1));
@@ -134,7 +123,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         let x_out = cx + r_outer * cos_a;
         let y_out = cy + r_outer * sin_a * tilt_y;
 
-        // Spike rises vertically (-Y) from tilted mid-point
         let spike_y = y_mid - spike_h;
 
         let color = rainbow_color(t, 0.95);
@@ -160,10 +148,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     render_order.sort_by(|&a, &b| spokes[a].sin_val.partial_cmp(&spokes[b].sin_val).unwrap());
 
     // -------------------------------------------------------------------------
-    // 3. RENDER DISC & FREQUENCY SPIKES (PAINTER'S ALGORITHM)
+    // RENDER DISC & FREQUENCY SPIKES (PAINTER'S ALGORITHM)
     // -------------------------------------------------------------------------
-
-    // Helper to draw a single spoke and its vertical spike fin
     let draw_spoke = |c: &mut GpuCanvas, sp: &SpokeData, next_sp: &SpokeData| {
         let depth_t = (sp.sin_val * 0.5 + 0.5).clamp(0.0, 1.0);
         let alpha = 0.55 + depth_t * 0.42;
@@ -174,6 +160,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_line_width((1.2 + depth_t * 1.0 + sp.fv * 1.5) * user_scale);
         c.set_shadow(spoke_col, (4.0 + sp.fv * 8.0) * user_scale);
         c.stroke_line(sp.x_in, sp.y_in, sp.x_out, sp.y_out);
+
+        // Rounded tip motes at outer spoke tips (removes flat "ujung buntung")
+        c.set_fill(Fill::Solid(mix(spoke_col, Color::WHITE, 0.6)));
+        c.set_shadow(spoke_col, 6.0 * user_scale);
+        c.fill_circle(sp.x_out, sp.y_out, (1.8 + sp.fv * 1.5) * user_scale);
 
         // 2. Vertical Audio Frequency Fin / Spike
         let spike_poly = vec![
@@ -201,11 +192,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_line_width((1.5 + sp.fv * 1.2) * user_scale);
         c.set_shadow(spoke_col, 6.0 * user_scale);
         c.stroke_line(sp.x_mid, sp.spike_y, next_sp.x_mid, next_sp.spike_y);
+
+        // Glowing peak dot at spike vertex
+        c.set_fill(Fill::Solid(Color::WHITE));
+        c.set_shadow(glow, 10.0 * user_scale);
+        c.fill_circle(sp.x_mid, sp.spike_y, (2.2 + sp.fv * 1.8) * user_scale);
     };
 
-    // -------------------------------------------------------------------------
-    // 3. RENDER BACK SPOKES (sin_val < 0)
-    // -------------------------------------------------------------------------
+    // Render back spokes
     for &idx in &render_order {
         if spokes[idx].sin_val < 0.0 {
             let next_idx = (idx + 1) % SPOKES;
@@ -213,33 +207,22 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // 4. INNER BLACK HOLE & RIM GLOW (Renders ON TOP of back spokes, BEHIND front spokes)
-    // -------------------------------------------------------------------------
-    let inner_rx = r_inner;
-    let inner_ry = r_inner * tilt_y;
+    let stroke_ellipse_poly = |c: &mut GpuCanvas, rx: f32, ry: f32| {
+        let mut pts: Vec<(f32, f32)> = Vec::with_capacity(65);
+        for k in 0..=64 {
+            let a = k as f32 / 64.0 * TAU;
+            pts.push((cx + a.cos() * rx, cy + a.sin() * ry));
+        }
+        c.stroke_polyline(&pts);
+    };
 
-    // Black Hole Cutout
-    c.set_fill(Fill::Solid(Color::hex("#020108")));
-    c.set_shadow(Color::TRANSPARENT, 0.0);
-    c.fill_ellipse(cx, cy, inner_rx, inner_ry);
+    // Inner glowing ring
+    c.set_stroke(Fill::Solid(glow));
+    c.set_line_width((2.5 + be * 2.0) * user_scale);
+    c.set_shadow(glow, (14.0 + bs * 10.0) * user_scale);
+    stroke_ellipse_poly(c, r_inner, r_inner * tilt_y);
 
-    // Inner Rim Neon Outline
-    let rim_col = rainbow_color(frame_time * 0.1, 0.90);
-    c.set_stroke(Fill::Solid(rim_col));
-    c.set_line_width((2.0 + be * 1.5) * user_scale);
-    c.set_shadow(rim_col, (12.0 + be * 8.0) * user_scale);
-
-    let mut rim_pts: Vec<(f32, f32)> = Vec::with_capacity(64);
-    for k in 0..=60 {
-        let a = k as f32 / 60.0 * TAU;
-        rim_pts.push((cx + inner_rx * a.cos(), cy + inner_ry * a.sin()));
-    }
-    c.stroke_polyline(&rim_pts);
-
-    // -------------------------------------------------------------------------
-    // 5. RENDER FRONT SPOKES (sin_val >= 0) — Covers front edge of inner black hole
-    // -------------------------------------------------------------------------
+    // Render front spokes
     for &idx in &render_order {
         if spokes[idx].sin_val >= 0.0 {
             let next_idx = (idx + 1) % SPOKES;
@@ -247,18 +230,13 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // 5. BEAT FLASH
-    // -------------------------------------------------------------------------
-    if bs > 0.65 {
-        let fa = (bs - 0.65) * 0.25;
-        c.set_fill(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, fa)));
-        c.set_shadow(Color::TRANSPARENT, 0.0);
-//         c.fill_rect(0.0, 0.0, width, height);
-    }
-
-    let _ = (p_col, s_col, acc_col, glow);
+    // Outer perimeter neon ring
+    c.set_stroke(Fill::Solid(p_col.with_alpha(0.65)));
+    c.set_line_width(1.5 * user_scale);
+    c.set_shadow(p_col, 8.0 * user_scale);
+    stroke_ellipse_poly(c, r_outer, r_outer * tilt_y);
 
     c.set_global_alpha(1.0);
     c.restore();
+
 }

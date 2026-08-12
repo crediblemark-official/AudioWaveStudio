@@ -9,7 +9,7 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -133,6 +133,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(star_core);
     c.set_shadow(Color::rgba(1.0, 0.90, 0.30, 0.95), (20.0 + bs * 12.0) * user_scale);
     c.fill_circle(cx, cy, core_r);
+
+    // Center image on top of star detonation core (drawn last = on top)
+    draw_radial_center_image(c, ctx, cx, cy, core_r * 0.70);
 
     c.set_global_alpha(1.0);
     c.restore();

@@ -116,10 +116,20 @@ export component Navbar inherits Rectangle {
     in-out property <string> mic-device-label: "Default (System)";
     in-out property <bool> show-mic-picker: false;
 
-    private property <float> ticker-progress: 0.0;
-    // Pulsing "live" dot state for the mic status pill (toggled by the ticker
-    // timer below).
+    in-out property <string> ticker-text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
+    private property <float> ticker-offset: 0.0;
     private property <bool> mic-pulse: false;
+
+    Timer {
+        interval: 30ms;
+        running: true;
+        triggered => {
+            root.ticker-offset = root.ticker-offset - 1.0;
+            if (root.ticker-offset <= -600.0) {
+                root.ticker-offset = 0.0;
+            }
+        }
+    }
 
     // FULL-NAVBAR DRAG REGION — legacy `data-tauri-drag-region` on the whole
     // header. Sits behind all interactive elements so it only receives events
@@ -249,59 +259,52 @@ export component Navbar inherits Rectangle {
             }
         }
 
-        // FLEXIBLE CENTER TICKER (Shrinks automatically on smaller screen width)
+        // FLEXIBLE CENTER TICKER (Auto-width borderless marquee)
         Rectangle {
             horizontal-stretch: 1;
-            min-width: 0px;
-            max-width: 320px;
+            min-width: 120px;
             height: 28px;
-            border-radius: 6px;
-            background: ticker-ta.has-hover ? #ffd70024 : #ffd70010;
-            border-width: 1px;
-            border-color: #ffd70025;
+            background: ticker-ta.has-hover ? #ffffff0d : transparent;
             clip: true;
 
-            ticker-scroll := Rectangle {
-                x: -1 * root.ticker-progress * measure.width;
+            HorizontalLayout {
+                x: root.ticker-offset * 1px;
                 y: 0;
-                width: 2 * measure.width;
+                spacing: 40px;
                 height: parent.height;
 
-                HorizontalLayout {
-                    spacing: 0;
-                    Text {
-                        text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                        color: #ffd700;
-                        font-size: 11px;
-                        font-weight: 500;
-                        vertical-alignment: center;
-                    }
-                    Text {
-                        text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                        color: #ffd700;
-                        font-size: 11px;
-                        font-weight: 500;
-                        vertical-alignment: center;
-                    }
+                Text {
+                    text: root.ticker-text;
+                    color: #ffd700;
+                    font-size: 11px;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: root.ticker-text;
+                    color: #ffd700;
+                    font-size: 11px;
+                    font-weight: 600;
+                    vertical-alignment: center;
                 }
             }
 
-            // Left Edge Fade Blur Overlay
+            // Left Edge Fade Overlay
             Rectangle {
                 x: 0;
                 y: 0;
-                width: 20px;
+                width: 24px;
                 height: parent.height;
-                background: @linear-gradient(90deg, #0d0d0d 0%, #0d0d0d00 100%);
+                background: @linear-gradient(90deg, #000000 0%, #00000000 100%);
             }
 
-            // Right Edge Fade Blur Overlay
+            // Right Edge Fade Overlay
             Rectangle {
-                x: parent.width - 20px;
+                x: parent.width - 24px;
                 y: 0;
-                width: 20px;
+                width: 24px;
                 height: parent.height;
-                background: @linear-gradient(270deg, #0d0d0d 0%, #0d0d0d00 100%);
+                background: @linear-gradient(270deg, #000000 0%, #00000000 100%);
             }
 
             ticker-ta := TouchArea {
@@ -309,15 +312,6 @@ export component Navbar inherits Rectangle {
                 height: parent.height;
                 mouse-cursor: pointer;
                 clicked => { root.ticker-clicked(); }
-            }
-
-            measure := Text {
-                x: -10000px;
-                y: -10000px;
-                text: "✦ Powered by CredibleMark — Professional Web, Mobile & Desktop Software Development • Visit crediblemark.com • ";
-                color: transparent;
-                font-size: 11px;
-                font-weight: 500;
             }
         }
 
@@ -327,11 +321,9 @@ export component Navbar inherits Rectangle {
         }
 
         Timer {
-            interval: 16ms;
+            interval: 500ms;
             running: true;
             triggered() => {
-                root.ticker-progress = Math.mod(root.ticker-progress + 1.0 / 1125.0, 1.0);
-                // Toggle the mic-status dot twice per second while listening.
                 if (root.is-listening) { root.mic-pulse = !root.mic-pulse; }
                 else { root.mic-pulse = false; }
             }

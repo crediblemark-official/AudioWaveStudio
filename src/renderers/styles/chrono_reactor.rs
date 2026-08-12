@@ -9,7 +9,7 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -150,6 +150,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(core_grad);
     c.set_shadow(glow_col, (18.0 + bs * 10.0) * user_scale);
     c.fill_circle(cx, cy, core_r);
+
+    // Center image inside tachyon core (drawn last = on top)
+    draw_radial_center_image(c, ctx, cx, cy, core_r * 0.90);
 
     c.set_global_alpha(1.0);
     c.restore();

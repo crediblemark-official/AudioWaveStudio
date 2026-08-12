@@ -8,7 +8,7 @@ The app was migrated from a Tauri v2 (React 18 + TypeScript + Vite) webview arch
 
 ## Features
 
-- **64+ Visualizer Styles** — Spectrum Bars, 3D Synthwave Landscapes, 3D Laser Equalizer Wall, 3D Orbit Spike Rainbow Wheel, Hologram Stage, 10+ Waveform Renderers (3D Seismograph, Neon Dual Tube, Voxel Terrain, Spring Comb, Harmonic Web, etc.), Audio Prism 3D, Cyber Black Hole, and many more.
+- **134+ Visualizer Styles** — Spectrum Bars, 3D Synthwave Landscapes, 3D Laser Equalizer Wall, 3D Orbit Spike Rainbow Wheel, Hologram Stage, 10+ Glass Box 3D Chambers, 10+ Waveform Renderers (3D Seismograph, Neon Dual Tube, Voxel Terrain, Spring Comb, Harmonic Web, etc.), Audio Prism 3D, Cyber Black Hole, and many more.
 - **Beat-Synced Visuals** — Screen effects (shake, glitch, chromatic aberration, vignette, pulse) trigger on percussive beats, not smooth energy.
 - **Customizable Particles** — 8+ particle styles with beat-responsive bursts, size, and velocity.
 - **60 FPS Real-Time Preview** — GPU-accelerated live preview viewport rendered via wgpu.

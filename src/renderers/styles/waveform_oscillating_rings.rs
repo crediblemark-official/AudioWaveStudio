@@ -6,7 +6,7 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -55,7 +55,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(bg_glow);
-//     c.fill_rect(0.0, 0.0, width, height);
+    c.fill_rect(0.0, 0.0, width, height);
 
     // 3 Nested Concentric Waveform Rings
     let ring_scales = [0.65, 1.0, 1.35];
@@ -97,7 +97,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         }
     }
 
-    let _ = (s_col, be);
+    // Center image in the open area between the rings (drawn last = on top)
+    let center_r = base_radius * ring_scales[0] * 0.55; // fits inside the innermost ring
+    draw_radial_center_image(c, ctx, cx, cy, center_r);
 
     c.set_global_alpha(1.0);
     c.restore();

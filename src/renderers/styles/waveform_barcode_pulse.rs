@@ -52,7 +52,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(bg_glow);
-//     c.fill_rect(0.0, 0.0, width, height);
+    c.fill_rect(0.0, 0.0, width, height);
 
     let sample_step = (pcm.len() / bar_lines).max(1);
 
@@ -81,8 +81,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_shadow(barcode_col, (4.0 + val * 8.0) * user_scale);
         c.stroke_line(x, top_y, x, bot_y);
     }
-
-    let _ = (s_col, acc_col);
 
     c.set_global_alpha(1.0);
     c.restore();

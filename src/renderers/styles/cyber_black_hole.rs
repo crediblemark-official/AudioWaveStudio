@@ -7,7 +7,7 @@
 //! - Full UI Theme colors (`theme_primary`, `theme_secondary`, `theme_accent`, `theme_glow`) and slider integration.
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -108,6 +108,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(Fill::Solid(Color::hex("#000002")));
     c.set_shadow(Color::TRANSPARENT, 0.0);
     c.fill_circle(cx, cy, horizon_r);
+
+    // Center image inside the event horizon (drawn last = on top)
+    draw_radial_center_image(c, ctx, cx, cy, horizon_r * 0.88);
 
     c.set_global_alpha(1.0);
     c.restore();

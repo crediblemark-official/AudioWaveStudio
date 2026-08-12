@@ -9,7 +9,7 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -129,6 +129,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.set_fill(stamen_fill);
     c.set_shadow(Color::rgba(1.0, 0.85, 0.20, 0.90), (14.0 + bs * 8.0) * user_scale);
     c.fill_circle(cx, cy, stamen_r);
+
+    // Center image inside lotus stamen (drawn last = on top)
+    draw_radial_center_image(c, ctx, cx, cy, stamen_r * 0.85);
 
     c.set_global_alpha(1.0);
     c.restore();

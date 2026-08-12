@@ -131,6 +131,144 @@ pub enum VisualizerStyle {
   WaveformOscillatingRings,
   #[serde(rename = "waveformTopographicRibbon")]
   WaveformTopographicRibbon,
+  #[serde(rename = "radialSpikeBlade")]
+  RadialSpikeBlade,
+  #[serde(rename = "radialPlasmaAura")]
+  RadialPlasmaAura,
+  #[serde(rename = "radialCyberRune")]
+  RadialCyberRune,
+  #[serde(rename = "radialNeonOrbiter")]
+  RadialNeonOrbiter,
+  #[serde(rename = "radialStarlightHalo")]
+  RadialStarlightHalo,
+  #[serde(rename = "radialVortexSpiral")]
+  RadialVortexSpiral,
+  #[serde(rename = "radialBioShuriken")]
+  RadialBioShuriken,
+  #[serde(rename = "radialHexCore")]
+  RadialHexCore,
+  #[serde(rename = "radialSonicMandala")]
+  RadialSonicMandala,
+  #[serde(rename = "radialLaserCurtain")]
+  RadialLaserCurtain,
+  #[serde(rename = "radialSolarFlareBurst")]
+  RadialSolarFlareBurst,
+  #[serde(rename = "radialApertureIris")]
+  RadialApertureIris,
+  #[serde(rename = "radialRadarSweep")]
+  RadialRadarSweep,
+  #[serde(rename = "radialGearMechanism")]
+  RadialGearMechanism,
+  #[serde(rename = "radialFireworksBurst")]
+  RadialFireworksBurst,
+  #[serde(rename = "radialKaleidoscope")]
+  RadialKaleidoscope,
+  #[serde(rename = "radialOrrery")]
+  RadialOrrery,
+  #[serde(rename = "radialClockwork")]
+  RadialClockwork,
+  #[serde(rename = "radialGeodesicWeb")]
+  RadialGeodesicWeb,
+  #[serde(rename = "pulsingPillRing")]
+  PulsingPillRing,
+  #[serde(rename = "pulsingLiquidAura")]
+  PulsingLiquidAura,
+  #[serde(rename = "pulsingDualRing")]
+  PulsingDualRing,
+  #[serde(rename = "pulsingShockwave")]
+  PulsingShockwave,
+  #[serde(rename = "pulsingNeonArcade")]
+  PulsingNeonArcade,
+  #[serde(rename = "pulsingLaserWeb")]
+  PulsingLaserWeb,
+  #[serde(rename = "pulsingCosmicDust")]
+  PulsingCosmicDust,
+  #[serde(rename = "pulsingCyberShield")]
+  PulsingCyberShield,
+  #[serde(rename = "pulsingSunburstCorona")]
+  PulsingSunburstCorona,
+  #[serde(rename = "pulsingBarcodePill")]
+  PulsingBarcodePill,
+  #[serde(rename = "SaturnHalo")]
+  SaturnHalo,
+  #[serde(rename = "StarHexagon")]
+  StarHexagon,
+  #[serde(rename = "QuantumCloud")]
+  QuantumCloud,
+  #[serde(rename = "HyperdriveTunnel")]
+  HyperdriveTunnel,
+  #[serde(rename = "NebulaRing")]
+  NebulaRing,
+  #[serde(rename = "TacticalHud")]
+  TacticalHud,
+  #[serde(rename = "CrystalPrism")]
+  CrystalPrism,
+  #[serde(rename = "SynthwaveSun")]
+  SynthwaveSun,
+  #[serde(rename = "BiomorphicBloom")]
+  BiomorphicBloom,
+  #[serde(rename = "InfinityLoop")]
+  InfinityLoop,
+  #[serde(rename = "liquidTriLobeAura")]
+  LiquidTriLobeAura,
+  #[serde(rename = "liquidFerrofluidSpikes")]
+  LiquidFerrofluidSpikes,
+  #[serde(rename = "liquidMoltenMercury")]
+  LiquidMoltenMercury,
+  #[serde(rename = "liquidConcentricDrop")]
+  LiquidConcentricDrop,
+  #[serde(rename = "liquidJellyfishTentacles")]
+  LiquidJellyfishTentacles,
+  #[serde(rename = "liquidOilSlick")]
+  LiquidOilSlick,
+  #[serde(rename = "liquidVortexSwirl")]
+  LiquidVortexSwirl,
+  #[serde(rename = "liquidMetaballLava")]
+  LiquidMetaballLava,
+  #[serde(rename = "liquidToxicSlime")]
+  LiquidToxicSlime,
+  #[serde(rename = "liquidCymascopeWater")]
+  LiquidCymascopeWater,
+  #[serde(rename = "liquidBioluminescentPlasma")]
+  LiquidBioluminescentPlasma,
+  #[serde(rename = "liquidPlasmaBlob3D")]
+  LiquidPlasmaBlob3D,
+  #[serde(rename = "liquidChromaticViscosity")]
+  LiquidChromaticViscosity,
+  #[serde(rename = "liquidHydroElectricArcs")]
+  LiquidHydroElectricArcs,
+  #[serde(rename = "liquidBioluminescentPlankton")]
+  LiquidBioluminescentPlankton,
+  #[serde(rename = "liquidRadioactiveIsotope")]
+  LiquidRadioactiveIsotope,
+  #[serde(rename = "liquidNeonCyberGoo")]
+  LiquidNeonCyberGoo,
+  #[serde(rename = "liquidMoltenGoldStream")]
+  LiquidMoltenGoldStream,
+  #[serde(rename = "liquidMagmaCrustCore")]
+  LiquidMagmaCrustCore,
+  #[serde(rename = "liquidQuantumFluid")]
+  LiquidQuantumFluid,
+  #[serde(rename = "glassBoxQuantumPlasma")]
+  GlassBoxQuantumPlasma,
+  #[serde(rename = "glassBoxNeonSpectrum")]
+  GlassBoxNeonSpectrum,
+  #[serde(rename = "glassBoxCyberGrid")]
+  GlassBoxCyberGrid,
+  #[serde(rename = "glassBoxBioluminescentJellyfish")]
+  GlassBoxBioluminescentJellyfish,
+  #[serde(rename = "glassBoxMoltenLava")]
+  GlassBoxMoltenLava,
+  #[serde(rename = "glassBoxLaserMatrix")]
+  GlassBoxLaserMatrix,
+  #[serde(rename = "glassBoxLiquidChrome")]
+  GlassBoxLiquidChrome,
+  #[serde(rename = "glassBoxCosmicNebula")]
+  GlassBoxCosmicNebula,
+  #[serde(rename = "glassBoxHologramCore")]
+  GlassBoxHologramCore,
+  #[serde(rename = "glassBoxMatrixRain")]
+  GlassBoxMatrixRain,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -574,7 +712,7 @@ impl Default for TextSettings {
         font_size: 36.0,
         font_weight: 700.0,
         position_x: 50.0,
-        position_y: 78.0,
+        position_y: 81.0,
         color: "#ffffff".to_string(),
         opacity: 1.0,
         enabled: true,
@@ -586,7 +724,7 @@ impl Default for TextSettings {
         font_size: 20.0,
         font_weight: 400.0,
         position_x: 50.0,
-        position_y: 86.0,
+        position_y: 88.0,
         color: "#a3a3a3".to_string(),
         opacity: 1.0,
         enabled: true,

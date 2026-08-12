@@ -6,8 +6,11 @@
 use std::f32::consts::TAU;
 
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::draw_radial_center_image;
-use crate::renderers::RenderContext;
+use crate::renderers::helpers::mix;
+use crate::renderers::{
+    theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
+};
+use super::radial_common;
 
 const RING_COUNT: usize = 32;
 const RING_POINTS: usize = 128;
@@ -19,6 +22,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
   let freq = ctx.freq_data;
+  let theme = &ctx.config.theme;
+  let p_col = theme_primary(theme);
+  let s_col = theme_secondary(theme);
+  let accent = theme_accent(theme);
+  let glow = theme_glow(theme);
 
   let center_x = width * 0.48;
   let center_y = height * 0.62;
@@ -29,9 +37,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
-
-  // User Radial Center Image at the ripple core (if set)
-  draw_radial_center_image(c, ctx, center_x, center_y, 34.0);
 
   let st = &mut ctx.state.advanced;
 
@@ -56,8 +61,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let base_radius = 18.0 + (r_idx as f32) * 11.0 + (r_idx as f32).powf(1.4) * 2.2;
     let max_height = (35.0 + (1.0 - ring_ratio) * 65.0 + be * 30.0) * sensitivity;
 
-    // Calculate ring color: Red/Orange at core -> Yellow -> Green -> Cyan at outer rim
-    let col = compute_ripple_color(ring_ratio, bs);
+    // Calculate ring color: theme-mixed gradient from accent core -> p_col -> glow rim
+    let col = compute_ripple_color(ring_ratio, p_col, s_col, accent, glow);
 
     let mut points_2d: Vec<(f32, f32)> = Vec::with_capacity(RING_POINTS + 1);
 
@@ -66,11 +71,17 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       let cos_a = angle.cos();
       let sin_a = angle.sin();
 
-      // Mirror frequency indexing around the circle so ripples are symmetrical left/right
-      let bin_i = if p_idx <= RING_POINTS / 2 {
-        (p_idx * step).min(history_data.len().saturating_sub(1))
+      // Mirror frequency indexing around the circle so ripples are symmetrical left/right.
+      // Rotate the sample start by a beat-driven pseudo-random sweep so the
+      // spectral shape (and its bass prominences) scatters across the ring.
+      let sweep_off = ((radial_common::sweep_angle(ctx.beat_count) / TAU)
+        * (RING_POINTS as f32)) as usize
+        % RING_POINTS.max(1);
+      let p_rot = (p_idx + RING_POINTS - sweep_off) % RING_POINTS.max(1);
+      let bin_i = if p_rot <= RING_POINTS / 2 {
+        (p_rot * step).min(history_data.len().saturating_sub(1))
       } else {
-        ((RING_POINTS - p_idx) * step).min(history_data.len().saturating_sub(1))
+        ((RING_POINTS - p_rot) * step).min(history_data.len().saturating_sub(1))
       };
 
       let raw_v = *history_data.get(bin_i).unwrap_or(&0) as f32 / 255.0;
@@ -115,7 +126,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // Render high-intensity core flash on beat
   if bs > 0.2 {
     let core_radius = 25.0 + bs * 20.0;
-    c.set_shadow(Color::rgba(1.0, 0.4, 0.0, 0.8), 25.0);
+    let flash = mix(accent, s_col, 0.5);
+    c.set_shadow(flash, 25.0);
     c.set_fill(Fill::radial_gradient(
       center_x,
       center_y,
@@ -124,8 +136,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       center_y,
       core_radius,
       &[
-        (0.0, Color::rgba(1.0, 0.9, 0.3, 0.8 * bs)),
-        (0.4, Color::rgba(1.0, 0.3, 0.0, 0.5 * bs)),
+        (0.0, mix(Color::WHITE, flash, 0.5).with_alpha(0.8 * bs)),
+        (0.4, flash.with_alpha(0.5 * bs)),
         (1.0, Color::TRANSPARENT),
       ],
     ));
@@ -135,28 +147,21 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.restore();
 }
 
-/// Dynamic spectrum color interpolation: Core Red/Orange -> Mid Green -> Outer Cyan
-fn compute_ripple_color(ratio: f32, beat: f32) -> Color {
+/// Dynamic spectrum color interpolation: theme-driven gradient that sweeps from
+/// the accent color at the core through `p_col` out to `glow` at the rim, with
+/// the secondary colour mixed in at the mid range for the classic neon banding.
+fn compute_ripple_color(ratio: f32, p_col: Color, s_col: Color, accent: Color, glow: Color) -> Color {
   if ratio < 0.2 {
-    // Center Core: Fiery Red to Bright Orange/Gold
+    // Center Core: Accent -> Accent/Secondary blend (fiery edge)
     let t = ratio / 0.2;
-    let r = 1.0;
-    let g = (0.2 + t * 0.65 + beat * 0.15).min(1.0);
-    let b = (t * 0.05).min(1.0);
-    Color::rgba(r, g, b, 0.95)
+    mix(accent, mix(accent, s_col, 0.6), t).with_alpha(0.95)
   } else if ratio < 0.6 {
-    // Mid Range: Gold/Yellow to Lime Green
+    // Mid Range: Accent/Secondary -> Primary (gold band to cool)
     let t = (ratio - 0.2) / 0.4;
-    let r = (1.0 - t * 0.8).clamp(0.0, 1.0);
-    let g = 1.0;
-    let b = (t * 0.15).clamp(0.0, 1.0);
-    Color::rgba(r, g, b, 0.9)
+    mix(mix(accent, s_col, 0.6), mix(s_col, p_col, 0.5), t).with_alpha(0.9)
   } else {
-    // Outer Rim: Lime Green to Electric Cyan
+    // Outer Rim: Primary -> Glow (cool electric rim)
     let t = (ratio - 0.6) / 0.4;
-    let r = 0.0;
-    let g = (1.0 - t * 0.3).clamp(0.0, 1.0);
-    let b = (0.2 + t * 0.8).clamp(0.0, 1.0);
-    Color::rgba(r, g, b, 0.85)
+    mix(mix(s_col, p_col, 0.5), glow, t).with_alpha(0.85)
   }
 }

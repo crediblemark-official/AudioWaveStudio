@@ -60,6 +60,18 @@ fn hueComponent(n: f32, h: f32, l: f32, a: f32) -> f32 {
   return l - a * max(-1.0, min(min(k - 3.0, 9.0 - k), 1.0));
 }
 
+fn hsl_to_rgb(hsl: vec3<f32>) -> vec3<f32> {
+  let h = hsl.x / 360.0;
+  let s = hsl.y;
+  let l = hsl.z;
+  let a = s * min(l, 1.0 - l);
+  return vec3<f32>(
+    hueComponent(0.0, h, l, a),
+    hueComponent(8.0, h, l, a),
+    hueComponent(4.0, h, l, a)
+  );
+}
+
 fn hash22(p: vec2<f32>) -> vec2<f32> {
   var p3 = fract(vec3(p.xyx) * vec3(0.1031, 0.1030, 0.0973));
   p3 += dot(p3, p3.yzx + 33.33);
@@ -268,32 +280,145 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     let cb = textureSample(src, samp, uv).rgb;
     col = vec4(mix(cb, hueBlend(cb, cs), p.intensity), 1.0);
   } else if (p.mode == 11u) {
-    // glass crack — sharp Voronoi polygonal shard fractures & razor-thin specular line highlights.
-    let beat_shake = select(0.0, p.beat * 0.02, p.beat > 0.15);
+    // glass crack — hyper-realistic 3D impact spiderweb, chromatic dispersion & bevel depth.
+    let beat_shake = select(0.0, p.beat * 0.015, p.beat > 0.15);
     let uvt = uv + vec2(beat_shake * sin(p.time * 20.0), beat_shake * cos(p.time * 17.0));
 
-    // Scale grid for glass cell size
-    let st = uvt * vec2(w / h, 1.0) * 4.5;
-    let v = voronoi_glass(st);
-    let edge_dist = v.y; // distance to nearest straight Voronoi edge
-    let cell_id = v.z;
+    let aspect = w / max(h, 1.0);
+    let px = uvt.x * aspect;
+    let py = uvt.y;
 
-    // Piece-wise constant shard UV refraction displacement per polygon plate
-    let shard_rand = hash22(vec2(cell_id * 100.0, cell_id * 43.0));
-    let shard_offset = (shard_rand - vec2(0.5)) * amount * 0.035;
+    // Fine organic domain warp (gives cracks realistic curved/jagged glass texture)
+    let warp = vec2<f32>(
+      sin(py * 14.0 + px * 8.0) * 0.015,
+      cos(px * 16.0 - py * 10.0) * 0.015
+    );
+    let p_warped = vec2<f32>(px, py) + warp;
 
-    let sample_uv = clamp(uv + shard_offset, vec2(0.0), vec2(1.0));
-    var sampled = textureSample(src, samp, sample_uv);
+    // Impact centers (in aspect-corrected coordinates)
+    let imp0 = vec2<f32>(0.22 * aspect, 0.88); // Primary bottom-left impact
+    let imp1 = vec2<f32>(0.78 * aspect, 0.40); // Secondary mid-right impact
+    let imp2 = vec2<f32>(0.35 * aspect, 0.12); // Tertiary top-left impact
 
-    // Razor-sharp 1-2px specular line highlight along straight cell edges
-    let crack_width = 0.012 + amount * 0.018;
-    let line_intensity = 1.0 - smoothstep(0.0, crack_width, edge_dist);
+    var min_dist = 999.0;
+    var shard_id = 0.0;
+    var impact_glow = 0.0;
+    var fracture_dir = vec2<f32>(0.0);
 
-    if (line_intensity > 0.001) {
-      let specular_highlight = vec4(1.0, 1.0, 1.0, 1.0);
-      col = mix(sampled, specular_highlight, line_intensity * amount * 0.95);
-    } else {
-      col = sampled;
+    // Impact 0: Primary dense spiderweb & radial rays
+    let d0_vec = p_warped - imp0;
+    let dist0 = length(d0_vec);
+    let ang0 = atan2(d0_vec.y, d0_vec.x);
+    let n_ang0 = (ang0 + 3.14159265) / 6.2831853;
+    let ray_phase0 = (n_ang0 + sin(n_ang0 * 48.0 + dist0 * 12.0) * 0.03) * 22.0;
+    let ray_id0 = floor(ray_phase0);
+    let ray_dist0 = abs(fract(ray_phase0) - 0.5) * (dist0 * 0.14 + 0.005);
+
+    let ring_scale0 = 16.0 + hash22(vec2<f32>(ray_id0, 1.0)).x * 8.0;
+    let ring_phase0 = sqrt(dist0 + 0.005) * ring_scale0;
+    let ring_id0 = floor(ring_phase0);
+    let ring_dist0 = abs(fract(ring_phase0) - 0.5) * (0.010 + dist0 * 0.025);
+
+    let core_factor0 = select(1.0, 2.5, dist0 < 0.20);
+    let crack_d0 = min(ray_dist0, ring_dist0) / core_factor0;
+
+    if (crack_d0 < min_dist) {
+      min_dist = crack_d0;
+      shard_id = hash22(vec2<f32>(ray_id0, ring_id0)).x;
+      fracture_dir = normalize(d0_vec + vec2<f32>(0.001));
+    }
+    if (dist0 < 0.25) {
+      impact_glow = max(impact_glow, (1.0 - dist0 / 0.25) * 0.35);
+    }
+
+    // Impact 1: Secondary impact web
+    let d1_vec = p_warped - imp1;
+    let dist1 = length(d1_vec);
+    let ang1 = atan2(d1_vec.y, d1_vec.x);
+    let n_ang1 = (ang1 + 3.14159265) / 6.2831853;
+    let ray_phase1 = (n_ang1 + cos(n_ang1 * 36.0 + dist1 * 10.0) * 0.03) * 14.0;
+    let ray_id1 = floor(ray_phase1);
+    let ray_dist1 = abs(fract(ray_phase1) - 0.5) * (dist1 * 0.16 + 0.008);
+
+    let ring_scale1 = 12.0 + hash22(vec2<f32>(ray_id1, 2.0)).x * 6.0;
+    let ring_phase1 = sqrt(dist1 + 0.008) * ring_scale1;
+    let ring_id1 = floor(ring_phase1);
+    let ring_dist1 = abs(fract(ring_phase1) - 0.5) * (0.014 + dist1 * 0.03);
+    let crack_d1 = min(ray_dist1, ring_dist1);
+
+    if (crack_d1 < min_dist) {
+      min_dist = crack_d1;
+      shard_id = hash22(vec2<f32>(ray_id1 + 100.0, ring_id1)).x;
+      fracture_dir = normalize(d1_vec + vec2<f32>(0.001));
+    }
+    if (dist1 < 0.18) {
+      impact_glow = max(impact_glow, (1.0 - dist1 / 0.18) * 0.25);
+    }
+
+    // Impact 2: Top-left impact web
+    let d2_vec = p_warped - imp2;
+    let dist2 = length(d2_vec);
+    let ang2 = atan2(d2_vec.y, d2_vec.x);
+    let n_ang2 = (ang2 + 3.14159265) / 6.2831853;
+    let ray_phase2 = (n_ang2 + sin(n_ang2 * 30.0) * 0.04) * 12.0;
+    let ray_dist2 = abs(fract(ray_phase2) - 0.5) * (dist2 * 0.18 + 0.01);
+    let crack_d2 = ray_dist2;
+    if (crack_d2 < min_dist) {
+      min_dist = crack_d2;
+      shard_id = hash22(vec2<f32>(floor(ray_phase2) + 200.0, 3.0)).x;
+      fracture_dir = normalize(d2_vec + vec2<f32>(0.001));
+    }
+
+    // Long sweeping primary diagonal crack across screen
+    let diag1 = abs((px * 0.5 + py * 1.1) - (0.35 * aspect + 0.45) + sin(px * 6.0) * 0.035);
+    let diag2 = abs((px * 1.0 - py * 0.8) - (0.1 * aspect) + cos(py * 7.0) * 0.03);
+    let sweeping_crack = min(diag1, diag2) * 0.12;
+
+    if (sweeping_crack < min_dist) {
+      min_dist = sweeping_crack;
+      fracture_dir = vec2<f32>(0.707, -0.707);
+    }
+
+    // 3D Shard Tilt Refraction & Chromatic Aberration (RGB Prism Split)
+    let shard_rand = hash22(vec2<f32>(shard_id * 123.4, shard_id * 567.8));
+    let shard_tilt = (shard_rand - vec2<f32>(0.5)) * 2.0;
+    let shard_offset = shard_tilt * amount * 0.022;
+
+    // Chromatic dispersion vector perpendicular to fracture edge
+    let ca_disp = vec2<f32>(-fracture_dir.y, fracture_dir.x) * amount * 0.008 * smoothstep(0.02, 0.001, min_dist);
+
+    let uv_r = clamp(uvt + shard_offset + ca_disp, vec2<f32>(0.0), vec2<f32>(1.0));
+    let uv_g = clamp(uvt + shard_offset, vec2<f32>(0.0), vec2<f32>(1.0));
+    let uv_b = clamp(uvt + shard_offset - ca_disp, vec2<f32>(0.0), vec2<f32>(1.0));
+
+    let sample_r = textureSample(src, samp, uv_r).r;
+    let sample_g = textureSample(src, samp, uv_g).g;
+    let sample_b = textureSample(src, samp, uv_b).b;
+    var sampled = vec4<f32>(sample_r, sample_g, sample_b, 1.0);
+
+    // 3D Bevel Lighting & Fracture Shadow
+    let light_dir = vec2<f32>(-0.6, 0.8);
+    let bevel_light = max(0.0, dot(fracture_dir, light_dir));
+    let shadow_depth = smoothstep(0.001, 0.006, min_dist) * (1.0 - smoothstep(0.006, 0.018, min_dist)) * 0.45;
+
+    // Specular line highlights: sharp center ray + frosted glass halo + bevel highlight
+    let crack_w = (0.0025 + amount * 0.004) * (1.0 + select(0.0, 0.5, min_dist == crack_d0 && dist0 < 0.2));
+    let line_core = 1.0 - smoothstep(0.0, crack_w, min_dist);
+    let line_halo = (1.0 - smoothstep(0.0, crack_w * 4.0, min_dist)) * 0.35;
+    let spec_intensity = clamp((line_core + line_halo + line_core * bevel_light * 0.6) * amount, 0.0, 1.0);
+
+    // Apply fracture edge shadow (gives 3D depth under crack edges)
+    sampled = sampled * (1.0 - shadow_depth * amount);
+
+    // Specular highlight & crushed glass glow composition
+    let spec_col = vec4<f32>(0.92, 0.95, 1.0, 1.0);
+    col = mix(sampled, spec_col, spec_intensity * 0.92);
+
+    // Frosted micro-glass scattering around impact centers
+    let micro_grain = (hash22(uvt * 80.0 + vec2<f32>(p.time * 0.1)).x - 0.5) * 0.15;
+    if (impact_glow > 0.01) {
+      let frosted_col = vec4<f32>(1.0 + micro_grain, 1.0 + micro_grain, 1.0 + micro_grain, 1.0);
+      col = mix(col, frosted_col, impact_glow * amount * 0.45);
     }
   }
 

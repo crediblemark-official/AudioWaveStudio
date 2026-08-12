@@ -209,8 +209,8 @@ pub fn render_particles(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let bx = p.x * ctx.width;
     let by = p.y * ctx.height;
     let base_radius = (p.radius * 0.5 + 1.2) * (size / 4.0);
-    let beat_pulse = if is_percussive { impact * 10.0 * (size / 4.0) } else { 0.0 };
-    let r = (base_radius + beat_pulse).max(0.5);
+    let beat_pulse = if is_percussive { (impact * 3.0 * (size / 4.0)).min(size * 2.0) } else { 0.0 };
+    let r = (base_radius + beat_pulse).clamp(0.5, size * 4.0);
     let alpha = (p.alpha + if is_percussive { impact * 0.6 } else { 0.0 }).min(1.0);
     c.set_fill(Fill::Solid(color.with_alpha(alpha)));
     c.fill_circle(bx, by, r);

@@ -102,6 +102,7 @@ pub fn export_gpu(
   output_path: String,
   include_audio: bool,
   cancel_flag: Arc<AtomicBool>,
+  progress_cb: Option<Arc<dyn Fn(f32, usize, usize) + Send + Sync>>,
 ) -> Result<String, String> {
   // A stale flag (e.g. a previous cancelled run) must not abort a fresh
   // export; the caller resets it before calling, but be defensive.
@@ -276,6 +277,14 @@ pub fn export_gpu(
         if tx.send(rgba).is_err() {
           let msg = get_stderr_msg(&stderr_buf_inner);
           final_error = Some(format!("FFmpeg write failed. FFmpeg stderr: {}", msg));
+          break;
+        }
+
+        if frame % 10 == 0 || frame == total_frames - 1 {
+          let percent = 10.0 + (frame as f32 / total_frames as f32) * 88.0;
+          if let Some(ref cb) = progress_cb {
+            cb(percent, frame + 1, total_frames);
+          }
         }
       }
     }
@@ -298,21 +307,19 @@ pub fn export_gpu(
       final_error = write_err;
     }
 
+    if let Some(e) = final_error {
+      let _ = child.kill();
+      let _ = child.wait();
+      let _ = stderr_reader.join();
+      return Err(e);
+    }
+
     // Signal EOF to FFmpeg and reap the process.
     if let Some(stdin) = child.stdin.take() {
       drop(stdin);
     }
     let status = child.wait().map_err(|e| format!("FFmpeg wait failed: {}", e))?;
     let _ = stderr_reader.join();
-
-    if let Some(e) = final_error {
-      // A cancelled export shouldn't wait for FFmpeg to finish the partial
-      // stream — kill it now so the cleanup path returns promptly.
-      if e == "Export cancelled" {
-        let _ = child.kill();
-      }
-      return Err(e);
-    }
 
     if status.success() {
       Ok(())
@@ -358,14 +365,12 @@ pub fn take_or_init_render_state(
 ) -> RenderState {
   match cached.take() {
     Some(rs) if rs.peak_data.len() == bar_count => rs,
-    // Bar count changed: restart per-bar state (peaks, particles, RNG) but
-    // keep the fade clock — the TS module-level fade state survives config
-    // changes, so the preview must not re-fade the text from 0.
-    Some(rs) => {
-      let mut fresh = RenderState::new(bar_count, 0xC0FFEE);
-      fresh.text_play_start_frame = rs.text_play_start_frame;
-      fresh.text_was_playing = rs.text_was_playing;
-      fresh
+    // Bar count changed: only resize peak_data — keep all other live state
+    // (particles, music notes, stars, RNG, aurora, screen fx, text clock)
+    // so that decorations don't teleport/flash when the user drags the slider.
+    Some(mut rs) => {
+      rs.peak_data.resize(bar_count, 0.0);
+      rs
     }
     _ => RenderState::new(bar_count, 0xC0FFEE),
   }

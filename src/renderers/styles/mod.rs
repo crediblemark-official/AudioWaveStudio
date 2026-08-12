@@ -34,7 +34,77 @@ pub mod pulse_rings;
 pub mod quantum_eye;
 pub mod quantum_ribbon;
 pub mod radial;
+pub mod radial_common;
 pub mod radial_ripple_3d;
+pub mod radial_spike_blade;
+pub mod radial_plasma_aura;
+pub mod radial_cyber_rune;
+pub mod radial_neon_orbiter;
+pub mod radial_starlight_halo;
+pub mod radial_vortex_spiral;
+pub mod radial_bio_shuriken;
+pub mod radial_hex_core;
+pub mod radial_sonic_mandala;
+pub mod radial_laser_curtain;
+pub mod radial_solar_flare_burst;
+pub mod radial_aperture_iris;
+pub mod radial_radar_sweep;
+pub mod radial_gear_mechanism;
+pub mod radial_fireworks_burst;
+pub mod radial_kaleidoscope;
+pub mod radial_orrery;
+pub mod radial_clockwork;
+pub mod radial_geodesic_web;
+pub mod pulsing_pill_ring;
+pub mod pulsing_liquid_aura;
+pub mod pulsing_dual_ring;
+pub mod pulsing_shockwave;
+pub mod pulsing_neon_arcade;
+pub mod pulsing_laser_web;
+pub mod pulsing_cosmic_dust;
+pub mod pulsing_cyber_shield;
+pub mod pulsing_sunburst_corona;
+pub mod pulsing_barcode_pill;
+pub mod saturn_halo;
+pub mod star_hexagon;
+pub mod quantum_cloud;
+pub mod hyperdrive_tunnel;
+pub mod nebula_ring;
+pub mod tactical_hud;
+pub mod crystal_prism;
+pub mod synthwave_sun;
+pub mod biomorphic_bloom;
+pub mod infinity_loop;
+pub mod liquid_tri_lobe_aura;
+pub mod liquid_ferrofluid_spikes;
+pub mod liquid_molten_mercury;
+pub mod liquid_concentric_drop;
+pub mod liquid_jellyfish_tentacles;
+pub mod liquid_oil_slick;
+pub mod liquid_vortex_swirl;
+pub mod liquid_metaball_lava;
+pub mod liquid_toxic_slime;
+pub mod liquid_cymascope_water;
+pub mod liquid_bioluminescent_plasma;
+pub mod liquid_plasma_blob_3d;
+pub mod liquid_chromatic_viscosity;
+pub mod liquid_hydro_electric_arcs;
+pub mod liquid_bioluminescent_plankton;
+pub mod liquid_radioactive_isotope;
+pub mod liquid_neon_cyber_goo;
+pub mod liquid_molten_gold_stream;
+pub mod liquid_magma_crust_core;
+pub mod liquid_quantum_fluid;
+pub mod glass_box_quantum_plasma;
+pub mod glass_box_neon_spectrum;
+pub mod glass_box_cyber_grid;
+pub mod glass_box_bioluminescent_jellyfish;
+pub mod glass_box_molten_lava;
+pub mod glass_box_laser_matrix;
+pub mod glass_box_liquid_chrome;
+pub mod glass_box_cosmic_nebula;
+pub mod glass_box_hologram_core;
+pub mod glass_box_matrix_rain;
 pub mod retro_radio;
 pub mod smooth_spectrum;
 pub mod solar_flare_crown;
@@ -136,5 +206,74 @@ pub fn render_style(style: &VisualizerStyle, c: &mut GpuCanvas, ctx: &mut Render
     VisualizerStyle::WaveformCurtainBeams => waveform_curtain_beams::render(c, ctx),
     VisualizerStyle::WaveformOscillatingRings => waveform_oscillating_rings::render(c, ctx),
     VisualizerStyle::WaveformTopographicRibbon => waveform_topographic_ribbon::render(c, ctx),
+    VisualizerStyle::RadialSpikeBlade => radial_spike_blade::render(c, ctx),
+    VisualizerStyle::RadialPlasmaAura => radial_plasma_aura::render(c, ctx),
+    VisualizerStyle::RadialCyberRune => radial_cyber_rune::render(c, ctx),
+    VisualizerStyle::RadialNeonOrbiter => radial_neon_orbiter::render(c, ctx),
+    VisualizerStyle::RadialStarlightHalo => radial_starlight_halo::render(c, ctx),
+    VisualizerStyle::RadialVortexSpiral => radial_vortex_spiral::render(c, ctx),
+    VisualizerStyle::RadialBioShuriken => radial_bio_shuriken::render(c, ctx),
+    VisualizerStyle::RadialHexCore => radial_hex_core::render(c, ctx),
+    VisualizerStyle::RadialSonicMandala => radial_sonic_mandala::render(c, ctx),
+    VisualizerStyle::RadialLaserCurtain => radial_laser_curtain::render(c, ctx),
+    VisualizerStyle::RadialSolarFlareBurst => radial_solar_flare_burst::render(c, ctx),
+    VisualizerStyle::RadialApertureIris => radial_aperture_iris::render(c, ctx),
+    VisualizerStyle::RadialRadarSweep => radial_radar_sweep::render(c, ctx),
+    VisualizerStyle::RadialGearMechanism => radial_gear_mechanism::render(c, ctx),
+    VisualizerStyle::RadialFireworksBurst => radial_fireworks_burst::render(c, ctx),
+    VisualizerStyle::RadialKaleidoscope => radial_kaleidoscope::render(c, ctx),
+    VisualizerStyle::RadialOrrery => radial_orrery::render(c, ctx),
+    VisualizerStyle::RadialClockwork => radial_clockwork::render(c, ctx),
+    VisualizerStyle::RadialGeodesicWeb => radial_geodesic_web::render(c, ctx),
+    VisualizerStyle::PulsingPillRing => pulsing_pill_ring::render(c, ctx),
+    VisualizerStyle::PulsingLiquidAura => pulsing_liquid_aura::render(c, ctx),
+    VisualizerStyle::PulsingDualRing => pulsing_dual_ring::render(c, ctx),
+    VisualizerStyle::PulsingShockwave => pulsing_shockwave::render(c, ctx),
+    VisualizerStyle::PulsingNeonArcade => pulsing_neon_arcade::render(c, ctx),
+    VisualizerStyle::PulsingLaserWeb => pulsing_laser_web::render(c, ctx),
+    VisualizerStyle::PulsingCosmicDust => pulsing_cosmic_dust::render(c, ctx),
+    VisualizerStyle::PulsingCyberShield => pulsing_cyber_shield::render(c, ctx),
+    VisualizerStyle::PulsingSunburstCorona => pulsing_sunburst_corona::render(c, ctx),
+    VisualizerStyle::PulsingBarcodePill => pulsing_barcode_pill::render(c, ctx),
+    VisualizerStyle::SaturnHalo => saturn_halo::render(c, ctx),
+    VisualizerStyle::StarHexagon => star_hexagon::render(c, ctx),
+    VisualizerStyle::QuantumCloud => quantum_cloud::render(c, ctx),
+    VisualizerStyle::HyperdriveTunnel => hyperdrive_tunnel::render(c, ctx),
+    VisualizerStyle::NebulaRing => nebula_ring::render(c, ctx),
+    VisualizerStyle::TacticalHud => tactical_hud::render(c, ctx),
+    VisualizerStyle::CrystalPrism => crystal_prism::render(c, ctx),
+    VisualizerStyle::SynthwaveSun => synthwave_sun::render(c, ctx),
+    VisualizerStyle::BiomorphicBloom => biomorphic_bloom::render(c, ctx),
+    VisualizerStyle::InfinityLoop => infinity_loop::render(c, ctx),
+    VisualizerStyle::LiquidTriLobeAura => liquid_tri_lobe_aura::render(c, ctx),
+    VisualizerStyle::LiquidFerrofluidSpikes => liquid_ferrofluid_spikes::render(c, ctx),
+    VisualizerStyle::LiquidMoltenMercury => liquid_molten_mercury::render(c, ctx),
+    VisualizerStyle::LiquidConcentricDrop => liquid_concentric_drop::render(c, ctx),
+    VisualizerStyle::LiquidJellyfishTentacles => liquid_jellyfish_tentacles::render(c, ctx),
+    VisualizerStyle::LiquidOilSlick => liquid_oil_slick::render(c, ctx),
+    VisualizerStyle::LiquidVortexSwirl => liquid_vortex_swirl::render(c, ctx),
+    VisualizerStyle::LiquidMetaballLava => liquid_metaball_lava::render(c, ctx),
+    VisualizerStyle::LiquidToxicSlime => liquid_toxic_slime::render(c, ctx),
+    VisualizerStyle::LiquidCymascopeWater => liquid_cymascope_water::render(c, ctx),
+    VisualizerStyle::LiquidBioluminescentPlasma => liquid_bioluminescent_plasma::render(c, ctx),
+    VisualizerStyle::LiquidPlasmaBlob3D => liquid_plasma_blob_3d::render(c, ctx),
+    VisualizerStyle::LiquidChromaticViscosity => liquid_chromatic_viscosity::render(c, ctx),
+    VisualizerStyle::LiquidHydroElectricArcs => liquid_hydro_electric_arcs::render(c, ctx),
+    VisualizerStyle::LiquidBioluminescentPlankton => liquid_bioluminescent_plankton::render(c, ctx),
+    VisualizerStyle::LiquidRadioactiveIsotope => liquid_radioactive_isotope::render(c, ctx),
+    VisualizerStyle::LiquidNeonCyberGoo => liquid_neon_cyber_goo::render(c, ctx),
+    VisualizerStyle::LiquidMoltenGoldStream => liquid_molten_gold_stream::render(c, ctx),
+    VisualizerStyle::LiquidMagmaCrustCore => liquid_magma_crust_core::render(c, ctx),
+    VisualizerStyle::LiquidQuantumFluid => liquid_quantum_fluid::render(c, ctx),
+    VisualizerStyle::GlassBoxQuantumPlasma => glass_box_quantum_plasma::render(c, ctx),
+    VisualizerStyle::GlassBoxNeonSpectrum => glass_box_neon_spectrum::render(c, ctx),
+    VisualizerStyle::GlassBoxCyberGrid => glass_box_cyber_grid::render(c, ctx),
+    VisualizerStyle::GlassBoxBioluminescentJellyfish => glass_box_bioluminescent_jellyfish::render(c, ctx),
+    VisualizerStyle::GlassBoxMoltenLava => glass_box_molten_lava::render(c, ctx),
+    VisualizerStyle::GlassBoxLaserMatrix => glass_box_laser_matrix::render(c, ctx),
+    VisualizerStyle::GlassBoxLiquidChrome => glass_box_liquid_chrome::render(c, ctx),
+    VisualizerStyle::GlassBoxCosmicNebula => glass_box_cosmic_nebula::render(c, ctx),
+    VisualizerStyle::GlassBoxHologramCore => glass_box_hologram_core::render(c, ctx),
+    VisualizerStyle::GlassBoxMatrixRain => glass_box_matrix_rain::render(c, ctx),
   }
 }

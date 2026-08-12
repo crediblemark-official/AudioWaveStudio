@@ -9,7 +9,7 @@ use std::f32::consts::TAU;
 
 use crate::gpu2d::text::TextAlign;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
   theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -87,18 +87,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     inner_pts.push((center_x + c_a * r_in, center_y + s_a * r_in));
     outer_pts.push((center_x + c_a * r_out, center_y + s_a * r_out));
 
-    // Radial Light Beams from peak points
+    // Glowing Energy Motes at peak audio points (replaces straight bristle lines)
     if fv > 0.45 {
-      let beam_len = h * 1.6;
       let bx0 = center_x + c_a * r_out;
       let by0 = center_y + s_a * r_out;
-      let bx1 = center_x + c_a * (r_out + beam_len);
-      let by1 = center_y + s_a * (r_out + beam_len);
-
-      let beam_col = mix(accent, glow, fv).with_alpha(0.35 * fv);
-      c.set_stroke(Fill::Solid(beam_col));
-      c.set_line_width(2.0 + fv * 3.0);
-      c.stroke_line(bx0, by0, bx1, by1);
+      let mote_r = 2.2 + fv * 2.5;
+      c.set_fill(Fill::Solid(mix(glow, Color::WHITE, fv * 0.8)));
+      c.set_shadow(glow, 10.0 + fv * 8.0);
+      c.fill_circle(bx0, by0, mote_r);
     }
   }
 
@@ -361,6 +357,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_stroke(Fill::Solid(Color::WHITE));
   c.set_line_width(1.2);
   c.stroke_circle(center_x, center_y, spindle_r);
+
+  // Center image on vinyl label (spins with the record)
+  draw_radial_center_image(c, ctx, center_x, center_y, label_r * 0.80);
 
   c.restore();
 

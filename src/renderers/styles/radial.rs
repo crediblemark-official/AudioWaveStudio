@@ -12,6 +12,7 @@ use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
+use super::radial_common;
 
 const RADIAL_CROWN_BARS: usize = 64;
 
@@ -71,15 +72,40 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     let step_f = (freq.len() / bar_count).max(1);
 
+    // Keep a short spectrum history so crown bars ease between frames instead
+    // of snapping with the raw bins.
+    let st = &mut ctx.state.advanced;
+    if st.frame_history.first().map(|f| f.len()) != Some(freq.len()) {
+        st.frame_history.clear();
+    }
+    st.frame_history.insert(0, freq.to_vec());
+    if st.frame_history.len() > 5 {
+        st.frame_history.pop();
+    }
+
     for i in 0..RADIAL_CROWN_BARS {
         let angle = (i as f32 / RADIAL_CROWN_BARS as f32) * TAU + frame_time * 0.12;
-        let bin_k = (i * step_f / (RADIAL_CROWN_BARS / bar_count.max(1)).max(1))
+        let sweep = radial_common::sweep_angle(ctx.beat_count);
+        let sweep_off = ((sweep / std::f32::consts::TAU) * (freq.len() as f32)) as usize
+            % freq.len().max(1);
+        let bin_k = ((i * step_f / (RADIAL_CROWN_BARS / bar_count.max(1)).max(1))
+            + sweep_off)
             .min(freq.len().saturating_sub(1));
-        let fv = freq[bin_k] as f32 / 255.0;
+
+        // Weighted multi-frame average smooths the crown's motion
+        let mut acc = 0.0f32;
+        let mut w = 0.0f32;
+        for (fi, frame) in st.frame_history.iter().enumerate() {
+            let wt = 1.0 / (fi as f32 + 1.0);
+            acc += (frame[bin_k] as f32 / 255.0) * wt;
+            w += wt;
+        }
+        let fv = acc / w.max(1e-6);
 
         let bar_h = 15.0 + fv * 150.0 * sensitivity + be * 35.0;
+        let bump = radial_common::beat_bump_at(sweep, _bs, angle);
         let r0 = base_r * (1.0 + be * 0.06);
-        let r1 = r0 + bar_h;
+        let r1 = r0 + bar_h + bump * 25.0;
 
         let (sin_a, cos_a) = angle.sin_cos();
         let x0 = cx + cos_a * r0;

@@ -337,6 +337,20 @@ pub fn bind_app_callbacks(
     preview: Option<&crate::PreviewWindow>,
     state: Arc<Mutex<SlintAppState>>,
 ) {
+    // BIND CALLBACK: MATCHES SEARCH (Case-insensitive substring search for style sidepanel cards)
+    window.on_matches_search(|label, query| {
+        let q = query.as_str().trim().to_lowercase();
+        if q.is_empty() {
+            return true;
+        }
+        label.as_str().to_lowercase().contains(&q)
+    });
+
+    // BIND CALLBACK: MATCHES CATEGORY ("all" shows every category)
+    window.on_matches_category(|category, selected| {
+        selected.as_str() == "all" || category.as_str() == selected.as_str()
+    });
+
     // BIND CALLBACK: OPEN FILE
     let state_clone = state.clone();
     let window_handle = window.as_weak();
@@ -1178,13 +1192,27 @@ pub fn bind_app_callbacks(
 
         if let Some(w) = window_handle_export.upgrade() {
             w.set_is_exporting(true);
-            w.set_export_status_text(slint::SharedString::from("Rendering & encoding MP4..."));
+            let fmt_label = if is_webm { "WebM" } else { "MP4" };
+            w.set_export_status_text(slint::SharedString::from(format!("Rendering & encoding {}...", fmt_label)));
             w.set_export_progress_percent(10.0);
         }
 
         let window_weak = window_handle_export.clone();
+        let window_weak_prog = window_handle_export.clone();
         let state_for_toast = state_export.clone();
         let cancel_flag = export_cancel_flag.clone();
+
+        let progress_cb = Arc::new(move |percent: f32, frame: usize, total: usize| {
+            let window_weak = window_weak_prog.clone();
+            let status_text = format!("Rendering frame {}/{} ({:.0}%)...", frame, total, percent);
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(w) = window_weak.upgrade() {
+                    w.set_export_progress_percent(percent);
+                    w.set_export_status_text(slint::SharedString::from(status_text));
+                }
+            });
+        });
+
         std::thread::spawn(move || {
             let res = crate::gpu_export::export_gpu(
                 config,
@@ -1192,6 +1220,7 @@ pub fn bind_app_callbacks(
                 output_path.clone(),
                 include_audio,
                 cancel_flag,
+                Some(progress_cb),
             );
             slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {

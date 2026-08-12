@@ -51,7 +51,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(bg_glow);
-//     c.fill_rect(0.0, 0.0, width, height);
+    c.fill_rect(0.0, 0.0, width, height);
 
     let node_count = 60usize;
     let step_p = (pcm.len() / node_count).max(1);
@@ -98,8 +98,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_shadow(core_col, 10.0 * user_scale);
         c.stroke_polyline(&nodes);
     }
-
-    let _ = (s_col, be);
 
     c.set_global_alpha(1.0);
     c.restore();

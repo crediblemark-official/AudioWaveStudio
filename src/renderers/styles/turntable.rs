@@ -14,7 +14,7 @@ use std::f32::consts::TAU;
 
 use crate::gpu2d::text::TextAlign;
 use crate::gpu2d::{Color, Fill, GpuCanvas};
-use crate::renderers::helpers::mix;
+use crate::renderers::helpers::{draw_radial_center_image, mix};
 use crate::renderers::{
   theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
@@ -427,6 +427,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.set_stroke(Fill::Solid(Color::WHITE));
   c.set_line_width(1.2);
   c.stroke_circle(center_x, center_y, spindle_r);
+
+  // Center image on vinyl label (spins with the record)
+  draw_radial_center_image(c, ctx, center_x, center_y, label_r * 0.80);
 
   c.restore();
 
