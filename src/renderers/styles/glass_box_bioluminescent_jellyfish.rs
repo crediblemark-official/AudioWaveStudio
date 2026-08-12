@@ -128,22 +128,47 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.stroke_polyline(&tentacle_pts);
     }
 
-    // 3. 3D Glass Box Faces & Refraction (Realistic Glass Tint Color)
+    // 3. 3D Glass Box Faces (Smooth Specular Light Glare Gradient)
     let glass_tint_color = mix(glow, Color::rgba(0.75, 0.92, 1.0, 1.0), 0.70);
+    let (p4, p5, p6, p7) = (projected[4], projected[5], projected[6], projected[7]);
 
     // Top Glass Face
     let top_poly = vec![projected[3], projected[2], projected[6], projected[7]];
-    c.set_fill(Fill::Solid(glass_tint_color.with_alpha(0.20 + be * 0.06)));
+    c.set_fill(Fill::linear_gradient(
+        projected[3].0, projected[3].1,
+        projected[6].0, projected[6].1,
+        &[
+            (0.00, Color::rgba(1.0, 1.0, 1.0, 0.35 + be * 0.10)),
+            (0.60, glass_tint_color.with_alpha(0.18)),
+            (1.00, glass_tint_color.with_alpha(0.08)),
+        ],
+    ));
     c.fill_polygon(&top_poly);
 
     // Right Glass Face
     let right_poly = vec![projected[1], projected[2], projected[6], projected[5]];
-    c.set_fill(Fill::Solid(glass_tint_color.with_alpha(0.15 + be * 0.05)));
+    c.set_fill(Fill::linear_gradient(
+        projected[1].0, projected[1].1,
+        projected[6].0, projected[6].1,
+        &[
+            (0.00, glass_tint_color.with_alpha(0.12)),
+            (1.00, Color::rgba(1.0, 1.0, 1.0, 0.22 + be * 0.08)),
+        ],
+    ));
     c.fill_polygon(&right_poly);
 
-    // Front Glass Face
-    let front_poly = vec![projected[4], projected[5], projected[6], projected[7]];
-    c.set_fill(Fill::Solid(glass_tint_color.with_alpha(0.25 + be * 0.08)));
+    // Front Glass Face (Smooth 3D Glass Light Glare Gradient)
+    let front_poly = vec![p4, p5, p6, p7];
+    c.set_fill(Fill::linear_gradient(
+        p4.0, p4.1,
+        p6.0, p6.1,
+        &[
+            (0.00, Color::rgba(1.0, 1.0, 1.0, 0.38 + be * 0.12)),
+            (0.35, Color::rgba(1.0, 1.0, 1.0, 0.16 + be * 0.05)),
+            (0.70, glass_tint_color.with_alpha(0.12)),
+            (1.00, glass_tint_color.with_alpha(0.22 + be * 0.06)),
+        ],
+    ));
     c.fill_polygon(&front_poly);
 
     let edges = [
@@ -160,13 +185,6 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         c.set_shadow(glass_tint_color, (12.0 + be * 6.0) * user_scale);
         c.stroke_line(p1.0, p1.1, p2.0, p2.1);
     }
-
-    // Diagonal Glass Glint Line
-    let glint_p1 = projected[4];
-    let glint_p2 = projected[6];
-    c.set_stroke(Fill::Solid(glass_glint.with_alpha(0.65 + be * 0.20)));
-    c.set_line_width((3.2 + bs * 1.5) * user_scale);
-    c.stroke_line(glint_p1.0, glint_p1.1, glint_p2.0, glint_p2.1);
 
     let _ = p_col;
     c.set_global_alpha(1.0);
