@@ -198,30 +198,109 @@ pub struct GpuRenderer {
   cam_buf: wgpu::Buffer,
   cam_bind_group: wgpu::BindGroup,
   pipeline_3d: wgpu::RenderPipeline,
+  /// Human-readable "name (device type / backend)" of the chosen adapter.
+  adapter_label: String,
+}
+
+fn device_type_label(info: &wgpu::AdapterInfo) -> &'static str {
+  match info.device_type {
+    wgpu::DeviceType::DiscreteGpu => "Discrete GPU",
+    wgpu::DeviceType::IntegratedGpu => "Integrated GPU",
+    wgpu::DeviceType::VirtualGpu => "Virtual GPU",
+    wgpu::DeviceType::Cpu => "CPU (Software)",
+    _ => "GPU",
+  }
+}
+
+fn backend_label(backend: wgpu::Backend) -> &'static str {
+  match backend {
+    wgpu::Backend::Vulkan => "Vulkan",
+    wgpu::Backend::Metal => "Metal",
+    wgpu::Backend::Dx12 => "DirectX 12",
+    wgpu::Backend::Gl => "OpenGL",
+    wgpu::Backend::BrowserWebGpu => "WebGPU",
+    _ => "Unknown",
+  }
 }
 
 impl GpuRenderer {
+  /// Human-readable description of the adapter actually used for rendering
+  /// (name / device type / backend). Shown in the Hardware modal so users can
+  /// verify the live preview really renders on the GPU.
+  pub fn adapter_label(&self) -> &str {
+    &self.adapter_label
+  }
+
   pub async fn new(width: u32, height: u32) -> Result<Self, String> {
     let instance = wgpu::Instance::default();
-    let adapter = instance
+
+    // Collect candidate adapters: the preferred (HighPerformance) one first,
+    // then every other enumerated adapter (other backends / the iGPU), so a
+    // broken driver on ONE adapter can never strand the whole app on the
+    // pure-CPU software renderer. A `request_device` failure on one candidate
+    // falls through to the next instead of giving up.
+    let mut candidates: Vec<wgpu::Adapter> = Vec::new();
+    if let Some(a) = instance
       .request_adapter(&wgpu::RequestAdapterOptions {
         power_preference: wgpu::PowerPreference::HighPerformance,
         compatible_surface: None,
         force_fallback_adapter: false,
       })
       .await
-      .ok_or("No GPU adapter found")?;
+    {
+      candidates.push(a);
+    }
+    for a in instance.enumerate_adapters(wgpu::Backends::all()) {
+      let info = a.get_info();
+      if !candidates
+        .iter()
+        .any(|c| c.get_info().name == info.name && c.get_info().backend == info.backend)
+      {
+        candidates.push(a);
+      }
+    }
 
-    let (device, queue) = adapter
-      .request_device(
-        &wgpu::DeviceDescriptor {
-          label: Some("AudioWave GPU Export"),
-          ..Default::default()
-        },
-        None,
-      )
-      .await
-      .map_err(|e| format!("GPU device error: {}", e))?;
+    let mut last_err = "No GPU adapter found".to_string();
+    for adapter in candidates {
+      let info = adapter.get_info();
+      match adapter
+        .request_device(
+          &wgpu::DeviceDescriptor {
+            label: Some("AudioWave GPU"),
+            ..Default::default()
+          },
+          None,
+        )
+        .await
+      {
+        Ok((device, queue)) => {
+          let adapter_label = format!(
+            "{} ({} / {})",
+            info.name,
+            device_type_label(&info),
+            backend_label(info.backend)
+          );
+          crate::logline!("[GPU] using adapter: {}", adapter_label);
+          return Self::build(device, queue, adapter_label, width, height);
+        }
+        Err(e) => {
+          crate::logline!("[GPU] adapter '{}' rejected: {}", info.name, e);
+          last_err = format!("{}: {}", info.name, e);
+        }
+      }
+    }
+    Err(last_err)
+  }
+
+  /// Build the full renderer from an already-created device + queue (adapter
+  /// selection lives in [`Self::new`]).
+  fn build(
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    adapter_label: String,
+    width: u32,
+    height: u32,
+  ) -> Result<Self, String> {
 
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
       label: Some("gpu2d"),
@@ -754,6 +833,7 @@ impl GpuRenderer {
       cam_buf,
       cam_bind_group,
       pipeline_3d,
+      adapter_label,
     })
   }
 

@@ -68,7 +68,7 @@ pub(crate) fn decode_background_image(uri: Option<&str>) -> Option<(Vec<u8>, u32
     } else if let Ok(b) = std::fs::read(uri) {
       b
     } else {
-      eprintln!("[Rust GPU Export] Background image not found: '{}'", uri);
+      crate::logline!("[Rust GPU Export] Background image not found: '{}'", uri);
       return None;
     }
   };
@@ -135,7 +135,14 @@ pub fn export_gpu(
 
   let _start = std::time::Instant::now();
 
-  let render_result = std::thread::spawn(move || -> Result<(), String> {
+  // Windows threads default to a 1 MB stack (the main thread was raised to
+  // 8 MB via /STACK in build.rs because deep mesh/scene building overflowed
+  // it), and this thread does the same depth of rendering per frame. Give it
+  // the same 8 MB so a long export can never abort with STATUS_STACK_OVERFLOW
+  // midway.
+  let render_result = std::thread::Builder::new()
+    .stack_size(8 * 1024 * 1024)
+    .spawn(move || -> Result<(), String> {
     let mut gpu = pollster::block_on(GpuRenderer::new(width, height))
       .map_err(|e| format!("GPU unavailable: {}", e))?;
 
@@ -328,6 +335,7 @@ pub fn export_gpu(
       Err(format!("FFmpeg error (exit {}): {}", status.code().unwrap_or(-1), msg))
     }
   })
+  .expect("Failed to spawn GPU export render thread")
   .join()
   .map_err(|_| "GPU export thread panicked".to_string())?;
 
@@ -397,6 +405,17 @@ pub fn render_preview_frame_inner(
   // VU decay and RNG continuity persist across frames. Rebuild only on the
   // first frame or when the bar count changed (peak_data is sized to it).
   let mut rstate = take_or_init_render_state(&mut engine.render_state, bar_count);
+
+  // A style switch must NOT inherit the previous style's live state: e.g.
+  // waterfall/radial keep a rolling `frame_history`, pulse styles fill `rings`,
+  // and VU/peak/beat counters decay at style-specific rates. Carrying that
+  // state into the newly selected style renders stale artifacts of the old
+  // style ("preview still shows the previous style"). Detect the change and
+  // rebuild from scratch so the new style starts clean.
+  if engine.last_style.as_ref() != Some(&config.style) {
+    rstate = RenderState::new(bar_count, 0xC0FFEE);
+    engine.last_style = Some(config.style.clone());
+  }
 
   // Monotonic clock for time-based effects: keeps them animating across
   // pause/seek instead of freezing/jumping (fx_time, not song time).

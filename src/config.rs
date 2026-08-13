@@ -735,7 +735,7 @@ impl Default for TextSettings {
   }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AudioReactivitySettings {
   pub fft_size: usize,
@@ -753,6 +753,32 @@ pub struct AudioReactivitySettings {
   pub fire_width_ratio: Option<f32>,
   #[serde(default)]
   pub fire_height_scale: Option<f32>,
+}
+
+impl Default for AudioReactivitySettings {
+  /// Mirror the Slint control-panel slider defaults (app_window.slint) so a
+  /// FRESH config — app launch, or an old/partial preset that omits these
+  /// fields — is immediately usable instead of zeroed (sensitivity 0 would
+  /// flatten every frequency bin to silence, making the visualizer look
+  /// dead/unresponsive until the user touches a control and fires
+  /// `config-changed`).
+  fn default() -> Self {
+    AudioReactivitySettings {
+      fft_size: 1024,
+      sensitivity: 1.2,
+      bass_multiplier: 1.5,
+      bar_count: 64,
+      bar_width: 6.0,
+      bar_gap: 2.0,
+      bar_rounding: 2.0,
+      smoothing: 0.8,
+      mirror_bars: false,
+      show_peaks: false,
+      peak_color: "#ffffff".to_string(),
+      fire_width_ratio: Some(0.94),
+      fire_height_scale: Some(1.0),
+    }
+  }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -846,7 +872,7 @@ impl Default for ScreenEffectsSettings {
   }
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(default, rename_all = "camelCase")]
 pub struct VisualizerConfig {
   pub style: VisualizerStyle,
@@ -859,4 +885,61 @@ pub struct VisualizerConfig {
   pub position_x: f32,
   pub position_y: f32,
   pub scale: f32,
+}
+
+impl Default for VisualizerConfig {
+  /// Custom default so `scale` starts at 1.0 (the derived Default was 0.0,
+  /// which the renderers clamp to a barely-visible 0.1) and `reactivity`
+  /// picks up the UI-matching defaults above instead of all zeros.
+  fn default() -> Self {
+    VisualizerConfig {
+      style: VisualizerStyle::Spectrum,
+      theme: ColorTheme::default(),
+      background: BackgroundSettings::default(),
+      text: TextSettings::default(),
+      reactivity: AudioReactivitySettings::default(),
+      export: ExportSettings::default(),
+      screen_effects: ScreenEffectsSettings::default(),
+      position_x: 0.0,
+      position_y: 0.0,
+      scale: 1.0,
+    }
+  }
+}
+
+#[cfg(test)]
+mod defaults_tests {
+  use super::*;
+
+  #[test]
+  fn reactivity_defaults_are_usable_not_zeroed() {
+    // The visualizer must be responsive from the first frame, before the user
+    // touches any control. A zeroed sensitivity/scale made every frequency bin
+    // collapse to silence ("visualizer not responding to the music").
+    let r = AudioReactivitySettings::default();
+    assert!(r.sensitivity > 0.0, "sensitivity must be > 0");
+    assert!(r.smoothing > 0.0);
+    assert!(r.bass_multiplier > 0.0);
+    assert!(r.bar_count >= 16);
+    assert!(r.fft_size >= 64);
+  }
+
+  #[test]
+  fn config_default_scale_is_visible() {
+    let c = VisualizerConfig::default();
+    assert_eq!(c.scale, 1.0);
+    assert_eq!(c.style, VisualizerStyle::Spectrum);
+    assert!(c.reactivity.sensitivity > 0.0);
+  }
+
+  #[test]
+  fn serde_default_fills_reactivity_for_legacy_presets() {
+    // A preset that omits the reactivity block (legacy export) must still
+    // deserialize to a usable config, not zeros.
+    let json = r#"{"style":"radial"}"#;
+    let c: VisualizerConfig = serde_json::from_str(json).unwrap();
+    assert_eq!(c.style, VisualizerStyle::Radial);
+    assert!(c.reactivity.sensitivity > 0.0);
+    assert_eq!(c.scale, 1.0);
+  }
 }

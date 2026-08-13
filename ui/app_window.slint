@@ -344,6 +344,9 @@ export component AppWindow inherits Window {
 
     // Callbacks
     callback open-file-clicked();
+    // Fired when the navbar Hardware button opens the modal, so Rust can
+    // refresh the hardware report (incl. the Live Preview Renderer line).
+    callback open-hardware-clicked();
     callback open-custom-image-clicked();
     callback open-radial-image-clicked();
     callback remove-radial-image-clicked();
@@ -354,6 +357,9 @@ export component AppWindow inherits Window {
     callback volume-changed(float);
     callback mute-toggle-clicked();
     callback config-changed();
+    // Fired with the exact style id the user clicked (see ControlPanel), so
+    // Rust applies the style directly instead of reading the property back.
+    callback style-selected(string);
     callback theme-preset-selected(string);
     callback save-preset-clicked();
     callback load-preset-clicked();
@@ -449,7 +455,7 @@ export component AppWindow inherits Window {
             if (!root.full-screen) : Navbar {
                 open-file-clicked => { root.open-file-clicked(); }
                 open-custom-image-clicked => { root.open-custom-image-clicked(); }
-                open-hardware-clicked => { root.show-hardware-modal = true; }
+                open-hardware-clicked => { root.show-hardware-modal = true; root.open-hardware-clicked(); }
                 open-about-clicked => { root.show-about-modal = true; }
                 open-export-clicked => { root.show-export-modal = true; }
                 save-preset-clicked => { root.save-preset-clicked(); }
@@ -702,6 +708,7 @@ export component AppWindow inherits Window {
                         root.custom-text-edited(id, text, enabled, pos_x, pos_y, font_size, font_family, font_weight, color_hex);
                     }
                     config-changed => { root.config-changed(); }
+                    style-selected(id) => { root.style-selected(id); }
                     theme-preset-selected(preset) => { root.theme-preset-selected(preset); }
                     open-radial-image-clicked => { root.open-radial-image-clicked(); }
                     remove-radial-image-clicked => { root.remove-radial-image-clicked(); }

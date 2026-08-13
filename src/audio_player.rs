@@ -386,7 +386,7 @@ fn spawn_os_fallback(
         return Some(c);
     }
 
-    eprintln!("[AudioPlayer] Failed to launch audio process for: {}", file_path);
+    crate::logline!("[AudioPlayer] Failed to launch audio process for: {}", file_path);
     None
 }
 

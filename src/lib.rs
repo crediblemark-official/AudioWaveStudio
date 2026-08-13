@@ -9,6 +9,7 @@ pub mod fft_analyzer;
 pub mod gpu2d;
 pub mod gpu_export;
 pub mod hardware;
+pub mod logging;
 pub mod renderers;
 pub mod text_shaper;
 
@@ -130,8 +131,8 @@ impl i_slint_backend_winit::CustomApplicationHandler for DropFileHandler {
 }
 
 pub fn run() {
-    // Log every panic (with a backtrace) to a file so a force-close is never
-    // silent: the user can share /tmp/audiowave-panic.log for a diagnosis.
+    // Log every panic (with a backtrace) to the on-disk diagnostic log (see
+    // crate::logging for the per-OS path) so a force-close is never silent.
     // Throttled to ~1 logged panic per second (see LAST_PANIC_LOG).
     std::panic::set_hook(Box::new(|info| {
         let now = std::time::SystemTime::now()
@@ -150,18 +151,17 @@ pub fn run() {
             .map(|l| format!("{}:{}", l.file(), l.line()))
             .unwrap_or_default();
         let backtrace = std::backtrace::Backtrace::force_capture();
-        eprintln!("[Panic] {msg} at {location}\n{backtrace}");
-        let log_path = std::env::var("AUDIOWAVE_PANIC_LOG")
-            .unwrap_or_else(|_| "/tmp/audiowave-panic.log".to_string());
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-        {
-            use std::io::Write;
-            let _ = writeln!(f, "[{now}] {msg} at {location}\n{backtrace}");
-        }
+        crate::logging::write(&format!(
+            "[{now}] [Panic] {msg} at {location}\n{backtrace}"
+        ));
     }));
+
+    // First line of the log: verify the file is writable on this platform and
+    // tell the user (and the file itself) where it lives.
+    crate::logline!(
+        "[Log] Diagnostic log file: {}",
+        crate::logging::log_path().display()
+    );
 
     // Install the winit backend with the file-drop handler BEFORE any window
     // is created (slint::platform::set_platform must precede window creation).
@@ -196,7 +196,7 @@ pub fn run() {
             Some(p)
         }
         Err(e) => {
-            eprintln!("[Preview] Pop-out preview unavailable: {}", e);
+            crate::logline!("[Preview] Pop-out preview unavailable: {}", e);
             None
         }
     };
@@ -219,7 +219,11 @@ pub fn run() {
 
     // Detect system hardware info
     let window_hw = window.as_weak();
-    let refresh_hardware = move || {
+    let state_hw = state.clone();
+    // `deep` re-runs the ffmpeg encoder probes (spawns subprocesses, takes up
+    // to a second); the light refresh only re-renders the report from the last
+    // full scan so opening the modal never freezes on probes.
+    let refresh_hardware = move |deep: bool| {
         if let Some(w) = window_hw.upgrade() {
             if let Some(mem) = crate::hardware::get_system_memory() {
                 w.set_ram_info_text(slint::SharedString::from(format!("{:.1} GB RAM", mem.total_mb as f64 / 1024.0)));
@@ -229,62 +233,119 @@ pub fn run() {
                 let names: Vec<String> = gpus.iter().map(|g| g.name.clone()).collect();
                 w.set_gpu_info_text(slint::SharedString::from(names.join(", ")));
             }
-            match crate::hardware::check_hardware(None) {
-                Ok(info) => {
-                    if info.ffmpeg_installed {
-                        w.set_ffmpeg_status_text(slint::SharedString::from(format!("Ready ({})", info.recommended_encoder)));
-                    } else {
-                        w.set_ffmpeg_status_text(slint::SharedString::from("Not Found (System PATH)"));
+
+            let info = if deep {
+                match crate::hardware::check_hardware(None) {
+                    Ok(info) => {
+                        if let Ok(mut s) = state_hw.lock() {
+                            s.last_hardware = Some(info.clone());
+                        }
+                        Some(info)
                     }
-                    let mut lines = Vec::new();
-                    lines.push(format!("Acceleration Status: {}", info.recommended_label));
-                    lines.push(format!("Operating System: {} ({})", info.os.to_uppercase(), info.arch));
-                    lines.push(String::new());
-                    lines.push(format!("Graphics / GPU ({})", info.gpus.len()));
-                    for g in &info.gpus {
-                        let dev = match g.device_type.as_str() {
-                            "IntegratedGpu" => "Integrated GPU",
-                            "DiscreteGpu" => "Discrete GPU (Dedicated)",
-                            "Cpu" => "CPU Software Rendering",
-                            "VirtualGpu" => "Virtual / Passthrough GPU",
-                            other => other,
-                        };
-                        lines.push(format!("  • {} — {} [Backend: {}]", g.name, dev, g.backend));
+                    Err(e) => {
+                        crate::logline!("[Hardware] check_hardware error: {}", e);
+                        w.set_hardware_detail_text(slint::SharedString::from(format!("Error: {}", e)));
+                        None
                     }
-                    if info.gpus.is_empty() {
-                        lines.push("  (no wgpu GPU detected directly)".to_string());
-                    }
-                    lines.push(String::new());
-                    lines.push(format!("FFmpeg Video Encoder Technology {}", if info.ffmpeg_installed { "(FFmpeg Ready)" } else { "(FFmpeg Not Found)" }));
-                    let supported: Vec<_> = info.encoders.iter().filter(|e| e.supported).collect();
-                    if supported.is_empty() {
-                        lines.push("  (no encoders detected)".to_string());
-                    }
-                    for e in supported {
-                        let mark = if e.id == info.recommended_encoder { "◀ Active" } else { "" };
-                        lines.push(format!("  ✓ {} ({}) {}", e.name, e.id, mark));
-                        lines.push(format!("      {}", e.description));
-                    }
-                    if let Some(p) = &info.ffmpeg_path {
-                        lines.push(String::new());
-                        lines.push(format!("FFmpeg Path: {}", p));
-                    }
-                    w.set_hardware_detail_text(slint::SharedString::from(lines.join("\n")));
                 }
-                Err(e) => {
-                    eprintln!("[Hardware] check_hardware error: {}", e);
-                    w.set_hardware_detail_text(slint::SharedString::from(format!("Error: {}", e)));
+            } else {
+                state_hw.lock().unwrap_or_else(|e| e.into_inner()).last_hardware.clone()
+            };
+
+            if let Some(info) = info {
+                if info.ffmpeg_installed {
+                    w.set_ffmpeg_status_text(slint::SharedString::from(format!("Ready ({})", info.recommended_encoder)));
+                } else {
+                    w.set_ffmpeg_status_text(slint::SharedString::from("Not Found (System PATH)"));
                 }
+                let mut lines = Vec::new();
+                lines.push(format!("Acceleration Status: {}", info.recommended_label));
+                // Report which renderer the LIVE preview actually uses, so
+                // a silent fallback to the CPU software renderer is never
+                // mistaken for GPU rendering (or vice versa).
+                {
+                    let s = state_hw.lock().unwrap_or_else(|e| e.into_inner());
+                    let renderer_line = match (&s.gpu_adapter_label, &s.gpu_fallback_reason) {
+                        (Some(label), _) => {
+                            format!("Live Preview Renderer: ⚡ wgpu GPU — {label}")
+                        }
+                        (None, Some(reason)) => {
+                            format!("Live Preview Renderer: ⚠ CPU SOFTWARE FALLBACK ({reason})")
+                        }
+                        (None, None) => {
+                            "Live Preview Renderer: initializing…".to_string()
+                        }
+                    };
+                    lines.push(renderer_line);
+                }
+                lines.push(format!(
+                    "Diagnostic Log: {}",
+                    crate::logging::log_path().display()
+                ));
+                lines.push(format!("Operating System: {} ({})", info.os.to_uppercase(), info.arch));
+                lines.push(String::new());
+                lines.push(format!("Graphics / GPU ({})", info.gpus.len()));
+                for g in &info.gpus {
+                    let dev = match g.device_type.as_str() {
+                        "IntegratedGpu" => "Integrated GPU",
+                        "DiscreteGpu" => "Discrete GPU (Dedicated)",
+                        "Cpu" => "CPU Software Rendering",
+                        "VirtualGpu" => "Virtual / Passthrough GPU",
+                        other => other,
+                    };
+                    lines.push(format!("  • {} — {} [Backend: {}]", g.name, dev, g.backend));
+                }
+                if info.gpus.is_empty() {
+                    lines.push("  (no wgpu GPU detected directly)".to_string());
+                }
+                lines.push(String::new());
+                lines.push(format!("FFmpeg Video Encoder Technology {}", if info.ffmpeg_installed { "(FFmpeg Ready)" } else { "(FFmpeg Not Found)" }));
+                // Every encoder is shown with its status and — for a failure —
+                // WHY, so "export uses CPU x264" is never a silent mystery.
+                let mut any_hw = false;
+                for e in &info.encoders {
+                    if e.id == "libx264" {
+                        continue;
+                    }
+                    if e.supported {
+                        any_hw = true;
+                    }
+                    let mark = if e.id == info.recommended_encoder { " ◀ Active" } else { "" };
+                    let status = if e.supported { "✓" } else { "✗" };
+                    lines.push(format!("  {status} {} ({}){}", e.name, e.id, mark));
+                    lines.push(format!("      {}", e.description));
+                    if !e.supported && !e.detail.is_empty() {
+                        lines.push(format!("      ↳ {}", e.detail));
+                    }
+                }
+                if !any_hw {
+                    lines.push("  (no hardware encoder usable — export will use CPU x264)".to_string());
+                }
+                lines.push("  ✓ Software x264 (libx264) — always-available CPU fallback".to_string());
+                if let Some(p) = &info.ffmpeg_path {
+                    lines.push(String::new());
+                    lines.push(format!("FFmpeg Path: {}", p));
+                }
+                w.set_hardware_detail_text(slint::SharedString::from(lines.join("\n")));
             }
         }
     };
 
-    // Initial hardware scan.
-    refresh_hardware();
+    // Initial hardware scan (full: probes the encoders).
+    refresh_hardware(true);
 
     // Re-scan hardware when the user clicks the button in the modal.
+    let refresh_on_rescan = refresh_hardware.clone();
     window.on_rescan_hardware_clicked(move || {
-        refresh_hardware();
+        refresh_on_rescan(true);
+    });
+
+    // Light refresh when the modal is OPENED: re-render the report from the
+    // last full scan (incl. a fresh Live Preview Renderer line) without
+    // re-running ffmpeg encoder probes on the UI thread.
+    let refresh_on_open = refresh_hardware.clone();
+    window.on_open_hardware_clicked(move || {
+        refresh_on_open(false);
     });
 
     // Bind all Slint UI user callbacks
@@ -469,18 +530,51 @@ pub fn run() {
             let mut rendered = false;
             if let Ok(mut s) = state_clone.lock() {
                 let is_playing = s.audio_player.is_playing();
-                if s.gpu_engine.is_none() || s.gpu_engine.as_ref().unwrap().width != width || s.gpu_engine.as_ref().unwrap().height != height {
-                    if let Ok(renderer) = pollster::block_on(crate::gpu2d::GpuRenderer::new(width, height)) {
-                        s.gpu_engine = Some(crate::app_state::GpuPreviewEngine {
-                            renderer,
-                            width,
-                            height,
-                            bg_image_uri: None,
-                            bg_image_info: None,
-                            radial_image_uri: None,
-                            radial_image_info: None,
-                            render_state: None,
-                        });
+                let need_resize = s
+                    .gpu_engine
+                    .as_ref()
+                    .map(|e| e.width != width || e.height != height)
+                    .unwrap_or(false);
+                if s.gpu_engine.is_none() || need_resize {
+                    // Retry backoff: when the machine has no usable adapter
+                    // (or the driver is broken), probing wgpu on EVERY frame
+                    // would itself burn CPU. Wait out the cooldown between
+                    // attempts, but never block a real resize rebuild.
+                    if s.gpu_retry_cooldown == 0 || need_resize {
+                        match pollster::block_on(crate::gpu2d::GpuRenderer::new(width, height)) {
+                            Ok(renderer) => {
+                                let label = renderer.adapter_label().to_string();
+                                s.gpu_adapter_label = Some(label.clone());
+                                s.gpu_fallback_reason = None;
+                                s.gpu_panic_streak = 0;
+                                s.gpu_retry_cooldown = 0;
+                                crate::logline!("[Render] Live preview on GPU: {}", label);
+                                s.gpu_engine = Some(crate::app_state::GpuPreviewEngine {
+                                    renderer,
+                                    width,
+                                    height,
+                                    bg_image_uri: None,
+                                    bg_image_info: None,
+                                    radial_image_uri: None,
+                                    radial_image_info: None,
+                                    render_state: None,
+                                    last_style: None,
+                                });
+                            }
+                            Err(e) => {
+                                if s.gpu_fallback_reason.as_deref() != Some(e.as_str()) {
+                                    crate::logline!(
+                                        "[Render] GPU unavailable, using CPU software renderer: {}",
+                                        e
+                                    );
+                                }
+                                s.gpu_fallback_reason = Some(e);
+                                s.gpu_engine = None;
+                                s.gpu_retry_cooldown = 90; // ~1.5s @ 60fps
+                            }
+                        }
+                    } else {
+                        s.gpu_retry_cooldown = s.gpu_retry_cooldown.saturating_sub(1);
                     }
                 }
 
@@ -497,6 +591,9 @@ pub fn run() {
                         height,
                         is_playing,
                     ) {
+                        // A successful GPU frame clears the panic streak, so a
+                        // single transient fault doesn't tear the engine down.
+                        s.gpu_panic_streak = 0;
                         let slint_img = crate::app_state::create_slint_image_from_rgba(width, height, &raw_rgba);
                         w.set_preview_frame(slint_img.clone());
                         // Mirror the same live frame into the pop-out preview
@@ -540,19 +637,33 @@ pub fn run() {
         }));
 
         if let Err(payload) = frame_result {
-            // A panic can unwind while the GPU engine was borrowed, leaving its
-            // cached render state half-mutated — reusing it would re-trigger the
-            // same fault every frame. Drop the engine so the next frame builds a
-            // fresh one (the CPU fallback covers the gap).
+            // A panic inside a style/effect renderer usually corrupts only the
+            // cached render state, NOT the GPU device. Dropping the whole
+            // engine here forced a full wgpu re-init (adapter + device + shader
+            // compile) on EVERY frame while the fault persisted — the app then
+            // looks like it "renders on CPU" while actually churning GPU setup
+            // 60x/sec. Reset only the cached state so the frame is skipped and
+            // the CPU fallback covers it; tear the engine down only after many
+            // consecutive failures (e.g. a device-lost that must rebuild).
             if let Ok(mut s) = state_clone.lock() {
-                if s.gpu_engine.is_some() {
+                s.gpu_panic_streak = s.gpu_panic_streak.saturating_add(1);
+                if let Some(ref mut engine) = s.gpu_engine {
+                    engine.render_state = None;
+                }
+                if s.gpu_panic_streak >= 30 {
+                    crate::logline!(
+                        "[Render] GPU sustained failures ({}), rebuilding engine",
+                        s.gpu_panic_streak
+                    );
                     s.gpu_engine = None;
+                    s.gpu_panic_streak = 0;
+                    s.gpu_retry_cooldown = 90;
                 }
             }
             // Throttle the log: the same recurring fault must not spam ~60 lines/s.
             if idle_clock - last_panic_log > 1.0 {
                 last_panic_log = idle_clock;
-                eprintln!(
+                crate::logline!(
                     "[Frame] Recovered from panic (skipping frame, continuing): {}",
                     panic_message(&payload)
                 );
@@ -567,7 +678,7 @@ pub fn run() {
     // after the app is gone (the "audio masih muter" bug class this file keeps
     // fighting). Log it and fall through to the same cleanup as a normal close.
     if let Err(e) = window.run() {
-        eprintln!("[EventLoop] Window event loop ended with an error: {e}");
+        crate::logline!("[EventLoop] Window event loop ended with an error: {e}");
     }
 
     // Event loop ended (window closed). Stop audio + mic EXPLICITLY as a safety

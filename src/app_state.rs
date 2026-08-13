@@ -154,6 +154,11 @@ pub struct GpuPreviewEngine {
     pub radial_image_uri: Option<String>,
     pub radial_image_info: Option<(u32, u32)>,
     pub render_state: Option<crate::renderers::RenderState>,
+    /// The visualizer style the cached `render_state` was built for. When the
+    /// user switches style, the cached per-style live state (rings, spectrum
+    /// history, VU decay, beat/rotation counters) is discarded so the new
+    /// style starts clean instead of inheriting stale state from the old one.
+    pub last_style: Option<crate::config::VisualizerStyle>,
 }
 
 pub struct SlintAppState {
@@ -179,6 +184,25 @@ pub struct SlintAppState {
     /// Set true by the ExportModal cancel button so the in-flight export loop
     /// can stop rendering and clean up. Cleared on the next export start.
     pub export_cancel: bool,
+    /// wgpu adapter label of the ACTIVE live-preview engine (name / device
+    /// type / backend), surfaced in the Hardware modal. None until the engine
+    /// is built.
+    pub gpu_adapter_label: Option<String>,
+    /// Why the GPU engine is currently unavailable (adapter/device error), so
+    /// the CPU-software fallback is never silent.
+    pub gpu_fallback_reason: Option<String>,
+    /// Consecutive frames where the GPU render panicked. Used to reset only
+    /// the cached render state (cheap) instead of tearing down the whole
+    /// engine every frame, and to drop+rebuild the engine after sustained
+    /// failures (device lost).
+    pub gpu_panic_streak: u32,
+    /// Frames to wait before retrying GPU engine creation after a failure, so
+    /// a machine with no usable adapter doesn't burn CPU probing wgpu 60x/sec.
+    pub gpu_retry_cooldown: u32,
+    /// Result of the last FULL hardware scan (incl. the ffmpeg encoder probe
+    /// table). The modal-open refresh reuses this cache so opening the modal
+    /// never re-spawns ffmpeg probes (they run on the UI thread).
+    pub last_hardware: Option<crate::hardware::HardwareInfo>,
     /// Toast notification queue (see module docs above).
     pub toasts: VecDeque<ToastMsg>,
     /// Monotonic id counter so dismissals are unambiguous.
@@ -206,6 +230,11 @@ impl SlintAppState {
             mic_device_label: "Default (System)".to_string(),
             mic_device_arg: String::new(),
             export_cancel: false,
+            gpu_adapter_label: None,
+            gpu_fallback_reason: None,
+            gpu_panic_streak: 0,
+            gpu_retry_cooldown: 0,
+            last_hardware: None,
             toasts: VecDeque::new(),
             next_toast_id: 1,
         }

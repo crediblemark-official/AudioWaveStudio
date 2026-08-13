@@ -24,7 +24,7 @@ pub fn export_dimensions(config: &VisualizerConfig) -> (u32, u32) {
   (width, height)
 }
 
-pub fn apply_encoder_args(cmd: &mut Command, encoder_id: &str, cap_kbps: u32) {
+pub fn apply_encoder_args(cmd: &mut Command, encoder_id: &str, cap_kbps: u32, vaapi_cqp: bool) {
   let cap = format!("{cap_kbps}k");
   let buf = format!("{}k", cap_kbps * 2);
   let software = matches!(
@@ -52,7 +52,17 @@ pub fn apply_encoder_args(cmd: &mut Command, encoder_id: &str, cap_kbps: u32) {
       cmd.arg("-preset").arg("veryfast");
     }
     "h264_vaapi" | "hevc_vaapi" | "av1_vaapi" => {
-      cmd.arg("-rc_mode").arg("VBR");
+      // Some Intel VAAPI drivers (i965) only expose CQP rate control — VBR is
+      // rejected outright. Use the mode the probe detected so the export
+      // command matches what was verified as usable on this machine.
+      if vaapi_cqp {
+        cmd.arg("-rc_mode")
+          .arg("CQP")
+          .arg("-global_quality")
+          .arg("23");
+      } else {
+        cmd.arg("-rc_mode").arg("VBR");
+      }
     }
     "h264_amf" => {
       cmd.arg("-quality")
@@ -69,6 +79,9 @@ pub fn apply_encoder_args(cmd: &mut Command, encoder_id: &str, cap_kbps: u32) {
 
   if software {
     cmd.arg("-maxrate").arg(&cap).arg("-bufsize").arg(&buf);
+  } else if vaapi_cqp {
+    // CQP-only driver: -b:v/-maxrate are ignored (or rejected) by the driver;
+    // quality is fixed via -global_quality above.
   } else {
     cmd.arg("-b:v").arg(&cap).arg("-maxrate").arg(&cap).arg("-bufsize").arg(&buf);
   }
@@ -130,12 +143,16 @@ pub fn spawn_ffmpeg(
   }
 
   cmd.arg("-c:v").arg(&encoder_name);
+  // CQP-only VAAPI drivers (probe-detected) get -global_quality instead of
+  // bitrate args during export, matching the probe that verified them.
+  let vaapi_cqp = encoder_name.ends_with("_vaapi")
+    && crate::hardware::vaapi_rc_mode(&ffmpeg_exe) == Some("CQP");
   let cap_kbps = match (width, height) {
     (w, h) if w >= 3800 || h >= 2100 => 35_000,
     (w, h) if w >= 1900 || h >= 1000 => 12_000,
     _ => 6_000,
   };
-  apply_encoder_args(&mut cmd, &encoder_name, cap_kbps);
+  apply_encoder_args(&mut cmd, &encoder_name, cap_kbps, vaapi_cqp);
 
   if has_audio {
     if output_mp4_path.ends_with(".webm") {

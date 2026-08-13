@@ -24,7 +24,7 @@ fn guarded<F: FnOnce()>(what: &'static str, f: F) {
         } else {
             "unknown".to_string()
         };
-        eprintln!("[Callback:{what}] recovered from panic: {msg}");
+        crate::logline!("[Callback:{what}] recovered from panic: {msg}");
     }
 }
 
@@ -319,7 +319,7 @@ pub(crate) fn load_audio_from_path(
             }
         }
         Err(e) => {
-            eprintln!("[Slint] Failed to decode audio file: {}", e);
+            crate::logline!("[Slint] Failed to decode audio file: {}", e);
             if let Some(w) = window_weak.upgrade() {
                 push_toast(
                     &w,
@@ -349,6 +349,25 @@ pub fn bind_app_callbacks(
     // BIND CALLBACK: MATCHES CATEGORY ("all" shows every category)
     window.on_matches_category(|category, selected| {
         selected.as_str() == "all" || category.as_str() == selected.as_str()
+    });
+
+    // BIND CALLBACK: STYLE SELECTED
+    // The style card click carries the EXACT clicked id through this callback
+    // (instead of `config-changed` re-reading `style-val` from the property).
+    // That guarantees the style switch is applied even after many rapid style
+    // changes, so the preview can never stay stuck on the previous style.
+    let state_clone = state.clone();
+    window.on_style_selected(move |id| {
+        guarded("style_selected", || {
+            if let Ok(st) = serde_json::from_str::<VisualizerStyle>(&format!(
+                "\"{}\"",
+                id.as_str()
+            )) {
+                state_clone.lock().unwrap_or_else(|e| e.into_inner()).config.style = st;
+            } else {
+                crate::logline!("[Style] Unknown style id selected: {}", id);
+            }
+        });
     });
 
     // BIND CALLBACK: OPEN FILE
@@ -517,7 +536,7 @@ pub fn bind_app_callbacks(
                 }
             }
             Err(e) => {
-                eprintln!("[Listen] Failed to start mic capture: {}", e);
+                crate::logline!("[Listen] Failed to start mic capture: {}", e);
                 if let Some(w) = window_handle.upgrade() {
                     w.set_is_listening(false);
                     w.set_listen_status(slint::SharedString::from(e.clone()));
@@ -553,7 +572,7 @@ pub fn bind_app_callbacks(
         .collect();
     window.set_mic_devices(slint::ModelRc::new(slint::VecModel::from(labels)));
     window.set_mic_device_label(slint::SharedString::from("Default (System)"));
-    eprintln!("[Listen] {} capture device(s) detected", devices.len().saturating_sub(1));
+    crate::logline!("[Listen] {} capture device(s) detected", devices.len().saturating_sub(1));
 
     // BIND CALLBACK: MIC DEVICE SELECTED (from the navbar picker)
     let state_clone = state.clone();
@@ -566,7 +585,7 @@ pub fn bind_app_callbacks(
         let Some(dev) = found else {
             // The device disappeared since the picker was built (unplugged):
             // refuse to silently fall back to the system default.
-            eprintln!("[Listen] selected device no longer available: {}", label);
+            crate::logline!("[Listen] selected device no longer available: {}", label);
             if let Some(w) = window_handle.upgrade() {
                 w.set_listen_status(slint::SharedString::from(format!(
                     "Selected device is no longer available: {label}"
@@ -731,7 +750,7 @@ pub fn bind_app_callbacks(
                                 );
                             }
                             Ok(Err(e)) => {
-                                eprintln!("[Preset] Failed to save preset: {}", e);
+                                crate::logline!("[Preset] Failed to save preset: {}", e);
                                 push_toast(
                                     &w,
                                     &mut s,
@@ -740,7 +759,7 @@ pub fn bind_app_callbacks(
                                 );
                             }
                             Err(e) => {
-                                eprintln!("[Preset] Failed to serialize config: {}", e);
+                                crate::logline!("[Preset] Failed to serialize config: {}", e);
                                 push_toast(
                                     &w,
                                     &mut s,
@@ -783,7 +802,7 @@ pub fn bind_app_callbacks(
                                 }
                             }
                             Err(e) => {
-                                eprintln!("[Preset] Failed to parse preset: {}", e);
+                                crate::logline!("[Preset] Failed to parse preset: {}", e);
                                 if let Some(w) = window_handle.upgrade() {
                                     push_toast(
                                         &w,
@@ -795,7 +814,7 @@ pub fn bind_app_callbacks(
                             }
                         },
                         Err(e) => {
-                            eprintln!("[Preset] Failed to read preset file: {}", e);
+                            crate::logline!("[Preset] Failed to read preset file: {}", e);
                             if let Some(w) = window_handle.upgrade() {
                                 push_toast(
                                     &w,
@@ -886,12 +905,11 @@ pub fn bind_app_callbacks(
     window.on_config_changed(move || {
         if let Some(w) = window_handle.upgrade() {
             let mut s = state_clone.lock().unwrap_or_else(|e| e.into_inner());
-            if let Ok(st) = serde_json::from_str::<VisualizerStyle>(&format!(
-                "\"{}\"",
-                w.get_style_val()
-            )) {
-                s.config.style = st;
-            }
+            // NOTE: the style itself is NOT read from `style-val` here anymore;
+            // it is applied via the dedicated `style-selected` callback (which
+            // carries the exact clicked id). Reading the property back here
+            // could race rapid style changes and leave the preview on the
+            // previous style.
             s.config.reactivity.bar_count = w.get_bar_count() as usize;
             s.config.reactivity.bar_gap = w.get_bar_gap();
             s.config.reactivity.bar_width = w.get_bar_width();
@@ -1160,7 +1178,7 @@ pub fn bind_app_callbacks(
         let audio_path = match audio_path {
             Some(p) => p,
             None => {
-                eprintln!("[Export] No audio file loaded to export");
+                crate::logline!("[Export] No audio file loaded to export");
                 if let Some(w) = window_handle_export.upgrade() {
                     push_toast(
                         &w,
@@ -1181,93 +1199,108 @@ pub fn bind_app_callbacks(
             ("visualizer_wave.mp4", "MP4 Video", "mp4")
         };
 
-        let output_path = match FileDialog::new()
-            .set_file_name(file_name)
-            .add_filter(filter_name, &[filter_ext])
-            .save_file()
-        {
-            Some(p) => p.to_string_lossy().to_string(),
-            None => return,
-        };
-
-        if let Some(w) = window_handle_export.upgrade() {
-            w.set_is_exporting(true);
-            let fmt_label = if is_webm { "WebM" } else { "MP4" };
-            w.set_export_status_text(slint::SharedString::from(format!("Rendering & encoding {}...", fmt_label)));
-            w.set_export_progress_percent(10.0);
-        }
-
-        let window_weak = window_handle_export.clone();
-        let window_weak_prog = window_handle_export.clone();
-        let state_for_toast = state_export.clone();
-        let cancel_flag = export_cancel_flag.clone();
-
-        let progress_cb = Arc::new(move |percent: f32, frame: usize, total: usize| {
-            let window_weak = window_weak_prog.clone();
-            let status_text = format!("Rendering frame {}/{} ({:.0}%)...", frame, total, percent);
-            let _ = slint::invoke_from_event_loop(move || {
-                if let Some(w) = window_weak.upgrade() {
-                    w.set_export_progress_percent(percent);
-                    w.set_export_status_text(slint::SharedString::from(status_text));
-                }
-            });
-        });
-
+        // The native save dialog MUST NOT run on the UI thread: on Windows the
+        // rfd/IFileDialog modal loop blocks the winit event loop, freezing the
+        // whole app (the 60 FPS timer and window messages stall while the
+        // dialog is up — and a nested message-pump deadlock can freeze it for
+        // good, forcing a force-close). Every other file dialog in the app
+        // already runs on a background thread; the export dialog was the one
+        // exception. Show it on a worker thread and resume on the event loop
+        // once the user picks a path.
+        let dialog_window_weak = window_handle_export.clone();
+        let dialog_state = state_export.clone();
+        let dialog_cancel = export_cancel_flag.clone();
         std::thread::spawn(move || {
-            let res = crate::gpu_export::export_gpu(
-                config,
-                audio_path,
-                output_path.clone(),
-                include_audio,
-                cancel_flag,
-                Some(progress_cb),
-            );
+            let chosen = FileDialog::new()
+                .set_file_name(file_name)
+                .add_filter(filter_name, &[filter_ext])
+                .save_file()
+                .map(|p| p.to_string_lossy().to_string());
+
             slint::invoke_from_event_loop(move || {
-                if let Some(w) = window_weak.upgrade() {
-                    w.set_is_exporting(false);
-                    match res {
-                        Ok(_) => {
-                            w.set_export_status_text(slint::SharedString::from(format!(
-                                "Export Saved: {}",
-                                output_path
-                            )));
-                            w.set_export_progress_percent(100.0);
-                            push_toast(
-                                &w,
-                                &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
-                                ToastKind::Success,
-                                "Export complete — video saved",
-                            );
-                        }
-                        Err(e) if e == "Export cancelled" => {
-                            w.set_export_status_text(slint::SharedString::from(
-                                "Export cancelled",
-                            ));
-                            w.set_export_progress_percent(0.0);
-                            push_toast(
-                                &w,
-                                &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
-                                ToastKind::Info,
-                                "Export cancelled",
-                            );
-                        }
-                        Err(e) => {
-                            w.set_export_status_text(slint::SharedString::from(format!(
-                                "Error: {}",
-                                e
-                            )));
-                            w.set_export_progress_percent(0.0);
-                            push_toast(
-                                &w,
-                                &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
-                                ToastKind::Error,
-                                format!("Export failed: {e}"),
-                            );
-                        }
-                    }
+                let Some(output_path) = chosen else { return };
+
+                if let Some(w) = dialog_window_weak.upgrade() {
+                    w.set_is_exporting(true);
+                    let fmt_label = if is_webm { "WebM" } else { "MP4" };
+                    w.set_export_status_text(slint::SharedString::from(format!("Rendering & encoding {}...", fmt_label)));
+                    w.set_export_progress_percent(10.0);
                 }
+
+                let window_weak = dialog_window_weak.clone();
+                let window_weak_prog = dialog_window_weak.clone();
+                let state_for_toast = dialog_state.clone();
+                let cancel_flag = dialog_cancel.clone();
+
+                let progress_cb = Arc::new(move |percent: f32, frame: usize, total: usize| {
+                    let window_weak = window_weak_prog.clone();
+                    let status_text = format!("Rendering frame {}/{} ({:.0}%)...", frame, total, percent);
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            w.set_export_progress_percent(percent);
+                            w.set_export_status_text(slint::SharedString::from(status_text));
+                        }
+                    });
+                });
+
+                std::thread::spawn(move || {
+                    let res = crate::gpu_export::export_gpu(
+                        config,
+                        audio_path,
+                        output_path.clone(),
+                        include_audio,
+                        cancel_flag,
+                        Some(progress_cb),
+                    );
+                    slint::invoke_from_event_loop(move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            w.set_is_exporting(false);
+                            match res {
+                                Ok(_) => {
+                                    w.set_export_status_text(slint::SharedString::from(format!(
+                                        "Export Saved: {}",
+                                        output_path
+                                    )));
+                                    w.set_export_progress_percent(100.0);
+                                    push_toast(
+                                        &w,
+                                        &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
+                                        ToastKind::Success,
+                                        "Export complete — video saved",
+                                    );
+                                }
+                                Err(e) if e == "Export cancelled" => {
+                                    w.set_export_status_text(slint::SharedString::from(
+                                        "Export cancelled",
+                                    ));
+                                    w.set_export_progress_percent(0.0);
+                                    push_toast(
+                                        &w,
+                                        &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
+                                        ToastKind::Info,
+                                        "Export cancelled",
+                                    );
+                                }
+                                Err(e) => {
+                                    w.set_export_status_text(slint::SharedString::from(format!(
+                                        "Error: {}",
+                                        e
+                                    )));
+                                    w.set_export_progress_percent(0.0);
+                                    push_toast(
+                                        &w,
+                                        &mut state_for_toast.lock().unwrap_or_else(|e| e.into_inner()),
+                                        ToastKind::Error,
+                                        format!("Export failed: {e}"),
+                                    );
+                                }
+                            }
+                        }
+                    })
+                    .unwrap();
+                });
             })
-            .unwrap();
+            .ok();
         });
         });
     });
@@ -1288,13 +1321,13 @@ pub fn bind_app_callbacks(
     let preview_weak = preview.map(|p| p.as_weak());
     window.on_toggle_preview_clicked(move || {
         let Some(p) = preview_weak.as_ref().and_then(|w| w.upgrade()) else {
-            eprintln!("[Preview] Pop-out preview is not available");
+            crate::logline!("[Preview] Pop-out preview is not available");
             return;
         };
         if p.window().is_visible() {
             let _ = p.hide();
         } else if let Err(e) = p.show() {
-            eprintln!("[Preview] Failed to show preview window: {}", e);
+            crate::logline!("[Preview] Failed to show preview window: {}", e);
         }
     });
 

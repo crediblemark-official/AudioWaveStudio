@@ -238,9 +238,46 @@ const ARABIC_CANDIDATES: &[&str] = &[
   "/usr/share/fonts/noto/NotoSansArabic-Regular.ttf",
   "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
   "/usr/share/fonts/google-noto/NotoSansArabic-Regular.ttf",
-  "C:\\Windows\\Fonts\\seguiemj.ttf",
+  "C:\\Windows\\Fonts\\segoeui.ttf",
   "C:\\Windows\\Fonts\\arial.ttf",
+  // Segoe UI Emoji (seguiemj) has NO Arabic letters — a path-based probe
+  // would happily pick it up and make Arabic render as tofu boxes. It is
+  // listed LAST (and rejected by the glyph-coverage check below anyway) so it
+  // can never shadow a real Arabic-capable font.
+  "C:\\Windows\\Fonts\\seguiemj.ttf",
 ];
+
+/// Does `font` actually contain Arabic glyphs? Windows's Segoe UI Emoji is a
+/// classic false positive for path-based font discovery: it exists on every
+/// Win10+ box but has no Arabic letters, so shaping falls back to .notdef and
+/// the user sees empty boxes. Probe the cmap for a representative Arabic
+/// codepoint (ARABIC LETTER ALEF, U+0627) before accepting a candidate.
+fn has_arabic_glyphs(font: &Font) -> bool {
+  font.arc.glyph_id('\u{0627}').0 != 0
+}
+
+/// Load the first candidate that BOTH exists and covers Arabic glyphs.
+fn load_any_arabic(candidates: &[&str]) -> Option<Font> {
+  for p in candidates {
+    if let Some(f) = load_any(&[*p]) {
+      if has_arabic_glyphs(&f) {
+        return Some(f);
+      }
+    }
+  }
+  None
+}
+
+/// fc-match result, additionally verified to cover Arabic (fontconfig can
+/// resolve to a Latin-only face for a generic "arabic" match on some boxes).
+fn fc_match_arabic(hint: &str) -> Option<Font> {
+  let f = fc_match(hint)?;
+  if has_arabic_glyphs(&f) {
+    Some(f)
+  } else {
+    None
+  }
+}
 
 fn font_set() -> Option<&'static FontSet> {
   FONTS
@@ -262,7 +299,9 @@ fn font_set() -> Option<&'static FontSet> {
         .or_else(|| fc_match("monospace:italic:bold"));
       let serif = load_any(SERIF_CANDIDATES).or_else(|| fc_match("serif"));
       let serif_italic = load_any(SERIF_ITALIC_CANDIDATES).or_else(|| fc_match("serif:italic"));
-      let arabic = load_any(ARABIC_CANDIDATES).or_else(|| fc_match("arabic")).or_else(|| fc_match("Noto Sans Arabic"));
+      let arabic = load_any_arabic(ARABIC_CANDIDATES)
+        .or_else(|| fc_match_arabic("arabic"))
+        .or_else(|| fc_match_arabic("Noto Sans Arabic"));
       Some(FontSet {
         regular,
         bold: bold.clone().unwrap_or_else(|| reg.clone()),

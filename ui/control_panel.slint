@@ -732,6 +732,11 @@ export component ControlPanel inherits Rectangle {
     callback custom-text-edited(int, string, bool, float, float, float, string, string, string);
 
     callback config-changed();
+    // Carries the EXACT style id the user clicked straight into Rust. Unlike
+    // reading `style-val` back inside config-changed, this cannot be stale or
+    // miss the click, so the preview always switches to the newly selected
+    // style even after many rapid style changes.
+    callback style-selected(string);
     callback theme-preset-selected(string);
     callback open-radial-image-clicked();
     callback remove-radial-image-clicked();
@@ -972,7 +977,7 @@ export component ControlPanel inherits Rectangle {
                             style-id: item.id;
                             label: item.label;
                             current: root.style-val;
-                            style-clicked(id) => { root.style-val = id; root.config-changed(); }
+                            style-clicked(id) => { root.style-val = id; root.style-selected(id); root.config-changed(); }
                         }
                     }
                     if (root.has-bar-count(root.style-val)) : SliderRow {
