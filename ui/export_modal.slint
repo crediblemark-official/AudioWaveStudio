@@ -89,6 +89,7 @@ export component ExportModal inherits Rectangle {
     callback start-export-clicked();
     callback cancel-export-clicked();
     callback close-clicked();
+    callback config-changed();
 
     Rectangle {
         width: 500px;
@@ -172,7 +173,10 @@ export component ExportModal inherits Rectangle {
                             model: ["16:9", "9:16", "1:1"];
                             current-value: root.export-aspect-ratio;
                             current-index: root.export-aspect-ratio == "16:9" ? 0 : root.export-aspect-ratio == "9:16" ? 1 : 2;
-                            selected(val) => { root.export-aspect-ratio = val; }
+                            selected(val) => {
+                                root.export-aspect-ratio = val;
+                                root.config-changed();
+                            }
                         }
                     }
 

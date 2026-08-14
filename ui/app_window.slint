@@ -115,6 +115,92 @@ component EmptyStateOverlay {
     }
 }
 
+// Compact Aspect Ratio toggle button with active gold glow and hover effect
+component AspectRatioBtn inherits Rectangle {
+    in property <string> label: "";
+    in property <bool> active: false;
+    callback clicked();
+
+    height: 24px;
+    border-radius: 4px;
+    background: root.active ? #ffd700 : (ta.has-hover ? #ffffff18 : transparent);
+    drop-shadow-blur: root.active ? 6px : 0px;
+    drop-shadow-color: #ffd70060;
+    animate background { duration: 120ms; }
+    animate drop-shadow-blur { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        alignment: center;
+        cross-axis-alignment: center;
+
+        Text {
+            text: root.label;
+            color: root.active ? #000000 : (ta.has-hover ? #f8fafc : #94a3b8);
+            font-size: 11px;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+    }
+
+    ta := TouchArea {
+        width: parent.width;
+        height: parent.height;
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+// Floating glassmorphic Aspect Ratio switcher on the preview viewport
+component AspectRatioBadge inherits Rectangle {
+    in-out property <string> current-aspect: "16:9";
+    callback aspect-changed(string);
+
+    height: 32px;
+    border-radius: 8px;
+    background: #0b0f19d0;
+    border-width: 1px;
+    border-color: #ffffff1f;
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #000000a0;
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        spacing: 4px;
+        cross-axis-alignment: center;
+
+        Text {
+            text: "📐 Aspect:";
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 600;
+            vertical-alignment: center;
+        }
+
+        AspectRatioBtn {
+            label: "16:9";
+            active: root.current-aspect == "16:9";
+            clicked => { root.aspect-changed("16:9"); }
+        }
+
+        AspectRatioBtn {
+            label: "9:16";
+            active: root.current-aspect == "9:16";
+            clicked => { root.aspect-changed("9:16"); }
+        }
+
+        AspectRatioBtn {
+            label: "1:1";
+            active: root.current-aspect == "1:1";
+            clicked => { root.aspect-changed("1:1"); }
+        }
+    }
+}
+
 export component AppWindow inherits Window {
     title: "AudioWave Studio - Native Pure Rust & Slint UI";
     icon: @image-url("assets/icon.png");
@@ -492,9 +578,9 @@ export component AppWindow inherits Window {
                         source: root.preview-frame;
                         width: 100%;
                         height: 100%;
-                        // Safety net: never stretch a frame into a distorted
-                        // aspect (legacy objectFit: contain) — rounds stay round.
-                        image-fit: fill;
+                        // Always preserve the exact aspect ratio (16:9, 9:16, 1:1)
+                        // centered with letterbox/pillarbox bars.
+                        image-fit: contain;
                     }
 
                     canvas-ta := TouchArea {
@@ -508,6 +594,17 @@ export component AppWindow inherits Window {
                         // Space/arrows/M/S shortcuts until a control is focused.
                         clicked => { window-fs.focus(); }
                         double-clicked => { root.full-screen = !root.full-screen; }
+                    }
+
+                    // Live Aspect Ratio quick selector badge on the preview canvas
+                    if (!root.full-screen) : AspectRatioBadge {
+                        x: 16px;
+                        y: 16px;
+                        current-aspect: root.export-aspect-ratio;
+                        aspect-changed(ar) => {
+                            root.export-aspect-ratio = ar;
+                            root.config-changed();
+                        }
                     }
 
                     // ONBOARDING EMPTY STATE — no track loaded yet (no TouchArea
@@ -750,6 +847,7 @@ export component AppWindow inherits Window {
             export-status-text <=> root.export-status-text;
             is-exporting <=> root.is-exporting;
 
+            config-changed => { root.config-changed(); }
             start-export-clicked => { root.start-export-clicked(); }
             cancel-export-clicked => { root.cancel-export-clicked(); }
             close-clicked => { root.show-export-modal = false; }

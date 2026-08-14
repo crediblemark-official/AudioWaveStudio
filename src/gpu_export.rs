@@ -470,6 +470,13 @@ pub fn render_preview_frame_inner(
   );
   let bg_only = config.screen_effects.background_only.unwrap_or(true);
 
+  // Ping-pong readback: render this tick into `render_slot` while reading the
+  // previous tick's frame from the OTHER slot (already complete — the UI
+  // thread never spins waiting on freshly-submitted GPU work). Only the very
+  // first frame waits synchronously, because there is no prior frame yet.
+  let render_slot = engine.next_slot;
+  let read_slot = 1 - render_slot;
+
   if let Some(fx_ref) = fx.as_ref().filter(|_| bg_only) {
     // backgroundOnly: effect applies to the background layer only.
     let mut bg_canvas = GpuCanvas::new(width, height);
@@ -486,7 +493,7 @@ pub fn render_preview_frame_inner(
       FramePass::ForegroundOnly,
     );
     let fg_mesh = fg_canvas.finish_with(fg_scene);
-    engine.renderer.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx_ref, 0);
+    engine.renderer.render_bg_fx_then_over(&bg_mesh, &fg_mesh, fx_ref, render_slot);
   } else {
     let mut canvas = GpuCanvas::new(width, height);
     let mut scene3d = Scene3D::new();
@@ -496,11 +503,20 @@ pub fn render_preview_frame_inner(
     );
     let mesh = canvas.finish_with(scene3d);
     match fx {
-      Some(fx) => engine.renderer.render_into_fx(&mesh, &fx, 0),
-      None => engine.renderer.render_into(&mesh, 0),
+      Some(fx) => engine.renderer.render_into_fx(&mesh, &fx, render_slot),
+      None => engine.renderer.render_into(&mesh, render_slot),
     }
   }
-  let rgba = engine.renderer.readback(0);
+
+  let rgba = if engine.has_prev {
+    engine.renderer.readback(read_slot)
+  } else {
+    // First frame: no prior slot to read, so wait on this one (one-time cost).
+    let rgba = engine.renderer.readback(render_slot);
+    engine.has_prev = true;
+    rgba
+  };
+  engine.next_slot = read_slot;
 
   // Persist the state for the next preview frame.
   engine.render_state = Some(rstate);

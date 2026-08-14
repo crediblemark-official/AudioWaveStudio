@@ -261,8 +261,10 @@ impl GpuRenderer {
     }
 
     let mut last_err = "No GPU adapter found".to_string();
+    let mut seen: Vec<String> = Vec::new();
     for adapter in candidates {
       let info = adapter.get_info();
+      seen.push(format!("{} ({})", info.name, backend_label(info.backend)));
       match adapter
         .request_device(
           &wgpu::DeviceDescriptor {
@@ -289,7 +291,19 @@ impl GpuRenderer {
         }
       }
     }
-    Err(last_err)
+    // Surface WHY the CPU-software fallback kicked in: enumerate every adapter
+    // that was seen and the backend(s) wgpu was compiled with, so a Windows
+    // machine with a healthy GPU never silently renders on the CPU.
+    let backends: Vec<&str> = {
+      let b = wgpu::Instance::default().enumerate_adapters(wgpu::Backends::all());
+      b.iter().map(|a| backend_label(a.get_info().backend)).collect()
+    };
+    Err(format!(
+      "No usable wgpu adapter (tried: {}; wgpu backends enumerated: {}). Reason: {}",
+      if seen.is_empty() { "none".to_string() } else { seen.join(", ") },
+      if backends.is_empty() { "none".to_string() } else { backends.join(", ") },
+      last_err,
+    ))
   }
 
   /// Build the full renderer from an already-created device + queue (adapter

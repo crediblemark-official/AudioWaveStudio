@@ -402,6 +402,12 @@ pub fn run() {
     // Timestamp (in idle seconds) of the last recovered-frame log, used to
     // throttle recurring faults to ~1 line/s.
     let mut last_panic_log: f32 = -10.0;
+    // Idle-frame throttle: when nothing plays and no mic is listening, render
+    // the (nearly static) preview every OTHER tick (~30fps) instead of every
+    // tick (~60fps). The demo/paused frame barely changes, but skipping half
+    // the GPU render + readback + full-window UI repaints halves the CPU load
+    // when the app is sitting idle on a GPU-capable machine.
+    let mut tick_parity: u8 = 0;
 
     timer.start(slint::TimerMode::Repeated, Duration::from_millis(16), move || {
         // A panic on the UI thread (e.g. a transient wgpu/GPU hiccup inside a
@@ -513,21 +519,25 @@ pub fn run() {
                 (demo_freq, vec![128u8; 128], 0.2, frame_time)
             };
 
-            // Render at the ACTUAL canvas viewport size (read from the UI every
-            // frame). The renderer produces a buffer that matches the canvas
-            // aspect ratio exactly, so circles stay round — a fixed 16:9 buffer
-            // stretched into a wider viewport would squish them into ovals.
-            // Clamped for sanity: tiny viewports stay renderable, and huge ones
-            // (4K fullscreen) keep the 60 FPS render affordable. The size is
-            // quantized to a 8px grid so fractional-logical-px jitter during
-            // window drags (Wayland) cannot tear down & rebuild the wgpu engine
-            // on every frame — only real size changes rebuild it.
-            let vw = (w.get_canvas_viewport_w().clamp(320.0, 1920.0) as u32 / 8) * 8;
-            let vh = (w.get_canvas_viewport_h().clamp(180.0, 1080.0) as u32 / 8) * 8;
-            let width = vw.max(320);
-            let height = vh.max(180);
+            // Render at the target export aspect ratio (16:9 widescreen, 9:16
+            // portrait, or 1:1 square) scaled to fit the canvas viewport.
+            // Sizing strictly matches the export result so visualizer elements,
+            // radial scales, and text layouts look identical in preview and export.
+            let vw = w.get_canvas_viewport_w();
+            let vh = w.get_canvas_viewport_h();
+            let (width, height) = preview_dimensions(&config.export.aspect_ratio, vw, vh);
+
+            // Idle throttle (see `tick_parity` above): while paused with no
+            // playback and no mic, render every other tick. `is_playing` is the
+            // state read at the top of this tick; a just-pressed Play button is
+            // picked up on the very next tick, so the visualizer starts within
+            // ~32ms.
+            let is_idle = !is_playing && !is_listening;
+            tick_parity = tick_parity.wrapping_add(1);
+            let render_this_tick = !is_idle || (tick_parity & 1) == 0;
 
             let mut rendered = false;
+            if render_this_tick {
             if let Ok(mut s) = state_clone.lock() {
                 let is_playing = s.audio_player.is_playing();
                 let need_resize = s
@@ -559,6 +569,8 @@ pub fn run() {
                                     radial_image_info: None,
                                     render_state: None,
                                     last_style: None,
+                                    next_slot: 0,
+                                    has_prev: false,
                                 });
                             }
                             Err(e) => {
@@ -633,6 +645,7 @@ pub fn run() {
                     }
                 }
             }
+            } // end `if render_this_tick`
         }
         }));
 
@@ -694,4 +707,70 @@ pub fn run() {
     // paths used /tmp/fifo_cap.raw; an orphaned writer holding it open would
     // otherwise linger forever).
     let _ = std::fs::remove_file("/tmp/fifo_cap.raw");
+}
+
+/// Compute the live preview buffer dimensions that strictly match the target
+/// export aspect ratio (16:9 widescreen, 9:16 portrait, or 1:1 square) while
+/// fitting inside the available canvas viewport.
+///
+/// Returns dimensions that are multiples of 4 (and clamped for GPU sanity),
+/// preventing texture row misalignment and fractional-pixel resize thrashing.
+pub fn preview_dimensions(
+    aspect_ratio: &crate::config::AspectRatio,
+    avail_w: f32,
+    avail_h: f32,
+) -> (u32, u32) {
+    let avail_w = avail_w.clamp(180.0, 1920.0);
+    let avail_h = avail_h.clamp(180.0, 1080.0);
+    match aspect_ratio {
+        crate::config::AspectRatio::Widescreen => {
+            // Strict 16:9 widescreen
+            let scale = (avail_w / 16.0).min(avail_h / 9.0);
+            let k = ((scale / 4.0).floor() as u32).max(1) * 4;
+            let w = (k * 16).clamp(320, 1920);
+            let h = (k * 9).clamp(180, 1080);
+            (w, h)
+        }
+        crate::config::AspectRatio::Portrait => {
+            // Strict 9:16 portrait (e.g. TikTok, Reels, Shorts)
+            let scale = (avail_w / 9.0).min(avail_h / 16.0);
+            let k = ((scale / 4.0).floor() as u32).max(1) * 4;
+            let w = (k * 9).clamp(180, 1080);
+            let h = (k * 16).clamp(320, 1920);
+            (w, h)
+        }
+        crate::config::AspectRatio::Square => {
+            // Strict 1:1 square (e.g. Instagram Post)
+            let scale = avail_w.min(avail_h);
+            let k = (((scale as u32) / 16) * 16).clamp(320, 1080);
+            (k, k)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::AspectRatio;
+
+    #[test]
+    fn test_preview_dimensions_widescreen() {
+        let (w, h) = preview_dimensions(&AspectRatio::Widescreen, 1200.0, 700.0);
+        assert_eq!(w * 9, h * 16, "Widescreen preview must be exactly 16:9 ratio");
+        assert!(w <= 1200 && h <= 700, "Preview must fit inside available viewport");
+    }
+
+    #[test]
+    fn test_preview_dimensions_portrait() {
+        let (w, h) = preview_dimensions(&AspectRatio::Portrait, 1200.0, 700.0);
+        assert_eq!(w * 16, h * 9, "Portrait preview must be exactly 9:16 ratio");
+        assert!(w <= 1200 && h <= 700, "Preview must fit inside available viewport");
+    }
+
+    #[test]
+    fn test_preview_dimensions_square() {
+        let (w, h) = preview_dimensions(&AspectRatio::Square, 1200.0, 700.0);
+        assert_eq!(w, h, "Square preview must be exactly 1:1 ratio");
+        assert!(w <= 1200 && h <= 700, "Preview must fit inside available viewport");
+    }
 }

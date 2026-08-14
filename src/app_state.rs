@@ -159,6 +159,13 @@ pub struct GpuPreviewEngine {
     /// history, VU decay, beat/rotation counters) is discarded so the new
     /// style starts clean instead of inheriting stale state from the old one.
     pub last_style: Option<crate::config::VisualizerStyle>,
+    /// Ping-pong slot bookkeeping for the live preview. The GPU renders into
+    /// `next_slot` while `readback` waits on the OTHER slot, which holds the
+    /// frame submitted on the previous tick and is therefore already complete
+    /// — so the UI thread never blocks on this tick's GPU work. `has_prev`
+    /// is false only on the very first frame (nothing to read yet).
+    pub next_slot: usize,
+    pub has_prev: bool,
 }
 
 pub struct SlintAppState {
@@ -425,17 +432,22 @@ pub fn create_slint_image_from_rgb(width: u32, height: u32, rgb_bytes: &[u8]) ->
 }
 
 pub fn create_slint_image_from_rgba(width: u32, height: u32, rgba_bytes: &[u8]) -> Image {
-    let mut buffer = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+    use slint::Rgba8Pixel;
     let pixel_count = (width * height) as usize;
     let expected_src = pixel_count * 4;
-    if rgba_bytes.len() >= expected_src {
-        let dst = buffer.make_mut_bytes();
-        // Strip the alpha channel: copy R,G,B from each RGBA quad.
-        for i in 0..pixel_count {
-            dst[i * 3]     = rgba_bytes[i * 4];
-            dst[i * 3 + 1] = rgba_bytes[i * 4 + 1];
-            dst[i * 3 + 2] = rgba_bytes[i * 4 + 2];
-        }
+    if rgba_bytes.len() < expected_src {
+        // Truncated frame: fall back to a blank image instead of underflowing.
+        let mut blank = SharedPixelBuffer::<Rgb8Pixel>::new(width, height);
+        blank.make_mut_bytes().fill(0);
+        return Image::from_rgb8(blank);
     }
-    Image::from_rgb8(buffer)
+    // The wgpu renderer produces fully-opaque RGBA (the frame is cleared opaque
+    // and every draw is opaque), so keep the alpha channel as-is and do a
+    // single memcpy instead of a per-pixel RGBA->RGB strip (saves ~1M ops per
+    // 720p frame at 60fps).
+    let mut buffer = SharedPixelBuffer::<Rgba8Pixel>::new(width, height);
+    buffer
+        .make_mut_bytes()
+        .copy_from_slice(&rgba_bytes[..expected_src]);
+    Image::from_rgba8(buffer)
 }

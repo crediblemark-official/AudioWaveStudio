@@ -29,14 +29,20 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 slint-build = "1.17"
 
 [dependencies]
-slint = { version = "1.17", default-features = false, features = ["std", "compat-1-2", "backend-winit-x11", "backend-winit-wayland", "renderer-femtovg"] }
+slint = { version = "1.17", default-features = false, features = ["std", "compat-1-2", "backend-winit-x11", "backend-winit-wayland", "renderer-skia"] }
 rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 symphonia = { version = "0.5", features = ["mp3", "wav", "flac", "ogg", "isomp4", "pcm", "aac", "alac"] }
 realfft = "3.4"
 image = "0.25"
-wgpu = "23"
+# Explicitly compile the Vulkan backend in addition to the platform defaults
+# (DX12 on Windows / GL on Linux). wgpu's own default features only enable
+# dx12+metal+webgpu; the vulkan backend is normally pulled in via wgpu's
+# target-specific deps, but declaring it here guarantees the GPU renderer has
+# a robust fallback (e.g. a Windows machine whose DX12 shader compiler is
+# missing/broken falls back to Vulkan instead of the CPU software renderer).
+wgpu = { version = "23", features = ["vulkan-portability"] }
 # Lightweight zero-dependency linear algebra for the native 3D engine
 # (Camera + Scene3D). Replaces the OpenGL-based `three-d`/`three-d-asset`
 # crates, which did not fit the headless wgpu export pipeline (see the

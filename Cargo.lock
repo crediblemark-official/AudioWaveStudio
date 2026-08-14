@@ -1270,26 +1270,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "femtovg"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f43d05da42e81724c16d34a150fb7fda53d3f786e5a94673ee526ff8602f0f6a"
-dependencies = [
- "bitflags 2.13.1",
- "bytemuck",
- "fnv",
- "glow 0.17.0",
- "imgref",
- "itertools 0.14.0",
- "log",
- "rgb",
- "slotmap",
- "swash",
- "wasm-bindgen",
- "web-sys",
-]
-
-[[package]]
 name = "field-offset"
 version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1341,12 +1321,6 @@ name = "float-cmp"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98de4bbd547a563b716d8dfa9aad1cb19bfab00f4fa09a6a4ed21dbcf44ce9c4"
-
-[[package]]
-name = "fnv"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
 name = "foldhash"
@@ -1900,8 +1874,9 @@ dependencies = [
  "glutin",
  "i-slint-common",
  "i-slint-core",
- "i-slint-renderer-femtovg",
+ "i-slint-renderer-skia",
  "input",
+ "memmap2",
  "nix",
  "raw-window-handle",
  "xkbcommon",
@@ -1916,11 +1891,25 @@ dependencies = [
  "cfg-if",
  "cfg_aliases 0.2.2",
  "i-slint-backend-linuxkms",
+ "i-slint-backend-testing",
  "i-slint-backend-winit",
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
- "i-slint-renderer-femtovg",
+ "i-slint-renderer-skia",
+]
+
+[[package]]
+name = "i-slint-backend-testing"
+version = "1.17.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "521e901e3d47ab829c0ef500c63155776208707cd93259e6a7803ed627fa2786"
+dependencies = [
+ "cfg_aliases 0.2.2",
+ "i-slint-common",
+ "i-slint-core",
+ "i-slint-renderer-skia",
+ "vtable",
 ]
 
 [[package]]
@@ -1940,7 +1929,6 @@ dependencies = [
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
- "i-slint-renderer-femtovg",
  "i-slint-renderer-skia",
  "lyon_path",
  "muda",
@@ -2074,28 +2062,6 @@ dependencies = [
  "quote",
  "serde_json",
  "syn 2.0.119",
-]
-
-[[package]]
-name = "i-slint-renderer-femtovg"
-version = "1.17.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78d0d99a18d66738b684758fe8460743a0aa0f64a96e05940942231a340085b1"
-dependencies = [
- "cfg-if",
- "const-field-offset",
- "derive_more",
- "femtovg",
- "glow 0.17.0",
- "i-slint-common",
- "i-slint-core",
- "i-slint-core-macros",
- "imgref",
- "lyon_path",
- "pin-weak",
- "rgb",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -4547,7 +4513,7 @@ dependencies = [
  "i-slint-common",
  "i-slint-core",
  "i-slint-core-macros",
- "i-slint-renderer-femtovg",
+ "i-slint-renderer-skia",
  "i-slint-renderer-software",
  "num-traits",
  "once_cell",
@@ -4708,6 +4674,7 @@ checksum = "aac18da81ebbf05109ab275b157c22a653bb3c12cf884450179942f81bcbf6c3"
 dependencies = [
  "as-raw-xcb-connection",
  "bytemuck",
+ "drm",
  "fastrand",
  "js-sys",
  "memmap2",
