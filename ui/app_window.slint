@@ -386,6 +386,12 @@ export component AppWindow inherits Window {
 
     // Export Settings
     in-out property <string> export-aspect-ratio: "16:9";
+    // Width/height factor matching the export aspect (16:9 = 16/9, 9:16 = 9/16,
+    // 1:1 = 1). The on-canvas preview surface is sized to this ratio so the
+    // visible video is pixel-identical to the exported frame — no letterbox.
+    in-out property <float> export-aspect-factor: root.export-aspect-ratio == "9:16"
+        ? 9.0 / 16.0
+        : (root.export-aspect-ratio == "1:1" ? 1.0 : 16.0 / 9.0);
     in-out property <string> export-resolution: "1080p";
     in-out property <int> export-fps: 60;
     in-out property <string> export-format: "mp4";
@@ -569,49 +575,63 @@ export component AppWindow inherits Window {
                 vertical-stretch: 1;
                 spacing: 0;
 
-                // CANVAS VIEWPORT — double-click toggles fullscreen (legacy App.tsx)
+                // CANVAS VIEWPORT — double-click toggles fullscreen (legacy App.tsx).
+                // The outer shell fills the workspace; the preview surface inside
+                // is always sized to the export aspect ratio (16:9 / 9:16 / 1:1)
+                // and centered, so the visualizer fills it full-bleed exactly like
+                // the exported frame (no letterbox/pillarbox bars inside the video).
                 viewport := Rectangle {
                     horizontal-stretch: 1;
                     background: #000000;
+                    clip: true;
 
-                    Image {
-                        source: root.preview-frame;
-                        width: 100%;
-                        height: 100%;
-                        // Always preserve the exact aspect ratio (16:9, 9:16, 1:1)
-                        // centered with letterbox/pillarbox bars.
-                        image-fit: contain;
-                    }
+                    preview-surface := Rectangle {
+                        width: min(viewport.width, viewport.height * root.export-aspect-factor);
+                        height: min(viewport.width / root.export-aspect-factor, viewport.height);
+                        x: (viewport.width - self.width) / 2;
+                        y: (viewport.height - self.height) / 2;
+                        background: #000000;
 
-                    canvas-ta := TouchArea {
-                        width: parent.width;
-                        height: parent.height;
-                        mouse-cursor: default;
-                        // Re-focus the window keyboard scope when the (non-
-                        // focusable) canvas is clicked: Slint only delivers key
-                        // events to a focused scope, and without this, clicking
-                        // the canvas could drop focus and silently kill the
-                        // Space/arrows/M/S shortcuts until a control is focused.
-                        clicked => { window-fs.focus(); }
-                        double-clicked => { root.full-screen = !root.full-screen; }
-                    }
-
-                    // Live Aspect Ratio quick selector badge on the preview canvas
-                    if (!root.full-screen) : AspectRatioBadge {
-                        x: 16px;
-                        y: 16px;
-                        current-aspect: root.export-aspect-ratio;
-                        aspect-changed(ar) => {
-                            root.export-aspect-ratio = ar;
-                            root.config-changed();
+                        Image {
+                            source: root.preview-frame;
+                            width: 100%;
+                            height: 100%;
+                            // The surface is already exactly the export ratio, so
+                            // contain renders the frame full-bleed (safety net for
+                            // sub-pixel rounding differences with the GPU buffer).
+                            image-fit: contain;
                         }
-                    }
 
-                    // ONBOARDING EMPTY STATE — no track loaded yet (no TouchArea
-                    // of its own, so canvas double-click/fullscreen still works;
-                    // only the Browse button is interactive).
-                    if (!root.has-track && !root.is-listening) : EmptyStateOverlay {
-                        browse-clicked => { root.open-file-clicked(); }
+                        canvas-ta := TouchArea {
+                            width: parent.width;
+                            height: parent.height;
+                            mouse-cursor: default;
+                            // Re-focus the window keyboard scope when the (non-
+                            // focusable) canvas is clicked: Slint only delivers key
+                            // events to a focused scope, and without this, clicking
+                            // the canvas could drop focus and silently kill the
+                            // Space/arrows/M/S shortcuts until a control is focused.
+                            clicked => { window-fs.focus(); }
+                            double-clicked => { root.full-screen = !root.full-screen; }
+                        }
+
+                        // Live Aspect Ratio quick selector badge on the preview canvas
+                        if (!root.full-screen) : AspectRatioBadge {
+                            x: 16px;
+                            y: 16px;
+                            current-aspect: root.export-aspect-ratio;
+                            aspect-changed(ar) => {
+                                root.export-aspect-ratio = ar;
+                                root.config-changed();
+                            }
+                        }
+
+                        // ONBOARDING EMPTY STATE — no track loaded yet (no TouchArea
+                        // of its own, so canvas double-click/fullscreen still works;
+                        // only the Browse button is interactive).
+                        if (!root.has-track && !root.is-listening) : EmptyStateOverlay {
+                            browse-clicked => { root.open-file-clicked(); }
+                        }
                     }
 
                     // DROP HIGHLIGHT — a file is being dragged over the window.
@@ -979,6 +999,12 @@ export component PreviewWindow inherits Window {
     background: #000000;
 
     in-out property <image> preview-frame;
+    // Mirrored from the main window so the pop-out video surface matches the
+    // export aspect ratio (set by the Rust timer while the window is visible).
+    in-out property <string> export-aspect-ratio: "16:9";
+    in-out property <float> export-aspect-factor: root.export-aspect-ratio == "9:16"
+        ? 9.0 / 16.0
+        : (root.export-aspect-ratio == "1:1" ? 1.0 : 16.0 / 9.0);
 
     FocusScope {
         width: parent.width;
@@ -998,18 +1024,29 @@ export component PreviewWindow inherits Window {
         Rectangle {
             background: #000000;
 
-            Image {
-                source: root.preview-frame;
-                width: 100%;
-                height: 100%;
-                image-fit: contain;
-            }
+            // Preview surface sized to the export aspect ratio (16:9 / 9:16 /
+            // 1:1) and centered, so the pop-out shows the video full-bleed
+            // exactly like the exported frame — no letterbox bars.
+            preview-surface := Rectangle {
+                width: min(parent.width, parent.height * root.export-aspect-factor);
+                height: min(parent.width / root.export-aspect-factor, parent.height);
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                background: #000000;
 
-            preview-ta := TouchArea {
-                width: parent.width;
-                height: parent.height;
-                mouse-cursor: default;
-                double-clicked => { root.full-screen = !root.full-screen; }
+                Image {
+                    source: root.preview-frame;
+                    width: 100%;
+                    height: 100%;
+                    image-fit: contain;
+                }
+
+                preview-ta := TouchArea {
+                    width: parent.width;
+                    height: parent.height;
+                    mouse-cursor: default;
+                    double-clicked => { root.full-screen = !root.full-screen; }
+                }
             }
         }
     }

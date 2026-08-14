@@ -612,6 +612,12 @@ pub fn run() {
                         // window when it is open (legacy BroadcastChannel sync).
                         if let Some(p) = preview_handle.as_ref().and_then(|w| w.upgrade()) {
                             if p.window().is_visible() {
+                                // Keep the pop-out surface aspect in sync so its
+                                // preview also matches the export ratio.
+                                let label = aspect_ratio_label(&config.export.aspect_ratio);
+                                if p.get_export_aspect_ratio() != label {
+                                    p.set_export_aspect_ratio(label.into());
+                                }
                                 p.set_preview_frame(slint_img);
                             }
                         }
@@ -641,6 +647,10 @@ pub fn run() {
                 w.set_preview_frame(slint_img.clone());
                 if let Some(p) = preview_handle.as_ref().and_then(|w| w.upgrade()) {
                     if p.window().is_visible() {
+                        let label = aspect_ratio_label(&config.export.aspect_ratio);
+                        if p.get_export_aspect_ratio() != label {
+                            p.set_export_aspect_ratio(label.into());
+                        }
                         p.set_preview_frame(slint_img);
                     }
                 }
@@ -745,6 +755,16 @@ pub fn preview_dimensions(
             let k = (((scale as u32) / 16) * 16).clamp(320, 1080);
             (k, k)
         }
+    }
+}
+
+/// The display label for an export aspect ratio, kept in sync with the
+/// `export-aspect-ratio` string property used by the Slint preview surfaces.
+pub fn aspect_ratio_label(aspect_ratio: &crate::config::AspectRatio) -> &'static str {
+    match aspect_ratio {
+        crate::config::AspectRatio::Widescreen => "16:9",
+        crate::config::AspectRatio::Portrait => "9:16",
+        crate::config::AspectRatio::Square => "1:1",
     }
 }
 
