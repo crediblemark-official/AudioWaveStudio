@@ -11,12 +11,12 @@ The app was migrated from a Tauri v2 (React 18 + TypeScript + Vite) webview arch
 - **134+ Visualizer Styles** — Spectrum Bars, 3D Synthwave Landscapes, 3D Laser Equalizer Wall, 3D Orbit Spike Rainbow Wheel, Hologram Stage, 10+ Glass Box 3D Chambers, 10+ Waveform Renderers (3D Seismograph, Neon Dual Tube, Voxel Terrain, Spring Comb, Harmonic Web, etc.), Audio Prism 3D, Cyber Black Hole, and many more.
 - **Beat-Synced Visuals** — Screen effects (shake, glitch, chromatic aberration, vignette, pulse) trigger on percussive beats, not smooth energy.
 - **Customizable Particles** — 8+ particle styles with beat-responsive bursts, size, and velocity.
-- **60 FPS Real-Time Preview** — GPU-accelerated live preview viewport rendered via wgpu.
-- **Video Export** — Hardware-accelerated wgpu MP4 (H.264) export via FFmpeg pipeline with configurable FPS, resolution, and bitrate.
+- **60 FPS Real-Time Preview** — GPU-accelerated live preview viewport rendered via wgpu with seamless CPU software fallback.
+- **Video Export (MP4 & WebM)** — Hardware-accelerated wgpu MP4 (H.264, HEVC, AV1) and WebM (VP9 + Opus) export via FFmpeg pipeline with configurable FPS, resolution (720p, 1080p, 4K), aspect ratios (16:9, 9:16, 1:1), and bitrate.
 - **Theme Presets & Custom Colors** — Switch between ready-made color themes (cyberpunk, synthwave, emerald, violet, gold) or tune custom primary, secondary, accent, and glow colors.
 - **Custom Image Backgrounds** — Load your own image via the native file dialog or drag & drop.
 - **Multi-Format Audio** — Load MP3, WAV, FLAC, OGG, and AAC via the native file dialog, or drag & drop a song directly onto the canvas.
-- **Hardware Info Modal** — System RAM, GPU adapter, and FFmpeg encoder capability detection.
+- **Hardware Info Modal** — System RAM, GPU adapter, and FFmpeg hardware encoder capability detection (NVENC, QSV, VAAPI, AMF, VideoToolbox).
 
 ---
 
@@ -26,7 +26,7 @@ The app was migrated from a Tauri v2 (React 18 + TypeScript + Vite) webview arch
 - **Language**: Pure Rust (edition 2021), no JavaScript runtime
 - **Audio**: symphonia decoding + realfft spectrum analysis
 - **Graphics**: wgpu GPU-accelerated 2D/3D rendering engine (custom WGSL shaders)
-- **Export**: Full-Rust wgpu MP4 video exporter with FFmpeg subprocess pipeline
+- **Export**: Full-Rust wgpu MP4/WebM video exporter with FFmpeg subprocess pipeline
 
 ---
 
@@ -65,7 +65,7 @@ audiowave/
 │   ├── navbar.slint           # Top Navigation Bar component
 │   ├── audio_bar.slint        # Bottom Audio Player Bar component
 │   ├── control_panel.slint    # Right Control Panel (Style cards, Colors, Bg, FX, Text)
-│   ├── export_modal.slint     # Export MP4 Video modal component
+│   ├── export_modal.slint     # Export MP4/WebM Video modal component
 │   ├── hardware_modal.slint   # System Hardware info modal component
 │   ├── custom_text.slint      # Custom Dynamic Text Overlays data model
 │   └── about_modal.slint      # About modal component
@@ -80,9 +80,9 @@ audiowave/
 │   ├── ffmpeg.rs              # FFmpeg resolution & installation helper
 │   ├── fft_analyzer.rs        # Real-time RealFFT spectrum analyzer
 │   ├── gpu2d/                 # 2D GPU rendering engine & WGSL shaders
-│   ├── gpu_export.rs          # Full-Rust wgpu MP4 video exporter
+│   ├── gpu_export.rs          # Full-Rust wgpu MP4/WebM video exporter
 │   ├── hardware.rs            # Hardware detection (RAM, GPU, FFmpeg encoders)
-│   └── renderers/             # 64+ Visualizer styles, background effects, screen FX, & text overlay
+│   └── renderers/             # 134+ Visualizer styles, background effects, screen FX, & text overlay
 ├── docs/                      # Documentation & parity references
 ├── MIGRATION_PLAN.md          # Migration architecture document
 ├── build.rs                   # Slint UI build script
