@@ -187,11 +187,25 @@ impl AudioPlayer {
 
     pub fn seek(&mut self, target_sec: f64) {
         let was_playing = self.is_playing;
-        self.stop();
-        self.accumulated_sec = target_sec.clamp(0.0, self.duration_sec);
-        if was_playing {
-            let _ = self.play();
+        let clamped = target_sec.clamp(0.0, self.duration_sec);
+        if !was_playing {
+            self.accumulated_sec = clamped;
+            self.start_instant = None;
+            return;
         }
+
+        let now = Instant::now();
+        if let Some(last) = self.last_restart {
+            if now.duration_since(last) < RESTART_THROTTLE {
+                self.accumulated_sec = clamped;
+                return;
+            }
+        }
+        self.last_restart = Some(now);
+
+        self.stop();
+        self.accumulated_sec = clamped;
+        let _ = self.play();
     }
 
     pub fn set_volume(&mut self, vol: f32) {

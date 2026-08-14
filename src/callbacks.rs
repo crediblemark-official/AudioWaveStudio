@@ -934,12 +934,13 @@ pub fn bind_app_callbacks(
             ];
             for (label, c) in theme_colors {
                 if !is_valid_hex(c.as_str()) {
-                    push_toast(
-                        &w,
-                        &mut s,
-                        ToastKind::Error,
-                        format!("{label} color is not a valid hex value (\"{c}\"). Expected #RGB or #RRGGBB."),
-                    );
+                    let trimmed = c.as_str().trim();
+                    if !trimmed.is_empty() && trimmed != "#" && (trimmed.len() >= 4 || !trimmed.starts_with('#')) {
+                        let text = format!("{label} color is not a valid hex value (\"{c}\"). Expected #RGB or #RRGGBB.");
+                        if !s.toasts.iter().any(|t| t.text == text) {
+                            push_toast(&w, &mut s, ToastKind::Error, text);
+                        }
+                    }
                 }
             }
 

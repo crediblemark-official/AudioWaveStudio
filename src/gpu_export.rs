@@ -399,7 +399,7 @@ pub fn render_preview_frame_inner(
   height: u32,
   is_playing: bool,
 ) -> Result<Vec<u8>, String> {
-  let bar_count = config.reactivity.bar_count.min(128);
+  let bar_count = config.reactivity.bar_count.clamp(8, 128);
 
   // Reuse the previous frame's render state so particles, music notes, peaks,
   // VU decay and RNG continuity persist across frames. Rebuild only on the

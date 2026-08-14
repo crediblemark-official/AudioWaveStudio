@@ -155,7 +155,7 @@ pub fn spawn_ffmpeg(
   apply_encoder_args(&mut cmd, &encoder_name, cap_kbps, vaapi_cqp);
 
   if has_audio {
-    if output_mp4_path.ends_with(".webm") {
+    if is_webm {
       // AAC is not valid in a WebM container; use Opus instead.
       cmd.arg("-c:a").arg("libopus").arg("-b:a").arg("160k").arg("-shortest");
     } else {
@@ -163,7 +163,9 @@ pub fn spawn_ffmpeg(
     }
   }
 
-  cmd.arg("-movflags").arg("+faststart");
+  if !is_webm {
+    cmd.arg("-movflags").arg("+faststart");
+  }
   cmd.arg(output_mp4_path);
 
   cmd.stdin(Stdio::piped()).stderr(Stdio::piped()).stdout(Stdio::null());

@@ -83,7 +83,7 @@ export component ExportModal inherits Rectangle {
     in-out property <int> export-fft-size: 1024;
     in-out property <bool> include-audio: true;
     in-out property <float> export-progress-percent: 0.0;
-    in-out property <string> export-status-text: "Ready to render MP4 video";
+    in-out property <string> export-status-text: "Ready to render video";
     in-out property <bool> is-exporting: false;
 
     callback start-export-clicked();
@@ -104,7 +104,7 @@ export component ExportModal inherits Rectangle {
                 spacing: 8px;
 
                 Text {
-                    text: "Export MP4 Video";
+                    text: root.export-format == "webm" ? "Export WebM Video" : "Export MP4 Video";
                     font-size: 17px;
                     font-weight: 700;
                     color: #ffd700;
@@ -205,7 +205,12 @@ export component ExportModal inherits Rectangle {
                             model: ["mp4", "webm"];
                             current-value: root.export-format;
                             current-index: root.export-format == "mp4" ? 0 : 1;
-                            selected(val) => { root.export-format = val; }
+                            selected(val) => {
+                                root.export-format = val;
+                                if (!root.is-exporting) {
+                                    root.export-status-text = val == "webm" ? "Ready to render WebM video" : "Ready to render MP4 video";
+                                }
+                            }
                         }
                     }
 
