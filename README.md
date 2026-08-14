@@ -2,8 +2,6 @@
 
 **AudioWave Studio** is a high-performance desktop audio visualizer built as a **Pure Rust Native Desktop Application** using **Slint UI 1.17** and **wgpu Hardware Acceleration**. It renders dynamic beat-synced visualizations and exports high-quality visualizer videos in real-time.
 
-The app was migrated from a Tauri v2 (React 18 + TypeScript + Vite) webview architecture to a native Rust + Slint + wgpu stack for performance: eliminating WebView/Chromium IPC overhead, reducing RAM usage, and lowering rendering latency for 60 FPS real-time visualizers. See [MIGRATION_PLAN.md](MIGRATION_PLAN.md) for the full architecture document.
-
 ---
 
 ## Features
@@ -84,7 +82,6 @@ audiowave/
 │   ├── hardware.rs            # Hardware detection (RAM, GPU, FFmpeg encoders)
 │   └── renderers/             # 134+ Visualizer styles, background effects, screen FX, & text overlay
 ├── docs/                      # Documentation & parity references
-├── MIGRATION_PLAN.md          # Migration architecture document
 ├── build.rs                   # Slint UI build script
 └── Cargo.toml                 # Root Cargo crate manifest
 ```
