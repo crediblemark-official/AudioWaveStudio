@@ -174,7 +174,10 @@ pub struct SlintAppState {
     pub audio_path: Option<String>,
     pub config: VisualizerConfig,
     pub gpu_engine: Option<GpuPreviewEngine>,
-    pub _prev_smoothed: Option<Vec<f32>>,
+    /// Frequency smoothing history shared by the preview and export pipelines
+    /// (see [`crate::fft_analyzer::FreqSmoother`]) so both feed the renderers
+    /// identical data.
+    pub freq_smoother: crate::fft_analyzer::FreqSmoother,
     /// Mute state for the audio player bar.
     pub is_muted: bool,
     /// Volume restored when unmuting.
@@ -227,7 +230,7 @@ impl SlintAppState {
             audio_path: None,
             config,
             gpu_engine: None,
-            _prev_smoothed: None,
+            freq_smoother: crate::fft_analyzer::FreqSmoother::new(),
             is_muted: false,
             prev_volume: 0.8,
             is_listening: false,

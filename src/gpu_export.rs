@@ -111,7 +111,7 @@ pub fn export_gpu(
   let (width, height) = export_dimensions(&config);
   let fps = config.export.fps.max(1);
   let fft_size = config.reactivity.fft_size.max(64);
-  let bar_count = config.reactivity.bar_count.max(1);
+  let bar_count = config.reactivity.bar_count.clamp(8, 128);
 
   let audio = AudioData::decode_file(&audio_file_path)?;
   if audio.duration_seconds <= 0.0 {
@@ -180,8 +180,10 @@ pub fn export_gpu(
       Ok(())
     });
 
-    let smoothing = clamp_smoothing(config.reactivity.smoothing);
-    let mut prev_smoothed: Option<Vec<f32>> = None;
+    // Frequency smoothing MUST reuse the live preview's FreqSmoother so the
+    // exported bars are bit-identical to what the preview shows (same per-bin
+    // sensitivity gain, same asymmetric attack/release curve).
+    let mut smoother = crate::fft_analyzer::FreqSmoother::new();
 
     let mut render_frame = |gpu: &mut GpuRenderer, frame: usize, slot: usize| -> Result<(), String> {
       let time_sec = frame as f64 / fps as f64;
@@ -191,31 +193,26 @@ pub fn export_gpu(
         .compute_full_spectrum(&samples)
         .map_err(|e| format!("FFT error: {}", e))?;
 
-      let smoothed_mag = match &mut prev_smoothed {
-        Some(prev) if prev.len() == mag.len() => {
-          for (p, &m) in prev.iter_mut().zip(mag.iter()) {
-            *p = *p * smoothing + m * (1.0 - smoothing);
-          }
-          prev.clone()
-        }
-        _ => {
-          prev_smoothed = Some(mag.clone());
-          mag.clone()
-        }
-      };
-
-      let freq_u8: Vec<u8> = smoothed_mag.iter().map(|m| (m.clamp(0.0, 1.0) * 255.0).round() as u8).collect();
-      let time_u8: Vec<u8> = samples
-        .iter()
-        .map(|s| ((s + 1.0) * 128.0).clamp(0.0, 255.0) as u8)
-        .collect();
+      let freq_u8 = smoother.smooth_u8(
+        &mag,
+        config.reactivity.sensitivity,
+        config.reactivity.smoothing,
+      );
+      let time_u8 = crate::fft_analyzer::time_domain_u8(&samples);
 
       // Export always renders as if playing (TS export sets isPlaying=true).
       let frame_time = time_sec as f32;
       // Export time is already continuous, so it doubles as the fx clock.
       rstate.screen_fx.fx_time = frame_time;
       // Advance the envelope ONCE per frame; the passes below only read it.
-      let env = advance_envelope(&mut rstate, &config, &freq_u8, frame_time, true);
+      let env = advance_envelope(
+        &mut rstate,
+        &config,
+        &freq_u8,
+        frame_time,
+        true,
+        config.export.fps.max(1) as f32,
+      );
       let fx = crate::renderers::screen_effects::post_fx(
         &mut rstate.screen_fx,
         &config.screen_effects,
@@ -347,15 +344,6 @@ pub fn export_gpu(
   Ok(output_path)
 }
 
-/// Clamp the smoothing value to the same range the TS analyser uses
-/// (`audioEngine.setSmoothing` → `Math.max(0, Math.min(0.99, smoothing))`).
-/// Web Audio's `smoothingTimeConstant` accepts up to 1.0; the TS guard is
-/// 0.99, so the export path must use the same ceiling for preview/export
-/// parity when a config carries a value above the slider max (0.95).
-pub fn clamp_smoothing(value: f32) -> f32 {
-  value.clamp(0.0, 0.99)
-}
-
 /// Take the cached render state for a preview frame, or build a fresh one.
 ///
 /// The cached state is reused when its `peak_data` length still matches the
@@ -395,6 +383,7 @@ pub fn render_preview_frame_inner(
   frame_time: f32,
   fx_time: f32,
   fps: f32,
+  render_fps: f32,
   width: u32,
   height: u32,
   is_playing: bool,
@@ -459,8 +448,10 @@ pub fn render_preview_frame_inner(
     rstate.radial_center_image = None;
   }
 
-  // Advance the envelope once; the passes below only read it.
-  let env = advance_envelope(&mut rstate, config, freq_data, frame_time, is_playing);
+  // Advance the envelope once; the passes below only read it. `render_fps`
+  // (the live display rate) makes rotation time-based, so it matches the
+  // export regardless of the export FPS.
+  let env = advance_envelope(&mut rstate, config, freq_data, frame_time, is_playing, render_fps);
   let fx = crate::renderers::screen_effects::post_fx(
     &mut rstate.screen_fx,
     &config.screen_effects,

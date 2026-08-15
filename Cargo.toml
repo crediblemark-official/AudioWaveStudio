@@ -1,6 +1,6 @@
 [package]
 name = "audiowave-studio"
-version = "1.14.4"
+version = "1.14.5"
 description = "AudioWave Studio Desktop Audio Visualizer"
 authors = ["CredibleMark <contact@crediblemark.com>"]
 edition = "2021"

@@ -419,6 +419,8 @@ pub fn run() {
         let tick_dt = now.duration_since(last_tick).as_secs_f32().clamp(0.001, 1.0);
         last_tick = now;
         fx_clock += tick_dt;
+        // Actual display rate — drives time-based animations (rotation) so
+        // they run at real speed regardless of the export FPS.
         let live_fps = (1.0 / tick_dt).clamp(1.0, 240.0);
         idle_clock += 0.016;
         let (audio_opt, time_sec, duration_sec, is_playing, config) = {
@@ -483,28 +485,16 @@ pub fn run() {
                 let analyzer = FftAnalyzer::new(fft_size);
                 if let Ok((magnitudes, bass_e)) = analyzer.compute_full_spectrum(&window_samples) {
                     let mut s = poison_proof(&state_clone);
-                    let smooth_factor = config.reactivity.smoothing.clamp(0.0, 0.95);
-                    let alpha = (1.0 - smooth_factor).clamp(0.08, 1.0);
+                    // Shared with the export path (gpu_export.rs) so the live
+                    // preview and the exported video feed the renderers the
+                    // exact same frequency data.
+                    let freq = s.freq_smoother.smooth_u8(
+                        &magnitudes,
+                        config.reactivity.sensitivity,
+                        config.reactivity.smoothing,
+                    );
 
-                    let prev_vec = s._prev_smoothed.get_or_insert_with(|| vec![0.0; magnitudes.len()]);
-                    if prev_vec.len() != magnitudes.len() {
-                        *prev_vec = vec![0.0; magnitudes.len()];
-                    }
-
-                    let mut freq = Vec::with_capacity(magnitudes.len());
-                    for (i, &m) in magnitudes.iter().enumerate() {
-                        let scaled_m = (m * config.reactivity.sensitivity).clamp(0.0, 1.0);
-                        let prev = prev_vec[i];
-                        let next_val = if scaled_m > prev {
-                            prev + (scaled_m - prev) * (alpha * 1.4).min(1.0)
-                        } else {
-                            (prev * 0.90 + scaled_m * 0.10).max(0.0)
-                        };
-                        prev_vec[i] = next_val;
-                        freq.push((next_val * 255.0).min(255.0) as u8);
-                    }
-
-                    let time: Vec<u8> = window_samples.iter().map(|&s| ((s + 1.0) * 127.5).clamp(0.0, 255.0) as u8).collect();
+                    let time: Vec<u8> = crate::fft_analyzer::time_domain_u8(&window_samples);
                     (freq, time, bass_e, frame_time)
                 } else {
                     (vec![20u8; 64], vec![128u8; 128], 0.0, frame_time)
@@ -518,6 +508,14 @@ pub fn run() {
                 }
                 (demo_freq, vec![128u8; 128], 0.2, frame_time)
             };
+
+            // Screen-fx clock: anchor to SONG time while playing so time-based
+            // effects (shake buckets, strobe, glitch color bar, shockwave) are
+            // phase-identical to the exported video (gpu_export.rs uses the
+            // song time too). While paused/listening there is no deterministic
+            // song clock, so fall back to the monotonic wall clock so effects
+            // keep animating instead of freezing.
+            let fx_time = if is_playing && !is_listening { frame_time } else { fx_clock };
 
             // Render at the target export aspect ratio (16:9 widescreen, 9:16
             // portrait, or 1:1 square) scaled to fit the canvas viewport.
@@ -597,7 +595,14 @@ pub fn run() {
                         &freq_data,
                         &time_data,
                         frame_time,
-                        fx_clock,
+                        fx_time,
+                        // The glitch color-bar cadence in postfx.wgsl derives
+                        // from p.fps; use the EXPORT fps so it fires at the
+                        // same song moments the exported video will show.
+                        config.export.fps.max(1) as f32,
+                        // Live display rate keeps time-based animations
+                        // (rotation_angle) matched to real seconds, same as
+                        // the export.
                         live_fps,
                         width,
                         height,
@@ -639,7 +644,7 @@ pub fn run() {
                     &time_data,
                     0.0,
                     frame_time,
-                    fx_clock,
+                    fx_time,
                     cpu_w,
                     cpu_h,
                 );

@@ -2,6 +2,79 @@ use realfft::RealFftPlanner;
 use std::f32::consts::PI;
 use std::sync::Mutex;
 
+/// Attack/release smoother that turns raw FFT magnitudes into the exact u8
+/// frequency data the live preview feeds to the renderers.
+///
+/// The preview and export paths MUST share this single implementation:
+/// otherwise the exported video visibly diverges from what's on screen — the
+/// export path previously skipped the per-bin sensitivity gain and used a
+/// symmetric smoothing curve, so exported bars were dimmer and attacked/decayed
+/// differently than the preview.
+pub struct FreqSmoother {
+  prev: Option<Vec<f32>>,
+}
+
+impl FreqSmoother {
+  pub fn new() -> Self {
+    Self { prev: None }
+  }
+
+  /// Smooth a fresh spectrum and quantize to u8, applying the same per-bin
+  /// sensitivity gain and asymmetric attack/release as the live preview
+  /// (`lib.rs`):
+  ///
+  /// - attack: `prev + (scaled - prev) * (alpha * 1.4)` with `alpha =
+  ///   (1 - smoothing).clamp(0.08, 1.0)`
+  /// - release: `prev * 0.90 + scaled * 0.10`
+  ///
+  /// The internal history starts at zero (mirrors the preview's initial
+  /// `_prev_smoothed`) and resets automatically when the spectrum length
+  /// changes (e.g. an `fft_size` switch).
+  pub fn smooth_u8(&mut self, magnitudes: &[f32], sensitivity: f32, smoothing: f32) -> Vec<u8> {
+    let smooth_factor = smoothing.clamp(0.0, 0.95);
+    let alpha = (1.0 - smooth_factor).clamp(0.08, 1.0);
+    let attack = (alpha * 1.4).min(1.0);
+
+    let prev = self.prev.get_or_insert_with(|| vec![0.0; magnitudes.len()]);
+    if prev.len() != magnitudes.len() {
+      *prev = vec![0.0; magnitudes.len()];
+    }
+
+    let mut out = Vec::with_capacity(magnitudes.len());
+    for (i, &m) in magnitudes.iter().enumerate() {
+      let scaled = (m * sensitivity).clamp(0.0, 1.0);
+      let p = &mut prev[i];
+      *p = if scaled > *p {
+        *p + (scaled - *p) * attack
+      } else {
+        (*p * 0.90 + scaled * 0.10).max(0.0)
+      };
+      out.push((*p * 255.0).min(255.0) as u8);
+    }
+    out
+  }
+
+  /// Drop the smoothing history so the next `smooth_u8` restarts from zero.
+  pub fn reset(&mut self) {
+    self.prev = None;
+  }
+}
+
+impl Default for FreqSmoother {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+/// Quantize mono PCM samples to the u8 time-domain data used by waveform
+/// styles. Uses the exact same scaling as the live preview path.
+pub fn time_domain_u8(samples: &[f32]) -> Vec<u8> {
+  samples
+    .iter()
+    .map(|s| ((s + 1.0) * 127.5).clamp(0.0, 255.0) as u8)
+    .collect()
+}
+
 pub struct FftAnalyzer {
   planner: Mutex<RealFftPlanner<f32>>,
   pub fft_size: usize,

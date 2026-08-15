@@ -405,6 +405,7 @@ pub fn advance_envelope(
   freq: &[u8],
   frame_time: f32,
   is_playing: bool,
+  fps: f32,
 ) -> FrameEnvelope {
   let react: &AudioReactivitySettings = &config.reactivity;
 
@@ -444,7 +445,10 @@ pub fn advance_envelope(
     state.beat_strength_raw * 0.5
   };
 
-  state.rotation_angle += 0.003;
+  // Rotation is TIME-based (0.003 rad per frame at 60 FPS), so a 30 FPS export
+  // spins rotating styles (vinyl, turntable, DJ controller, ...) at the same
+  // angular speed as the ~60 FPS live preview instead of half as fast.
+  state.rotation_angle += 0.18 / fps.max(1.0);
 
   // Text fade factor — mirrors textOverlay.ts fadeFactor: paused → fully
   // visible, playing → ramp from the moment playback started.
@@ -612,7 +616,7 @@ pub fn draw_frame(
   frame_time: f32,
   is_playing: bool,
 ) {
-  let env = advance_envelope(state, config, freq, frame_time, is_playing);
+  let env = advance_envelope(state, config, freq, frame_time, is_playing, 60.0);
   let mut scene3d = Scene3D::new();
   draw_frame_pass(c, &mut scene3d, state, config, freq, time, frame_time, &env, FramePass::All);
 }
