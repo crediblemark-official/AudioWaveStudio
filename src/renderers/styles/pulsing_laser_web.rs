@@ -41,7 +41,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let frame_time = ctx.frame_time;
 
     let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.5 - pos_offset_y;
+    let cy = height * 0.5 + pos_offset_y;
 
     let reference_size = width.min(height);
     let base_r = 115.0 * (reference_size / 500.0) * user_scale;

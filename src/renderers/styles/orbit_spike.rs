@@ -41,7 +41,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let _bass_mult    = ctx.config.reactivity.bass_multiplier;
     let user_scale    = ctx.config.scale.clamp(0.1, 5.0);
     let pos_offset_x = ctx.config.position_x * width * 0.5;
-    let pos_offset_y = ctx.config.position_y * height * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
     let bar_count    = ctx.config.reactivity.bar_count.clamp(16, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);

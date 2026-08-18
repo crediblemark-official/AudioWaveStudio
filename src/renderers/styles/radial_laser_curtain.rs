@@ -16,14 +16,13 @@ use crate::renderers::RenderContext;
 
 use super::radial_common;
 
-const LASER_RAYS: usize = 64;
-
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let s = radial_common::setup(c, ctx, 115.0, 0.08, 0.0);
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
+    let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
 
-    let step = ((freq.len() as f32) / LASER_RAYS as f32).floor().max(1.0) as usize;
+    let step = ((freq.len() as f32) / bar_count as f32).floor().max(1.0) as usize;
     let rot = frame_time * 0.12;
 
     // Curated Laser Stage Palette (theme-dominant, hardcoded hue only as character accent)
@@ -60,28 +59,28 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         let pulse_alpha = ((1.0 - p_t) * (0.45 + s.bs * 0.40)).clamp(0.0, 0.85);
 
         c.set_stroke(Fill::Solid(mix(laser_cyan, laser_magenta, p_t).with_alpha(pulse_alpha)));
-        c.set_line_width((2.5 - p_t * 1.5) * s.user_scale);
-        c.set_shadow(laser_cyan, (12.0 + s.bs * 8.0) * s.user_scale);
+        c.set_line_width((2.5 - p_t * 1.5) * s.size_scale);
+        c.set_shadow(laser_cyan, (12.0 + s.bs * 8.0) * s.size_scale);
         c.stroke_circle(s.cx, s.cy, pulse_r);
     }
 
     // -------------------------------------------------------------------------
-    // 3. 64 HIGH-DENSITY 360° VOLUMETRIC LASER LIGHT BEAMS
+    // 3. 360° VOLUMETRIC LASER LIGHT BEAMS
     // -------------------------------------------------------------------------
-    let mut tip_points: Vec<(f32, f32)> = Vec::with_capacity(LASER_RAYS);
+    let mut tip_points: Vec<(f32, f32)> = Vec::with_capacity(bar_count);
 
-    for i in 0..LASER_RAYS {
-        let t = i as f32 / LASER_RAYS as f32;
+    for i in 0..bar_count {
+        let t = i as f32 / bar_count as f32;
         let angle = t * TAU + rot;
         let (cos_a, sin_a) = angle.sin_cos();
 
         let base_wave = (angle * 4.0 + frame_time * 2.0).sin() * 0.12 + 0.18;
-        let audio_v = radial_common::swept_bin(freq, step, i, LASER_RAYS, &s) * s.sensitivity;
+        let audio_v = radial_common::swept_bin(freq, step, i, bar_count, &s) * s.sensitivity;
         let val = (base_wave + audio_v * 0.85 + s.be * 0.35 + s.bs * 0.20
             + radial_common::beat_bump(&s, angle) * 0.5)
             .clamp(0.15, 2.2);
 
-        let max_r = s.inner_r + (35.0 + val * 115.0) * s.user_scale;
+        let max_r = s.inner_r + (35.0 + val * 115.0) * s.size_scale;
         let x0 = s.cx + cos_a * s.inner_r;
         let y0 = s.cy + sin_a * s.inner_r;
         let x1 = s.cx + cos_a * max_r;
@@ -89,34 +88,34 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
         tip_points.push((x1, y1));
 
-        let ray_col = mix(mix(laser_cyan, laser_green, t), mix(laser_magenta, spark_white, 0.4), fv_from_bin(freq, step, i, LASER_RAYS));
+        let ray_col = mix(mix(laser_cyan, laser_green, t), mix(laser_magenta, spark_white, 0.4), fv_from_bin(freq, step, i, bar_count));
 
         // Pass A: Outer volumetric neon plasma laser sheath
         c.set_stroke(Fill::Solid(ray_col.with_alpha(0.60)));
-        c.set_line_width((4.2 + val * 2.2) * s.user_scale);
-        c.set_shadow(ray_col, (16.0 + val * 14.0) * s.user_scale);
+        c.set_line_width((4.2 + val * 2.2) * s.size_scale);
+        c.set_shadow(ray_col, (16.0 + val * 14.0) * s.size_scale);
         c.stroke_line(x0, y0, x1, y1);
 
         // Pass B: Intense white-hot core laser filament
         c.set_stroke(Fill::Solid(spark_white));
-        c.set_line_width((1.4 + val * 0.8) * s.user_scale);
+        c.set_line_width((1.4 + val * 0.8) * s.size_scale);
         c.set_shadow(Color::TRANSPARENT, 0.0);
         c.stroke_line(x0, y0, x1, y1);
 
         // Pass C: Inner Laser Diode Optic Emitter Lens
         c.set_fill(Fill::Solid(spark_white));
-        c.set_shadow(ray_col, (10.0 + val * 8.0) * s.user_scale);
-        c.fill_circle(x0, y0, (2.6 + val * 1.5) * s.user_scale);
+        c.set_shadow(ray_col, (10.0 + val * 8.0) * s.size_scale);
+        c.fill_circle(x0, y0, (2.6 + val * 1.5) * s.size_scale);
 
         // Pass D: Outer Laser Curtain Boundary Impact Flare
         c.set_fill(Fill::Solid(mix(ray_col, spark_white, 0.80)));
-        c.set_shadow(ray_col, (14.0 + s.bs * 10.0) * s.user_scale);
-        c.fill_circle(x1, y1, (3.5 + val * 2.2) * s.user_scale);
+        c.set_shadow(ray_col, (14.0 + s.bs * 10.0) * s.size_scale);
+        c.fill_circle(x1, y1, (3.5 + val * 2.2) * s.size_scale);
 
         // Interlocking laser scanner cross-beams bridging adjacent laser rays
-        if i % 2 == 0 && i + 1 < LASER_RAYS {
+        if i % 2 == 0 && i + 1 < bar_count {
             let next_i = i + 1;
-            let t_next = next_i as f32 / LASER_RAYS as f32;
+            let t_next = next_i as f32 / bar_count as f32;
             let angle_next = t_next * TAU + rot;
 
             let r_mid = s.inner_r + (max_r - s.inner_r) * 0.65;
@@ -126,8 +125,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             let yb = s.cy + angle_next.sin() * r_mid;
 
             c.set_stroke(Fill::Solid(spark_white.with_alpha(0.70)));
-            c.set_line_width(1.2 * s.user_scale);
-            c.set_shadow(laser_cyan, 8.0 * s.user_scale);
+            c.set_line_width(1.2 * s.size_scale);
+            c.set_shadow(laser_cyan, 8.0 * s.size_scale);
             c.stroke_line(xa, ya, xb, yb);
         }
     }

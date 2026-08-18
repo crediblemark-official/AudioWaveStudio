@@ -42,9 +42,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let rot = ctx.rotation_angle;
 
     let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.5 - pos_offset_y;
+    let cy = height * 0.5 + pos_offset_y;
     let reference_size = width.min(height);
-    let base_disc_r = ((reference_size * 0.30).clamp(90.0, 360.0) * user_scale).clamp(50.0, width * 0.44);
+    let base_disc_r = reference_size * 0.30 * user_scale;
     let disc_r = base_disc_r * (1.0 + be * 0.025);
 
     // Curated Prismatic Holographic Colors

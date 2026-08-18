@@ -18,7 +18,6 @@ use crate::renderers::{
     theme_accent, theme_glow, theme_primary, theme_secondary, RenderContext,
 };
 
-const DONUT_BARS: usize = 64;
 const TRACK_DASHES: usize = 48;
 
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
@@ -36,7 +35,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let pos_offset_x = ctx.config.position_x * width * 0.5;
     let pos_offset_y = -ctx.config.position_y * height * 0.5;
     // Scale & position are applied internally per renderer.
-    let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+    let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let _bs = ctx.beat_strength.clamp(0.0, 1.0);
@@ -89,18 +88,22 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     let step_f = (freq.len() / bar_count).max(1);
     let rim_r_pulse = rim_r * (1.0 + be * 0.05);
-    let bar_span = TAU / DONUT_BARS as f32;
+    let bar_span = TAU / bar_count as f32;
     let seg_gap = bar_span * 0.30;
 
-    for i in 0..DONUT_BARS {
+    for i in 0..bar_count {
         let a0 = i as f32 * bar_span + frame_time * 0.08;
-        let mirrored = if i < DONUT_BARS / 2 {
-            DONUT_BARS / 2 - i - 1
+        let half = bar_count / 2;
+        let mirrored = if half > 0 {
+            if i < half {
+                half - i - 1
+            } else {
+                i - half
+            }
         } else {
-            i - DONUT_BARS / 2
+            0
         };
-        let bin_k = (mirrored * step_f / (DONUT_BARS / 2 / bar_count.max(1)).max(1))
-            .min(freq.len().saturating_sub(1));
+        let bin_k = (mirrored * step_f).min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
         // Bars hang from the rim and reach inward.

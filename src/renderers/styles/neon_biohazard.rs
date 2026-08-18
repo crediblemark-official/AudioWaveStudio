@@ -46,9 +46,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let rot = ctx.rotation_angle;
 
     let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.5 - pos_offset_y;
+    let cy = height * 0.5 + pos_offset_y;
     let reference_size = width.min(height);
-    let base_r = ((reference_size * 0.28).clamp(90.0, 340.0) * user_scale).clamp(50.0, width * 0.44);
+    let base_r = reference_size * 0.28 * user_scale;
 
     // Curated Cyber Toxic Color Palette
     let toxic_green = mix(mix(p_col, glow_col, 0.5), Color::rgba(0.0, 1.0, 0.40, 1.0), 0.65);

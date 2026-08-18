@@ -39,7 +39,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let frame_time = ctx.frame_time;
 
     let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.55 - pos_offset_y; // Horizon line height
+    let cy = height * 0.55 + pos_offset_y; // Horizon line height
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);

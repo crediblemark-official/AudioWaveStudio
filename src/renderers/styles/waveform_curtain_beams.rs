@@ -36,9 +36,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let frame_time = ctx.frame_time;
 
     let cx = width * 0.5 + pos_offset_x;
-    let cy = height * 0.50 - pos_offset_y;
+    let cy = height * 0.50 + pos_offset_y;
 
-    let span_w = ((width * 0.88).clamp(200.0, width * 0.95) * user_scale).clamp(100.0, width * 0.96);
+    let span_w = width * 0.88 * user_scale;
     let start_x = cx - span_w * 0.5;
     let max_amp = height * 0.32 * user_scale;
 

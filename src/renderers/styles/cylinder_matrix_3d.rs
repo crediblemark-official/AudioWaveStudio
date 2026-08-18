@@ -42,9 +42,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let rot = ctx.rotation_angle;
 
   let center_x = width * 0.5 + pos_offset_x;
-  let center_y = height * 0.50 - pos_offset_y;
+  let center_y = height * 0.50 + pos_offset_y;
 
-  let base_r = ((width.min(height) * 0.25).clamp(80.0, 300.0) * user_scale).clamp(45.0, width * 0.42);
+  let base_r = width.min(height) * 0.25 * user_scale;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);

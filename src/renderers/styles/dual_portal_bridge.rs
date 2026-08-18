@@ -45,7 +45,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let rot = ctx.rotation_angle;
 
   let center_x = width * 0.5 + pos_offset_x;
-  let center_y = height * 0.5 - pos_offset_y;
+  let center_y = height * 0.5 + pos_offset_y;
 
   let portal_dist = ((width * 0.36).clamp(140.0, 520.0) * user_scale).clamp(80.0, width * 0.44);
   let portal_r = ((height * 0.22).clamp(70.0, 240.0) * user_scale).clamp(40.0, height * 0.38) + be * 12.0;

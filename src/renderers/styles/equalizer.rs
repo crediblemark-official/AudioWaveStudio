@@ -27,7 +27,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let user_scale   = ctx.config.scale.clamp(0.1, 5.0);
     let pos_offset_x = ctx.config.position_x * width  * 0.5;
     let pos_offset_y = -ctx.config.position_y * height * 0.5;
-    let bar_count    = ctx.config.reactivity.bar_count.clamp(16, 128);
+    let bar_count    = ctx.config.reactivity.bar_count.clamp(8, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let bs = ctx.beat_strength.clamp(0.0, 1.0);
@@ -45,9 +45,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     // Bar geometry
     let total_w  = width * 0.92 * user_scale;
-    let bar_w    = (total_w / n_bars as f32).clamp(2.0, 40.0);
-    let gap      = (bar_w * 0.18).clamp(1.0, 5.0);
-    let b_w      = bar_w - gap;
+    let slot_w   = total_w / n_bars as f32;
+    let gap      = (slot_w * 0.18).max(1.0);
+    let b_w      = (slot_w - gap).max(1.0);
     let start_x  = cx - total_w * 0.5;
 
     c.save();
@@ -96,12 +96,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     for i in 0..n_bars {
         let i_f = i as f32;
-        let t   = i_f / (n_bars - 1) as f32; // 0..1 across width
+        let t   = if n_bars > 1 { i_f / (n_bars - 1) as f32 } else { 0.0 }; // 0..1 across width
 
         let bin_k = (i * step_f).min(freq.len().saturating_sub(1));
         let fv = freq[bin_k] as f32 / 255.0;
 
-        let x = start_x + i_f * bar_w;
+        let x = start_x + i_f * slot_w;
 
         // Bar height: frequency + bass boost
         let bar_h = (fv * max_h * sensitivity + be * max_h * 0.10)

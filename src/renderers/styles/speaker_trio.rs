@@ -16,6 +16,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let a = crate::renderers::theme_accent(theme);
   let glow = crate::renderers::theme_glow(theme);
   let sensitivity = ctx.config.reactivity.sensitivity;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
+  let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
   let be = ctx.bass_energy;
 
   let rng = &mut ctx.state.rng;
@@ -38,19 +42,19 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     }
   }
 
-  let center_x = width / 2.0;
-  let center_y = height / 2.0;
-  let base_r = width.min(height) * 0.14;
+  let center_x = width * 0.5 + pos_offset_x;
+  let center_y = height * 0.5 + pos_offset_y;
+  let base_r = width.min(height) * 0.14 * user_scale;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  let half_count = 40;
+  let half_count = (bar_count / 2).max(4);
   let step = ((ctx.freq_data.len() as f32 * 0.5) as usize / half_count).max(1);
-  let start_x = width * 0.04;
-  let half_w = center_x - start_x - 4.0;
+  let start_x = (center_x - width * 0.46 * user_scale).max(width * 0.02);
+  let half_w = (center_x - start_x - base_r * 2.2).max(20.0);
   let bar_w = ((half_w / half_count as f32) - 1.5).max(2.0);
-  let max_bar_h = height * 0.32;
+  let max_bar_h = height * 0.32 * user_scale;
 
   c.set_shadow(glow, 18.0 + be * 15.0);
   c.set_stroke(Fill::Solid(p));

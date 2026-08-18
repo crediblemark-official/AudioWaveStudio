@@ -42,7 +42,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let center_y = height * 0.44 + pos_offset_y;
 
   // Cassette Body Dimensions (Scale applied internally)
-  let tape_w = ((width * 0.54 * user_scale).clamp(300.0, 720.0)).clamp(160.0, width * 0.95);
+  let tape_w = (width * 0.54 * user_scale).min(width * 0.95);
   let tape_h = tape_w * 0.62;
   let left_x = center_x - tape_w / 2.0;
   let top_y = center_y - tape_h / 2.0;
@@ -72,9 +72,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     center_y,
     tape_w * 0.85,
     &[
-      (0.0, glow.with_alpha(0.20 + be * 0.15)),
-      (0.40, p.with_alpha(0.12)),
-      (0.75, Color::rgba(0.04, 0.02, 0.10, 0.06)),
+      (0.0, glow.with_alpha(0.18 + be * 0.14)),
+      (0.50, p.with_alpha(0.08)),
       (1.0, Color::TRANSPARENT),
     ],
   );
@@ -84,7 +83,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 2. SIDE DIGITAL TIMERS (VINTAGE LED FOIL DISPLAYS)
   // -------------------------------------------------------------------------
-  let timer_font_size = (tape_h * 0.080).clamp(10.0, 22.0);
+  let timer_font_size = tape_h * 0.080;
 
   // Current time (Left Side)
   if left_x > 110.0 {

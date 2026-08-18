@@ -15,13 +15,17 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let a = crate::renderers::theme_accent(theme);
   let glow = crate::renderers::theme_glow(theme);
   let sensitivity = ctx.config.reactivity.sensitivity;
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
+  let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
   let freq = ctx.freq_data;
 
-  let center_x = width / 2.0;
-  let center_y = height / 2.0;
-  let base_radius = width.min(height) * 0.27;
+  let center_x = width * 0.5 + pos_offset_x;
+  let center_y = height * 0.5 + pos_offset_y;
+  let base_radius = width.min(height) * 0.27 * user_scale;
   let bass_pulse = 1.0 + be * 0.12 + bs * 0.08;
   let speaker_r = base_radius * bass_pulse;
 
@@ -36,15 +40,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);
 
-  let half_bars = 48;
+  let half_bars = (bar_count / 2).max(4);
   let step = ((freq.len() as f32 * 0.7) as usize / half_bars).max(1);
-  let left_start = width * 0.02;
+  let left_start = (center_x - width * 0.48 * user_scale).max(width * 0.02);
   let left_end = (left_start + 20.0).max(center_x - speaker_r * 0.85);
   let left_width = left_end - left_start;
-  let right_start = (width * 0.98 - 20.0).min(center_x + speaker_r * 0.85);
-  let right_end = width * 0.98;
+  let right_start = (center_x + speaker_r * 0.85).min(center_x + width * 0.48 * user_scale - 20.0);
+  let right_end = (center_x + width * 0.48 * user_scale).min(width * 0.98);
   let right_width = right_end - right_start;
-  let bar_w = ((left_width / half_bars as f32) - 2.5).max(2.5);
+  let bar_w = ((left_width / half_bars as f32) - 2.5).max(2.0);
 
   c.set_shadow(glow, 20.0 + be * 20.0);
   c.set_stroke(Fill::Solid(p));

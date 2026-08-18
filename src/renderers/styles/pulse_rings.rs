@@ -41,7 +41,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let cx = width * 0.5 + pos_offset_x;
     let cy = height * 0.5 + pos_offset_y;
     let reference_size = width.min(height);
-    let base_r = 85.0 * (reference_size / 500.0) * user_scale;
+    let size_scale = (reference_size / 500.0) * user_scale;
+    let base_r = 85.0 * size_scale;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
@@ -84,7 +85,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
                 .min(freq.len().saturating_sub(1));
             let fv = freq[bin_k] as f32 / 255.0;
 
-            let wave = (angle * 6.0 + frame_time * 2.0).cos() * (10.0 + fv * 35.0 * sensitivity + be * 15.0);
+            let wave = (angle * 6.0 + frame_time * 2.0).cos() * (10.0 + fv * 35.0 * sensitivity + be * 15.0) * size_scale;
             let r_nodal = r_curr + wave;
 
             let (sin_a, cos_a) = angle.sin_cos();
@@ -98,8 +99,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         );
 
         c.set_stroke(Fill::Solid(ring_col));
-        c.set_line_width((2.5 - ring_f * 0.25).max(1.0));
-        c.set_shadow(ring_col, (12.0 - ring_f * 0.8).max(2.0));
+        c.set_line_width((2.5 - ring_f * 0.25).max(1.0) * size_scale);
+        c.set_shadow(ring_col, (12.0 - ring_f * 0.8).max(2.0) * size_scale);
         c.stroke_polyline(&pts);
     }
 

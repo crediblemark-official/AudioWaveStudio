@@ -14,8 +14,6 @@ use crate::renderers::{
 };
 use super::radial_common;
 
-const RADIAL_CROWN_BARS: usize = 64;
-
 pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let width = ctx.width;
     let height = ctx.height;
@@ -31,7 +29,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let pos_offset_x = ctx.config.position_x * width * 0.5;
     let pos_offset_y = -ctx.config.position_y * height * 0.5;
     // Scale & position are applied internally per renderer.
-    let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+    let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
 
     let be = ctx.bass_energy.clamp(0.0, 1.0);
     let _bs = ctx.beat_strength.clamp(0.0, 1.0);
@@ -41,7 +39,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let cx = width * 0.5 + pos_offset_x;
     let cy = height * 0.5 + pos_offset_y;
     let reference_size = width.min(height);
-    let base_r = 105.0 * (reference_size / 500.0) * user_scale;
+    let size_scale = reference_size / 500.0;
+    let base_r = 105.0 * size_scale * user_scale;
 
     c.save();
     c.set_shadow(Color::TRANSPARENT, 0.0);
@@ -83,14 +82,12 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         st.frame_history.pop();
     }
 
-    for i in 0..RADIAL_CROWN_BARS {
-        let angle = (i as f32 / RADIAL_CROWN_BARS as f32) * TAU + frame_time * 0.12;
+    for i in 0..bar_count {
+        let angle = (i as f32 / bar_count as f32) * TAU + frame_time * 0.12;
         let sweep = radial_common::sweep_angle(ctx.beat_count);
         let sweep_off = ((sweep / std::f32::consts::TAU) * (freq.len() as f32)) as usize
             % freq.len().max(1);
-        let bin_k = ((i * step_f / (RADIAL_CROWN_BARS / bar_count.max(1)).max(1))
-            + sweep_off)
-            .min(freq.len().saturating_sub(1));
+        let bin_k = (i * step_f + sweep_off).min(freq.len().saturating_sub(1));
 
         // Weighted multi-frame average smooths the crown's motion
         let mut acc = 0.0f32;
@@ -102,10 +99,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         }
         let fv = acc / w.max(1e-6);
 
-        let bar_h = 15.0 + fv * 150.0 * sensitivity + be * 35.0;
+        let bar_h = (15.0 + fv * 150.0 * sensitivity + be * 35.0) * size_scale * user_scale;
         let bump = radial_common::beat_bump_at(sweep, _bs, angle);
         let r0 = base_r * (1.0 + be * 0.06);
-        let r1 = r0 + bar_h + bump * 25.0;
+        let r1 = r0 + bar_h + bump * 25.0 * size_scale * user_scale;
 
         let (sin_a, cos_a) = angle.sin_cos();
         let x0 = cx + cos_a * r0;
@@ -120,8 +117,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         );
 
         c.set_stroke(Fill::Solid(crown_col));
-        c.set_line_width(3.5 + fv * 2.5);
-        c.set_shadow(crown_col, 10.0);
+        c.set_line_width((3.5 + fv * 2.5) * size_scale * user_scale);
+        c.set_shadow(crown_col, 10.0 * size_scale);
         c.stroke_line(x0, y0, x1, y1);
     }
 

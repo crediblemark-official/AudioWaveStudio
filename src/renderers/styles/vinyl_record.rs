@@ -26,17 +26,20 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   // Settings integration
   let sensitivity = ctx.config.reactivity.sensitivity;
-  let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
+  let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
 
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
   let freq = ctx.freq_data;
   let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5;
-  let center_y = height * 0.5;
+  let center_x = width * 0.5 + pos_offset_x;
+  let center_y = height * 0.5 + pos_offset_y;
 
-  let base_disc_r = ((width.min(height) * 0.30).clamp(90.0, 360.0)).clamp(60.0, width * 0.45);
+  let base_disc_r = width.min(height) * 0.30 * user_scale;
   let disc_r = base_disc_r * (1.0 + be * 0.03);
 
   c.save();

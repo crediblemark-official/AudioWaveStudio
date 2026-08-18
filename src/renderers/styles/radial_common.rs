@@ -22,6 +22,7 @@ pub struct RadialSetup {
     pub be: f32,
     pub bs: f32,
     pub user_scale: f32,
+    pub size_scale: f32,
     pub sensitivity: f32,
     pub bass_mult: f32,
     /// Continuously-advancing sweep angle (radians) used so the beat/prominence
@@ -61,7 +62,7 @@ pub fn setup(
     let bass_mult = ctx.config.reactivity.bass_multiplier;
     let user_scale = ctx.config.scale.clamp(0.1, 5.0);
     let pos_offset_x = ctx.config.position_x * width * 0.5;
-    let pos_offset_y = ctx.config.position_y * height * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
 
     let be = (ctx.bass_energy * bass_mult).clamp(0.0, 3.0);
     let bs = (ctx.beat_strength * bass_mult).clamp(0.0, 3.0);
@@ -70,7 +71,8 @@ pub fn setup(
     let cy = height * 0.5 + pos_offset_y;
 
     let reference_size = width.min(height);
-    let base_r = base_r_mult * (reference_size / 500.0) * user_scale;
+    let size_scale = (reference_size / 500.0) * user_scale;
+    let base_r = base_r_mult * size_scale;
     let inner_r = base_r * (0.35 + be * inner_be + bs * inner_bs);
 
     // Sweep angle is re-randomised on every detected beat via a hash of the
@@ -89,6 +91,7 @@ pub fn setup(
         be,
         bs,
         user_scale,
+        size_scale,
         sensitivity,
         bass_mult,
         sweep,

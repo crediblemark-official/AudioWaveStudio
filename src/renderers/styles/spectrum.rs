@@ -27,13 +27,18 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let user_scale = ctx.config.scale.clamp(0.1, 5.0);
   let pos_offset_x = ctx.config.position_x * ctx.width * 0.5;
   let pos_offset_y = -ctx.config.position_y * ctx.height * 0.5;
-  let total_gap = bar_gap * (bar_count as f32 - 1.0);
+
+  let res_scale = ctx.height / 1080.0;
+  let scaled_gap = (bar_gap * res_scale).max(0.0);
+  let scaled_rounding = bar_rounding * res_scale;
+  let total_gap = scaled_gap * (bar_count as f32 - 1.0);
   let bar_width = if bar_width_cfg > 0.0 {
-    bar_width_cfg * user_scale
+    (bar_width_cfg * res_scale * user_scale).max(1.0)
   } else {
-    ((available_width * user_scale - total_gap) / bar_count as f32).max(3.0)
+    ((available_width * user_scale - total_gap) / bar_count as f32).max(1.0)
   };
-  let start_x = (ctx.width * 0.5 + pos_offset_x) - (bar_count as f32 * bar_width + total_gap) / 2.0;
+  let total_actual_w = bar_count as f32 * bar_width + total_gap;
+  let start_x = (ctx.width * 0.5 + pos_offset_x) - total_actual_w / 2.0;
   let max_bar_height = ctx.height * 0.45 * user_scale;
   let center_y = ctx.height * 0.5 + pos_offset_y + ctx.height * 0.05 * user_scale;
 
@@ -44,7 +49,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   ]);
 
   c.set_fill(gradient.clone());
-  c.set_shadow(theme_glow(theme), 15.0);
+  c.set_shadow(theme_glow(theme), 15.0 * res_scale);
 
   let step = ((ctx.freq_data.len() as f32) / bar_count as f32).floor().max(1.0) as usize;
 
@@ -55,20 +60,20 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   for i in 0..bar_count {
     let val = bin_value(ctx.freq_data, step, i).min(1.0) * sensitivity;
     let bar_height = val * max_bar_height;
-    let x = start_x + i as f32 * (bar_width + bar_gap);
+    let x = start_x + i as f32 * (bar_width + scaled_gap);
 
-    if bar_rounding > 0.0 {
-      c.fill_rounded_rect_top(x, center_y - bar_height, bar_width, bar_height, bar_rounding);
+    if scaled_rounding > 0.0 {
+      c.fill_rounded_rect_top(x, center_y - bar_height, bar_width, bar_height, scaled_rounding);
     } else {
       c.fill_rect(x, center_y - bar_height, bar_width, bar_height);
     }
 
     if mirror_bars {
       c.set_global_alpha(0.6);
-      if bar_rounding > 0.0 {
-        c.fill_rounded_rect_bottom(x, center_y + 2.0, bar_width, bar_height, bar_rounding);
+      if scaled_rounding > 0.0 {
+        c.fill_rounded_rect_bottom(x, center_y + 2.0 * res_scale, bar_width, bar_height, scaled_rounding);
       } else {
-        c.fill_rect(x, center_y + 2.0, bar_width, bar_height);
+        c.fill_rect(x, center_y + 2.0 * res_scale, bar_width, bar_height);
       }
       c.set_global_alpha(1.0);
     }

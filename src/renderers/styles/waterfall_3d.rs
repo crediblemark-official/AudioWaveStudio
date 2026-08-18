@@ -57,7 +57,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let horizon_y = height * 0.18 + pos_offset_y;
   let rows_avail = st.frame_history.len().min(WATERFALL_ROWS);
 
-  let surf_r = (width * 0.28 * user_scale).clamp(140.0, 520.0);
+  let surf_r = width * 0.28 * user_scale;
 
   c.save();
   c.set_shadow(Color::TRANSPARENT, 0.0);

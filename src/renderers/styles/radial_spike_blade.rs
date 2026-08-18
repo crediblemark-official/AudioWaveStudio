@@ -17,7 +17,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let freq = ctx.freq_data;
     let frame_time = ctx.frame_time;
 
-    let blade_count = ctx.config.reactivity.bar_count.clamp(12, 48);
+    let blade_count = ctx.config.reactivity.bar_count.clamp(8, 128);
     let rot = frame_time * 0.08;
 
     // -------------------------------------------------------------------------
@@ -38,9 +38,9 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             + radial_common::beat_bump(&s, angle) * 0.6)
             .clamp(0.05, 3.5);
 
-        let spike_h = (25.0 + fv * 160.0) * s.user_scale;
+        let spike_h = (25.0 + fv * 160.0) * s.size_scale;
         let outer_r = s.inner_r + spike_h;
-        let width_factor = (0.22 + fv * 0.08).min(0.45);
+        let width_factor = (TAU / blade_count as f32) * (0.35 + fv * 0.10).min(0.48);
         let mid_r = s.inner_r + spike_h * 0.55;
 
         let (cos_a, sin_a) = angle.sin_cos();

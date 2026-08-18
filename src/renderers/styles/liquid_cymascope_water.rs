@@ -36,7 +36,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let bass_mult    = ctx.config.reactivity.bass_multiplier;
     let user_scale   = ctx.config.scale.clamp(0.1, 5.0);
     let pos_offset_x = ctx.config.position_x * width * 0.5;
-    let pos_offset_y = ctx.config.position_y * height * 0.5;
+    let pos_offset_y = -ctx.config.position_y * height * 0.5;
     let bar_count    = ctx.config.reactivity.bar_count.clamp(16, 96);
 
     let be = (ctx.bass_energy * bass_mult).clamp(0.0, 3.0);
@@ -48,7 +48,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     let cy = height * 0.5 + pos_offset_y;
 
     let reference_size = width.min(height);
-    let base_r  = 115.0 * (reference_size / 500.0) * user_scale;
+    let size_scale = (reference_size / 500.0) * user_scale;
+    let base_r  = 115.0 * size_scale;
     let inner_r = base_r * (0.35 + be * 0.10 + bs * 0.05);
 
     // Bioluminescent water palette (fluid blue, transparent).
@@ -90,7 +91,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
         // Rim undulates around outer_r — when silent rests at outer_r * 0.78
         let rim_base = outer_r * (0.78 + bs * 0.04);
-        let r_cur    = rim_base + wave_h * (20.0 + soft * 36.0 + wob * 10.0) * user_scale;
+        let r_cur    = rim_base + wave_h * (20.0 + soft * 36.0 + wob * 10.0) * size_scale;
 
         let (cos_a, sin_a) = angle.sin_cos();
         surf.push((cx + cos_a * r_cur, cy + sin_a * r_cur));
@@ -126,13 +127,13 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         ],
     );
     c.set_fill(water_fill);
-    c.set_shadow(aqua, (18.0 + bs * 12.0) * user_scale);
+    c.set_shadow(aqua, (18.0 + bs * 12.0) * size_scale);
     c.fill_polygon(&rim);
 
     // Water rim gloss.
     c.set_stroke(Fill::Solid(aqua.with_alpha((0.50 + bs * 0.2).min(0.90))));
-    c.set_line_width((2.0 + be * 1.5) * user_scale);
-    c.set_shadow(aqua, (12.0 + bs * 8.0) * user_scale);
+    c.set_line_width((2.0 + be * 1.5) * size_scale);
+    c.set_shadow(aqua, (12.0 + bs * 8.0) * size_scale);
     c.stroke_polyline(&rim);
 
     // -------------------------------------------------------------------------
@@ -150,14 +151,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             let ang = base_ang + (t - 0.5) * tilt;
             // Ray spans from just outside disc (dish_inner) to near the outer rim
             let r_ray = dish_inner + t * (outer_r * 0.82 - dish_inner);
-            let w     = (t * 9.0 - frame_time * 3.0).sin() * (1.5 + be * 2.0) * user_scale;
+            let w     = (t * 9.0 - frame_time * 3.0).sin() * (1.5 + be * 2.0) * size_scale;
             let rr    = (r_ray + w).max(dish_inner);
             let (cos_a, sin_a) = ang.sin_cos();
             ray.push((cx + cos_a * rr, cy + sin_a * rr));
         }
         let ray_col = mix(aqua, froth, 0.5).with_alpha(ray_alpha);
         c.set_stroke(Fill::Solid(ray_col));
-        c.set_line_width(1.0 * user_scale);
+        c.set_line_width(1.0 * size_scale);
         c.set_shadow(Color::TRANSPARENT, 0.0);
         c.stroke_polyline(&ray);
     }
@@ -169,7 +170,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         let rr      = dish_inner + rt * (outer_r * 0.82 - dish_inner);
         let rp_alpha = ((1.0 - rt) * (0.28 + bs * 0.35) * (total_val * 0.25 + 0.18)).clamp(0.0, 0.38);
         c.set_stroke(Fill::Solid(aqua.with_alpha(rp_alpha)));
-        c.set_line_width((1.8 - rt * 1.0).max(0.4) * user_scale);
+        c.set_line_width((1.8 - rt * 1.0).max(0.4) * size_scale);
         c.set_shadow(Color::TRANSPARENT, 0.0);
         c.stroke_circle(cx, cy, rr);
     }
@@ -182,10 +183,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
             // Spread motes from inner edge to outer rim using golden ratio
             let mfrac = (mf * 0.618_034).fract();
             let mr    = dish_inner + mfrac * (outer_r * 0.78 - dish_inner);
-            let m_sz  = (1.0 + be * 1.5) * user_scale;
+            let m_sz  = (1.0 + be * 1.5) * size_scale;
             let m_alpha = (0.40 + bs * 0.25 + (mf * 7.3).sin() * 0.15).clamp(0.15, 0.85);
             c.set_fill(Fill::Solid(froth.with_alpha(m_alpha)));
-            c.set_shadow(aqua, (5.0 + be * 3.0) * user_scale);
+            c.set_shadow(aqua, (5.0 + be * 3.0) * size_scale);
             c.fill_circle(cx + ma.cos() * mr, cy + ma.sin() * mr, m_sz);
         }
     }
@@ -193,8 +194,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // Center Logo Disc (drawn on top so the water appears to surround it)
     c.set_shadow(Color::TRANSPARENT, 0.0);
     c.set_stroke(Fill::Solid(aqua));
-    c.set_line_width((3.5 + be * 2.5) * user_scale);
-    c.set_shadow(aqua, (20.0 + bs * 15.0) * user_scale);
+    c.set_line_width((3.5 + be * 2.5) * size_scale);
+    c.set_shadow(aqua, (20.0 + bs * 15.0) * size_scale);
     c.stroke_circle(cx, cy, inner_r);
 
     c.set_fill(Fill::Solid(Color::hex("#000000")));

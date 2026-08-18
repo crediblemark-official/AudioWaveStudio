@@ -33,7 +33,10 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
   // Settings integration
   let sensitivity = ctx.config.reactivity.sensitivity;
-  let bar_count = ctx.config.reactivity.bar_count.clamp(16, 128);
+  let user_scale = ctx.config.scale.clamp(0.1, 5.0);
+  let pos_offset_x = ctx.config.position_x * width * 0.5;
+  let pos_offset_y = -ctx.config.position_y * height * 0.5;
+  let bar_count = ctx.config.reactivity.bar_count.clamp(8, 128);
 
   let be = ctx.bass_energy;
   let bs = ctx.beat_strength;
@@ -41,15 +44,15 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let frame_time = ctx.frame_time;
   let rot = ctx.rotation_angle;
 
-  let center_x = width * 0.5;
-  let center_y = height * 0.5;
+  let center_x = width * 0.5 + pos_offset_x;
+  let center_y = height * 0.5 + pos_offset_y;
 
-  let base_disc_r = ((width.min(height) * 0.26).clamp(80.0, 320.0)).clamp(50.0, width * 0.42);
+  let base_disc_r = width.min(height) * 0.26 * user_scale;
   let disc_r = base_disc_r * (1.0 + be * 0.03);
 
   // Turntable Deck Plinth Dimensions
-  let deck_w = (disc_r * 2.65).clamp(180.0, width * 0.95);
-  let deck_h = (disc_r * 2.15).clamp(150.0, height * 0.92);
+  let deck_w = disc_r * 2.65;
+  let deck_h = disc_r * 2.15;
   let deck_x = center_x - deck_w * 0.50;
   let deck_y = center_y - deck_h * 0.48;
 

@@ -82,10 +82,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let cx = ctx.width / 2.0 + pos_offset_x;
   let cy = ctx.height / 2.0 + pos_offset_y;
 
+  let res_scale = ctx.height / 1080.0;
   // Compute meter housing dimensions so both meters sit side-by-side cleanly
-  let card_w = (ctx.width * 0.42 * user_scale).clamp(240.0, 480.0);
-  let card_h = (ctx.height * 0.65 * user_scale).clamp(200.0, 360.0);
-  let card_gap = (ctx.width * 0.03 * user_scale).clamp(16.0, 40.0);
+  let card_w = ctx.width * 0.44 * user_scale;
+  let card_h = card_w * 0.75;
+  let card_gap = ctx.width * 0.03 * user_scale;
   let center_spacing = (card_w + card_gap) / 2.0;
 
   let gauge_r = (card_w * 0.40).min(card_h * 0.45);
@@ -186,7 +187,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       (3.0, 1.00, "+3"),
     ];
 
-    let font_sz = (card_w * 0.038).clamp(9.0, 13.0);
+    let font_sz = card_w * 0.038;
 
     for &(db, rel_pos, label) in &ticks {
       let tick_a = start_angle + rel_pos * sweep_angle;
@@ -198,8 +199,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
         Color::rgba(1.0, 1.0, 1.0, 0.50)
       };
 
-      let inner_r = gauge_r - 8.0;
-      let outer_r = gauge_r + 4.0;
+      let inner_r = gauge_r - 8.0 * res_scale;
+      let outer_r = gauge_r + 4.0 * res_scale;
 
       let x1 = pivot_x + tick_a.cos() * inner_r;
       let y1 = pivot_y + tick_a.sin() * inner_r;
@@ -207,11 +208,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
       let y2 = pivot_y + tick_a.sin() * outer_r;
 
       c.set_stroke(Fill::Solid(tick_col));
-      c.set_line_width(if is_overload { 2.0 } else { 1.2 });
+      c.set_line_width(if is_overload { 2.0 * res_scale } else { 1.2 * res_scale });
       c.stroke_line(x1, y1, x2, y2);
 
       // Label text
-      let text_r = gauge_r - 20.0;
+      let text_r = gauge_r - 20.0 * res_scale;
       let tx = pivot_x + tick_a.cos() * text_r;
       let ty = pivot_y + tick_a.sin() * text_r + font_sz * 0.35;
 
@@ -237,8 +238,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     c.save();
     c.set_fill(Fill::Solid(Color::WHITE));
-    c.set_shadow(Color::WHITE, 8.0);
-    c.fill_circle(hold_x, hold_y, 4.0);
+    c.set_shadow(Color::WHITE, 8.0 * res_scale);
+    c.fill_circle(hold_x, hold_y, 4.0 * res_scale);
     c.restore();
 
     // Overload Peak LED Indicator
@@ -250,14 +251,14 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     c.save();
     c.set_fill(Fill::Solid(led_color));
     if is_clipping {
-      c.set_shadow(Color::hex("#ff1122"), 12.0);
+      c.set_shadow(Color::hex("#ff1122"), 12.0 * res_scale);
     }
-    c.fill_circle(led_x, led_y, 5.0);
-    c.stroke_circle(led_x, led_y, 5.0);
+    c.fill_circle(led_x, led_y, 5.0 * res_scale);
+    c.stroke_circle(led_x, led_y, 5.0 * res_scale);
     c.draw_text(
       "PEAK",
-      led_x - 14.0,
-      led_y + 3.0,
+      led_x - 14.0 * res_scale,
+      led_y + 3.0 * res_scale,
       font_sz * 0.75,
       "sans-serif",
       600.0,
@@ -279,34 +280,34 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // Soft Needle Shadow for 3D depth on dial plate
     c.save();
     c.set_stroke(Fill::Solid(Color::rgba(0.0, 0.0, 0.0, 0.5)));
-    c.set_line_width(2.5);
-    c.stroke_line(pivot_x + 3.0, pivot_y + 4.0, needle_tip_x + 3.0, needle_tip_y + 4.0);
+    c.set_line_width(2.5 * res_scale);
+    c.stroke_line(pivot_x + 3.0 * res_scale, pivot_y + 4.0 * res_scale, needle_tip_x + 3.0 * res_scale, needle_tip_y + 4.0 * res_scale);
     c.restore();
 
     // Glowing Needle Shaft
     c.save();
     let needle_col = theme_accent(theme);
     c.set_stroke(Fill::Solid(needle_col));
-    c.set_line_width(2.5);
+    c.set_line_width(2.5 * res_scale);
     c.set_line_cap(LineCap::Round);
-    c.set_shadow(theme_glow(theme), 8.0);
+    c.set_shadow(theme_glow(theme), 8.0 * res_scale);
     c.stroke_line(pivot_x, pivot_y, needle_tip_x, needle_tip_y);
     c.restore();
 
     // Needle Pivot Cap
     c.save();
     c.set_fill(Fill::Solid(Color::hex("#111318")));
-    c.fill_circle(pivot_x, pivot_y, 9.0);
+    c.fill_circle(pivot_x, pivot_y, 9.0 * res_scale);
     c.set_stroke(Fill::Solid(Color::rgba(1.0, 1.0, 1.0, 0.25)));
-    c.set_line_width(1.5);
-    c.stroke_circle(pivot_x, pivot_y, 9.0);
+    c.set_line_width(1.5 * res_scale);
+    c.stroke_circle(pivot_x, pivot_y, 9.0 * res_scale);
     c.set_fill(Fill::Solid(Color::WHITE));
-    c.fill_circle(pivot_x, pivot_y, 3.5);
+    c.fill_circle(pivot_x, pivot_y, 3.5 * res_scale);
     c.restore();
 
     // --- F. Channel Subtitle & Unit Labels ---
     let ch_label = if ch == 0 { "LEFT  [CH 1]" } else { "RIGHT  [CH 2]" };
-    let ch_label_sz = (card_w * 0.042).clamp(10.0, 14.0);
+    let ch_label_sz = card_w * 0.042;
 
     c.draw_text(
       ch_label,
@@ -344,11 +345,11 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 4. BOTTOM CENTER SYSTEM TITLE
   // -------------------------------------------------------------------------
-  let title_sz = (ctx.width * 0.022).clamp(12.0, 18.0);
+  let title_sz = ctx.width * 0.016 * user_scale;
   c.draw_text(
     "ANALOG VU METER SYSTEM",
     cx,
-    ctx.height - 18.0,
+    ctx.height - 18.0 * res_scale,
     title_sz,
     "monospace",
     500.0,

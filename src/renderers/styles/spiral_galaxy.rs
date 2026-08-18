@@ -44,8 +44,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   let st = &mut ctx.state.advanced;
 
   let cx = width / 2.0 + pos_offset_x;
-  let cy = height / 2.0 - pos_offset_y;
-  let max_r = (width.min(height) * 0.48).clamp(180.0, 580.0);
+  let cy = height / 2.0 + pos_offset_y;
+  let max_r = width.min(height) * 0.48 * user_scale;
 
   // Audio energy calculation for dynamic motion (silky smooth when idle!)
   let step_f = (freq.len() / bar_count).max(1);
