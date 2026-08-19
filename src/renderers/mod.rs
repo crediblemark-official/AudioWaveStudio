@@ -853,18 +853,16 @@ pub fn render_frame_to_rgb(
   }
 
   // Custom background image (cover-fit, mirrors the GPU path + TS drawCoverImage).
-  if matches!(
-    config.background.mode,
-    crate::config::BackgroundMode::CustomImage
-  ) {
-    if let Some((rgba, iw, ih)) =
-      crate::gpu_export::decode_background_image(config.background.custom_image_uri.as_deref())
-    {
-      let default_opacity = 1.0;
-      let raw_op = config.background.image_opacity.unwrap_or(default_opacity);
-      let op = if raw_op > 1.0 { raw_op / 100.0 } else { raw_op };
-      cpu_background_image(&mut rgb, width, height, &rgba, iw, ih, op);
-    }
+  // Always render when a URI is set — regardless of background mode — matching
+  // the GPU path which draws `state.background_image` unconditionally. The
+  // default opacity is 1.0 for CustomImage mode, 0.7 for Solid/Gradient.
+  if let Some((rgba, iw, ih)) =
+    crate::gpu_export::decode_background_image(config.background.custom_image_uri.as_deref())
+  {
+    let default_opacity = if matches!(config.background.mode, crate::config::BackgroundMode::CustomImage) { 1.0 } else { 0.7 };
+    let raw_op = config.background.image_opacity.unwrap_or(default_opacity);
+    let op = if raw_op > 1.0 { raw_op / 100.0 } else { raw_op };
+    cpu_background_image(&mut rgb, width, height, &rgba, iw, ih, op);
   }
 
   // Theme Colors

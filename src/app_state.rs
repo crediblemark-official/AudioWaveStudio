@@ -364,7 +364,7 @@ impl SlintAppState {
     pub fn stop_listen(&mut self) {
         if let Some(mut cap) = self.mic_capture.take() {
             cap.running.store(false, Ordering::SeqCst);
-            if let Some(ref mut c) = cap.child {
+            if let Some(mut c) = cap.child.take() {
                 let deadline =
                     std::time::Instant::now() + std::time::Duration::from_millis(1200);
                 while std::time::Instant::now() < deadline {

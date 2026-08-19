@@ -145,7 +145,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     // Sort spokes back-to-front (sin_val ascending -> back spokes rendered first)
     let mut render_order: Vec<usize> = (0..SPOKES).collect();
-    render_order.sort_by(|&a, &b| spokes[a].sin_val.partial_cmp(&spokes[b].sin_val).unwrap());
+    render_order.sort_by(|&a, &b| spokes[a].sin_val.partial_cmp(&spokes[b].sin_val).unwrap_or(std::cmp::Ordering::Equal));
 
     // -------------------------------------------------------------------------
     // RENDER DISC & FREQUENCY SPIKES (PAINTER'S ALGORITHM)

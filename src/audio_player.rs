@@ -245,6 +245,26 @@ impl AudioPlayer {
 
     pub fn get_current_time_sec(&mut self) -> f64 {
         if self.is_playing {
+            // Detect an unexpectedly dead child process (ffplay/mpv crashed or
+            // was killed externally). Without this, the UI would keep showing
+            // "playing" with advancing time while no audio is heard.
+            let dead = self
+                .child_process
+                .as_mut()
+                .map(|c| matches!(c.try_wait(), Ok(Some(_))))
+                .unwrap_or(true);
+            if dead {
+                // Snapshot the current position so the seek bar freezes at the
+                // last heard moment instead of jumping to 0 or duration.
+                if let Some(instant) = self.start_instant {
+                    self.accumulated_sec += instant.elapsed().as_secs_f64();
+                }
+                self.child_process = None;
+                self.is_playing = false;
+                self.start_instant = None;
+                return self.accumulated_sec.min(self.duration_sec);
+            }
+
             if let Some(instant) = self.start_instant {
                 let current = self.accumulated_sec + instant.elapsed().as_secs_f64();
                 if current >= self.duration_sec && self.duration_sec > 0.0 {
