@@ -147,7 +147,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 4. SWIRLING COSMIC VORTEX STARDUST MOTES
     // -------------------------------------------------------------------------
-    let mote_count = (22.0 + s.be * 24.0 * s.sensitivity).clamp(14.0, 48.0) as usize;
+    let mote_count = (22.0 + s.be * 24.0).clamp(14.0, 48.0) as usize;
     for m_i in 0..mote_count {
         let m_t = ((frame_time * 0.35 + m_i as f32 * 0.17) % 1.0).clamp(0.0, 1.0);
         let m_angle = (m_i as f32 * 2.8) + spin_speed * 1.5 + (1.0 - m_t) * TAU * 1.2;

@@ -190,7 +190,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 5. FLOATING OPTICAL LENS FLARE DUST PARTICLES
     // -------------------------------------------------------------------------
-    let mote_count = (18.0 + s.be * 22.0 * s.sensitivity).clamp(10.0, 44.0) as usize;
+    let mote_count = (18.0 + s.be * 22.0).clamp(10.0, 44.0) as usize;
     for m_i in 0..mote_count {
         let m_t = ((frame_time * 0.35 + m_i as f32 * 0.17) % 1.0).clamp(0.0, 1.0);
         let m_angle = (m_i as f32 * 27.0).sin() * TAU;
