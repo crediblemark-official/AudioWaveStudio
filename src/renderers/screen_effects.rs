@@ -395,28 +395,30 @@ pub struct CpuEnvelope {
 
 /// Minimal export-style envelope for the CPU fallback: bass energy vs a slow
 /// floor plus onset-based beat, mirroring `advance_envelope` without a
-/// `RenderState`.
-pub fn cpu_envelope(freq: &[u8]) -> CpuEnvelope {
+/// `RenderState`. Takes `bass_multiplier` so the beat response matches the
+/// GPU path exactly.
+pub fn cpu_envelope(freq: &[u8], bass_multiplier: f32) -> CpuEnvelope {
   let bins = 16.min(freq.len());
   let mut sum = 0usize;
   for i in 0..bins {
     sum += freq[i] as usize;
   }
   let raw = if bins > 0 { sum as f32 / (bins as f32 * 255.0) } else { 0.0 };
+  let target = raw * bass_multiplier;
 
   // (bass_floor, prev_target_bass, beat_strength)
   static ENV: std::sync::Mutex<(f32, f32, f32)> = std::sync::Mutex::new((0.0, 0.0, 0.0));
   let mut g = ENV.lock().unwrap_or_else(|e| e.into_inner());
   let (mut floor, prev_target, prev_beat) = *g;
-  if raw < floor {
-    floor = raw;
+  if target < floor {
+    floor = target;
   } else {
-    floor += (raw - floor) * 0.0008;
+    floor += (target - floor) * 0.0008;
   }
-  let above_floor = (raw - floor).max(0.0);
-  let onset = (raw - prev_target).max(0.0);
+  let above_floor = (target - floor).max(0.0);
+  let onset = (target - prev_target).max(0.0);
   let beat = if onset > 0.03 { (onset * 6.0).max(prev_beat * 0.6) } else { prev_beat * 0.7 };
-  *g = (floor, raw, beat);
+  *g = (floor, target, beat);
   CpuEnvelope { above_floor: above_floor.max(0.0), beat }
 }
 

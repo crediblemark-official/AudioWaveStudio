@@ -72,7 +72,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 //   c.fill_rect(0.0, 0.0, width, height);
 
   // Glowing Horizon Sun Disc
-  let sun_r = (28.0 + be * 18.0 * sensitivity).clamp(16.0, 70.0) * user_scale;
+  let sun_r = (28.0 + be * 18.0).clamp(16.0, 70.0) * user_scale;
   let sun_grad = Fill::radial_gradient(
     sun_x,
     sun_y,

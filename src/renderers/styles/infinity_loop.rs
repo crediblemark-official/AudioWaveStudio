@@ -138,7 +138,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 3. ORBITING QUANTUM DUST PARTICLES ACROSS CANVAS
     // -------------------------------------------------------------------------
-    let mote_count = (28.0 + be * 28.0 * sensitivity).clamp(18.0, 56.0) as usize;
+    let mote_count = (28.0 + be * 28.0).clamp(18.0, 56.0) as usize;
     for m_i in 0..mote_count {
         let mf = m_i as f32;
         let m_t = ((frame_time * 0.4 + mf * 0.17) % 1.0).clamp(0.0, 1.0);

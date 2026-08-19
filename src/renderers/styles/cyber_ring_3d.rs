@@ -215,7 +215,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 8. LUMINOUS CENTER HOLOGRAM CORE SPHERE & 3 EXPANDING ENERGY PULSES
   // -------------------------------------------------------------------------
-  let orb_r = (base_r * 0.22 + be * 8.0 * sensitivity).clamp(12.0, 48.0);
+  let orb_r = (base_r * 0.22 + be * 8.0).clamp(12.0, 48.0);
   scene.add_disc(0.0, world_cy, 0.0, orb_r, 24, Color::WHITE);
   scene.add_disc(0.0, world_cy, 0.0, orb_r * 1.35, 28, accent.with_alpha(0.80));
 
@@ -230,7 +230,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 9. FLOATING 3D CYBER STARDUST PARTICLES (45+ MOTES)
   // -------------------------------------------------------------------------
-  let mote_count = (20.0 + be * 24.0 * sensitivity).clamp(14.0, 52.0) as usize;
+  let mote_count = (20.0 + be * 24.0).clamp(14.0, 52.0) as usize;
   for m_i in 0..mote_count {
     let m_t = ((frame_time * 0.4 + m_i as f32 * 0.17) % 1.0).clamp(0.0, 1.0);
     let mx = (m_i as f32 * 37.0).sin() * (base_r * 1.4);

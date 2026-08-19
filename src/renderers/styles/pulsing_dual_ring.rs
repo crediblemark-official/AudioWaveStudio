@@ -234,7 +234,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 6. ORBITING PLASMA MOTES & ENERGY SPARKS
     // -------------------------------------------------------------------------
-    let mote_count = (22.0 + be * 24.0 * sensitivity).clamp(14.0, 48.0) as usize;
+    let mote_count = (22.0 + be * 24.0).clamp(14.0, 48.0) as usize;
     for m_i in 0..mote_count {
         let m_t = ((frame_time * 0.35 + m_i as f32 * 0.17) % 1.0).clamp(0.0, 1.0);
         let m_angle = (m_i as f32 * 31.0).sin() * TAU;

@@ -157,7 +157,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 6. FLOATING 3D MICRO EMBERS
   // -------------------------------------------------------------------------
-  let ember_count = (16.0 + be * 20.0 * sensitivity).clamp(12.0, 45.0) as usize;
+  let ember_count = (16.0 + be * 20.0).clamp(12.0, 45.0) as usize;
   for e_i in 0..ember_count {
     let e_t = ((frame_time * 0.4 + e_i as f32 * 0.19) % 1.0).clamp(0.0, 1.0);
     let ex = (e_i as f32 * 37.0).sin() * (total_w * 0.45);

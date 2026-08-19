@@ -227,7 +227,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   let float_y = (frame_time * 2.2).sin() * 6.0 + be * 8.0;
   let orb_y = top_y + height * 0.08 + float_y;
-  let note_sz = (28.0 + be * 14.0 * sensitivity).clamp(22.0, 60.0);
+  let note_sz = (28.0 + be * 14.0).clamp(22.0, 60.0);
   let cyan_laser = Color::hex("#00f0ff");
   let gold_metallic = mix(accent, gold_col, 0.7);
 
@@ -378,7 +378,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 9. FLOATING 3D CYBER STARDUST PARTICLES (45+ MOTES)
   // -------------------------------------------------------------------------
-  let mote_count = (22.0 + be * 24.0 * sensitivity).clamp(16.0, 52.0) as usize;
+  let mote_count = (22.0 + be * 24.0).clamp(16.0, 52.0) as usize;
   for m_i in 0..mote_count {
     let m_t = ((frame_time * 0.4 + m_i as f32 * 0.17) % 1.0).clamp(0.0, 1.0);
     let mx = (m_i as f32 * 37.0).sin() * (base_r * 1.45);

@@ -369,7 +369,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // Dark sink disc behind central core
     scene.add_disc(0.0, world_cy, 0.0, base_r * 0.32, 32, dark_core);
 
-    let core_r = (base_r * 0.18 + be * 8.0 * sensitivity).clamp(10.0, 48.0);
+    let core_r = (base_r * 0.18 + be * 8.0).clamp(10.0, 48.0);
     scene.add_disc(0.0, world_cy, 0.0, core_r, 24, Color::WHITE);
     scene.add_disc(0.0, world_cy, 0.0, core_r * 1.35, 28, toxic_cyan.with_alpha(0.80));
 
@@ -384,7 +384,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 11. LAYER 8: FLOATING 3D TOXIC SPORE PARTICLES (45+ MOTES)
     // -------------------------------------------------------------------------
-    let mote_count = (22.0 + be * 24.0 * sensitivity).clamp(14.0, 52.0) as usize;
+    let mote_count = (22.0 + be * 24.0).clamp(14.0, 52.0) as usize;
     for m_i in 0..mote_count {
         let m_t = ((frame_time * 0.4 + m_i as f32 * 0.17) % 1.0).clamp(0.0, 1.0);
         let mx = (m_i as f32 * 37.0).sin() * (base_r * 1.4);

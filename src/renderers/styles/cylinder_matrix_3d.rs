@@ -170,7 +170,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 5. 3D FLOATING SPARK MOTES
   // -------------------------------------------------------------------------
-  let mote_count = (16.0 + be * 20.0 * sensitivity).clamp(12.0, 45.0) as usize;
+  let mote_count = (16.0 + be * 20.0).clamp(12.0, 45.0) as usize;
   for m_i in 0..mote_count {
     let m_t = ((frame_time * 0.4 + m_i as f32 * 0.19) % 1.0).clamp(0.0, 1.0);
     let mx = (m_i as f32 * 37.0).sin() * (base_r * 1.5);

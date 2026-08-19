@@ -353,8 +353,8 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     // Audio bass reactivity & mechanical playback wobble
     let wobble_speed = rot * 3.5;
-    let wobble_dx = (wobble_speed.sin() * 2.5 + (be * 6.0 + bs * 4.0) * sensitivity).clamp(-8.0, 8.0);
-    let wobble_dy = ((wobble_speed * 1.4).cos() * 2.0 + (be * 4.0 - bs * 3.0) * sensitivity).clamp(-6.0, 6.0);
+  let wobble_dx = (wobble_speed.sin() * 2.5 + be * 6.0 + bs * 4.0).clamp(-8.0, 8.0);
+  let wobble_dy = ((wobble_speed * 1.4).cos() * 2.0 + be * 4.0 - bs * 3.0).clamp(-6.0, 6.0);
 
     // Smooth tracking drift across vinyl micro-grooves
     let track_drift = (rot * 0.015) % 0.38; // Slowly sweeps inward over time

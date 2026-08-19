@@ -134,7 +134,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
     // -------------------------------------------------------------------------
     // 3. INTENSE GLOWING STELLAR CORE AT NEBULA CENTER
     // -------------------------------------------------------------------------
-    let core_r = (30.0 + be * 20.0 * sensitivity + bs * 10.0) * user_scale;
+    let core_r = (30.0 + be * 20.0 + bs * 10.0) * user_scale;
     let core_glow = Fill::radial_gradient(
         cx,
         cy,

@@ -19,9 +19,10 @@ impl FreqSmoother {
     Self { prev: None }
   }
 
-  /// Smooth a fresh spectrum and quantize to u8, applying the same per-bin
-  /// sensitivity gain and asymmetric attack/release as the live preview
-  /// (`lib.rs`):
+  /// Smooth a fresh spectrum and quantize to u8, applying asymmetric
+  /// attack/release smoothing. Sensitivity is NOT applied here — the
+  /// renderers apply it directly on the frequency data so that sensitivity
+  /// controls visual reactivity (not a double-squared size multiplier).
   ///
   /// - attack: `prev + (scaled - prev) * (alpha * 1.4)` with `alpha =
   ///   (1 - smoothing).clamp(0.08, 1.0)`
@@ -30,7 +31,7 @@ impl FreqSmoother {
   /// The internal history starts at zero (mirrors the preview's initial
   /// `_prev_smoothed`) and resets automatically when the spectrum length
   /// changes (e.g. an `fft_size` switch).
-  pub fn smooth_u8(&mut self, magnitudes: &[f32], sensitivity: f32, smoothing: f32) -> Vec<u8> {
+  pub fn smooth_u8(&mut self, magnitudes: &[f32], _sensitivity: f32, smoothing: f32) -> Vec<u8> {
     let smooth_factor = smoothing.clamp(0.0, 0.95);
     let alpha = (1.0 - smooth_factor).clamp(0.08, 1.0);
     let attack = (alpha * 1.4).min(1.0);
@@ -42,7 +43,7 @@ impl FreqSmoother {
 
     let mut out = Vec::with_capacity(magnitudes.len());
     for (i, &m) in magnitudes.iter().enumerate() {
-      let scaled = (m * sensitivity).clamp(0.0, 1.0);
+      let scaled = m.clamp(0.0, 1.0);
       let p = &mut prev[i];
       *p = if scaled > *p {
         *p + (scaled - *p) * attack

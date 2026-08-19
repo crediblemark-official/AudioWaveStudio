@@ -59,7 +59,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
 
     // Base radius grows non-linearly outward for perspective depth feeling
     let base_radius = 18.0 + (r_idx as f32) * 11.0 + (r_idx as f32).powf(1.4) * 2.2;
-    let max_height = (35.0 + (1.0 - ring_ratio) * 65.0 + be * 30.0) * sensitivity;
+    let max_height = 35.0 + (1.0 - ring_ratio) * 65.0 + be * 30.0;
 
     // Calculate ring color: theme-mixed gradient from accent core -> p_col -> glow rim
     let col = compute_ripple_color(ring_ratio, p_col, s_col, accent, glow);

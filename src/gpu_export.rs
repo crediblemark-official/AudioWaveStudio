@@ -404,6 +404,11 @@ pub fn render_preview_frame_inner(
   if engine.last_style.as_ref() != Some(&config.style) {
     rstate = RenderState::new(bar_count, 0xC0FFEE);
     engine.last_style = Some(config.style.clone());
+    // Reset ping-pong so the first frame after a style switch renders
+    // synchronously — the user sees the new style immediately instead of
+    // one stale frame of the previous style (which caused visible lag
+    // during rapid switching).
+    engine.has_prev = false;
   }
 
   // Monotonic clock for time-based effects: keeps them animating across

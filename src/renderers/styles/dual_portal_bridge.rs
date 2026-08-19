@@ -205,7 +205,7 @@ pub fn render(c: &mut GpuCanvas, ctx: &mut RenderContext) {
   // -------------------------------------------------------------------------
   // 6. HIGH-SPEED SPARKS & EMBERS ALONG LIGHT STRINGS
   // -------------------------------------------------------------------------
-  let spark_count = (20.0 + be * 24.0 * sensitivity).clamp(12.0, 50.0) as usize;
+  let spark_count = (20.0 + be * 24.0).clamp(12.0, 50.0) as usize;
   for s_i in 0..spark_count {
     let s_t = ((frame_time * 0.7 + s_i as f32 * 0.15) % 1.0).clamp(0.0, 1.0);
     let sx = left_x + s_t * (right_x - left_x);
