@@ -395,16 +395,16 @@ pub struct CpuEnvelope {
 
 /// Minimal export-style envelope for the CPU fallback: bass energy vs a slow
 /// floor plus onset-based beat, mirroring `advance_envelope` without a
-/// `RenderState`. Takes `bass_multiplier` so the beat response matches the
-/// GPU path exactly.
-pub fn cpu_envelope(freq: &[u8], bass_multiplier: f32) -> CpuEnvelope {
+/// `RenderState`. Takes `bass_multiplier` and `sensitivity` so the beat
+/// response matches the GPU path exactly.
+pub fn cpu_envelope(freq: &[u8], bass_multiplier: f32, sensitivity: f32) -> CpuEnvelope {
   let bins = 16.min(freq.len());
   let mut sum = 0usize;
   for i in 0..bins {
     sum += freq[i] as usize;
   }
   let raw = if bins > 0 { sum as f32 / (bins as f32 * 255.0) } else { 0.0 };
-  let target = raw * bass_multiplier;
+  let target = raw * bass_multiplier * sensitivity;
 
   // (bass_floor, prev_target_bass, beat_strength)
   static ENV: std::sync::Mutex<(f32, f32, f32)> = std::sync::Mutex::new((0.0, 0.0, 0.0));

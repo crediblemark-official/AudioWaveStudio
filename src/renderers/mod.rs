@@ -997,7 +997,7 @@ pub fn render_frame_to_rgb(
   }
 
   // Screen effects on the software path (mirror of the GPU pipeline).
-  let env = screen_effects::cpu_envelope(freq, config.reactivity.bass_multiplier);
+  let env = screen_effects::cpu_envelope(freq, config.reactivity.bass_multiplier, config.reactivity.sensitivity);
   screen_effects::apply_cpu_screen_effects(
     &mut rgb,
     width,
